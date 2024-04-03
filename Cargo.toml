@@ -1,0 +1,23 @@
+[package]
+name = "libdatadog-nodejs"
+version = "0.1.0"
+authors = ["julio.gonzalez@datadoghq.com"]
+license = "ISC"
+edition = "2021"
+exclude = ["index.node"]
+
+[lib]
+crate-type = ["cdylib"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+neon = "1"
+data-pipeline = { git = "ssh://git@github.com/DataDog/libdatadog.git", branch = "julio/nodejs-integration" }
+
+[profile.release]
+strip = true
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
