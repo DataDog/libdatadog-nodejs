@@ -10,7 +10,7 @@
     "test": "cargo test && node test"
   },
   "author": "julio.gonzalez@datadoghq.com",
-  "license": "ISC",
+  "license": "Apache-2.0",
   "devDependencies": {
     "cargo-cp-artifact": "^0.1"
   },

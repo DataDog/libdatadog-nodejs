@@ -2,7 +2,7 @@
 name = "libdatadog"
 version = "0.1.0"
 authors = ["julio.gonzalez@datadoghq.com"]
-license = "ISC"
+license = "Apache-2.0"
 edition = "2021"
 exclude = ["build/Debug/index.node", "build/Release/index.node"]
 
