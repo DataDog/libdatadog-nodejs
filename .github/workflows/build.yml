@@ -1,0 +1,17 @@
+name: Build
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    uses: Datadog/action-prebuildify/.github/workflows/build.yml@main
+    with:
+      target-name: 'index'
+      package-manager: 'npm'
+      cache: false
+      min-node-version: 14
+      neon: true

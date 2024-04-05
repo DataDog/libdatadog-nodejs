@@ -1,1 +1,1 @@
-module.exports = require('./build/Release/index.node')
+module.exports = require('node-gyp-build')(__dirname)
