@@ -96,9 +96,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
-name = "common"
+name = "collector"
 version = "0.1.0"
-source = "git+ssh://git@github.com/DataDog/dd-trace-collector.git?branch=beta#191e96335bf1b7928f4572b053ba4e5c896d704e"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=rochdev/collector#dba7af6983ac2bf54ab310227d06ae4740062523"
 dependencies = [
  "hyper",
  "once_cell",
@@ -137,7 +137,7 @@ dependencies = [
 [[package]]
 name = "data-pipeline"
 version = "6.0.0"
-source = "git+ssh://git@github.com/DataDog/libdatadog.git?branch=julio/nodejs-integration#bf883f325a716a3b28661224d496d31a3157abdf"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=julio/nodejs-integration#bf883f325a716a3b28661224d496d31a3157abdf"
 dependencies = [
  "anyhow",
  "bytes",
@@ -155,7 +155,7 @@ dependencies = [
 [[package]]
 name = "datadog-trace-normalization"
 version = "6.0.0"
-source = "git+ssh://git@github.com/DataDog/libdatadog.git?branch=julio/nodejs-integration#bf883f325a716a3b28661224d496d31a3157abdf"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=julio/nodejs-integration#bf883f325a716a3b28661224d496d31a3157abdf"
 dependencies = [
  "anyhow",
  "datadog-trace-protobuf",
@@ -164,7 +164,7 @@ dependencies = [
 [[package]]
 name = "datadog-trace-protobuf"
 version = "6.0.0"
-source = "git+ssh://git@github.com/DataDog/libdatadog.git?branch=julio/nodejs-integration#bf883f325a716a3b28661224d496d31a3157abdf"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=julio/nodejs-integration#bf883f325a716a3b28661224d496d31a3157abdf"
 dependencies = [
  "prost",
  "serde",
@@ -174,7 +174,7 @@ dependencies = [
 [[package]]
 name = "datadog-trace-utils"
 version = "6.0.0"
-source = "git+ssh://git@github.com/DataDog/libdatadog.git?branch=julio/nodejs-integration#bf883f325a716a3b28661224d496d31a3157abdf"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=julio/nodejs-integration#bf883f325a716a3b28661224d496d31a3157abdf"
 dependencies = [
  "anyhow",
  "datadog-trace-normalization",
@@ -194,7 +194,7 @@ dependencies = [
 [[package]]
 name = "ddcommon"
 version = "6.0.0"
-source = "git+ssh://git@github.com/DataDog/libdatadog.git?branch=julio/nodejs-integration#bf883f325a716a3b28661224d496d31a3157abdf"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=julio/nodejs-integration#bf883f325a716a3b28661224d496d31a3157abdf"
 dependencies = [
  "anyhow",
  "futures",
@@ -466,7 +466,7 @@ checksum = "9c198f91728a82281a64e1f4f9eeb25d82cb32a5de251c6bd1b5154d63a8e7bd"
 name = "libdatadog"
 version = "0.1.0"
 dependencies = [
- "common",
+ "collector",
  "data-pipeline",
  "neon",
  "tokio",

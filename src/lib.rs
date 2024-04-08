@@ -1,8 +1,8 @@
 use std::borrow::BorrowMut;
 use std::sync::Mutex;
 use std::cell::OnceCell;
-use events::collector::Collector;
-use events::runtime::RUNTIME;
+use collector::collector::Collector;
+use collector::runtime::RUNTIME;
 use neon::prelude::*;
 use data_pipeline::trace_exporter::TraceExporter;
 use data_pipeline::trace_exporter::TraceExporterBuilder;
