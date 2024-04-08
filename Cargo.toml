@@ -11,8 +11,12 @@ crate-type = ["cdylib"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+default = []
+data-pipeline = ["dep:data-pipeline"]
+
 [dependencies]
-data-pipeline = { git = "ssh://git@github.com/DataDog/libdatadog.git", branch = "julio/nodejs-integration" }
+data-pipeline = { git = "ssh://git@github.com/DataDog/libdatadog.git", branch = "julio/nodejs-integration", optional = true, default-features = false }
 events = { git = "ssh://git@github.com/DataDog/dd-trace-collector.git", branch = "beta", package = "common" }
 tokio = { version = "1.25.0", features = ["macros", "rt-multi-thread", "sync"] }
 
