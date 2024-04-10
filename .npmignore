@@ -1,0 +1,5 @@
+*
+!prebuilds/**/*
+!index.js
+!LICENSE
+!README.md
