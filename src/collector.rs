@@ -5,9 +5,18 @@ use collector::runtime::RUNTIME;
 use collector::collector::Collector;
 
 // TODO: Use a single collector for all worker threads.
-pub static COLLECTORS: LocalKey<Collector> = LocalKey::new();
+static COLLECTORS: LocalKey<Collector> = LocalKey::new();
 
-pub fn send_events(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+pub fn register (cx: &mut ModuleContext) -> NeonResult<()> {
+    COLLECTORS.get_or_init(cx, || Collector::new());
+
+    cx.export_function("send_events", send_events)?;
+    cx.export_function("receive_events", receive_events)?;
+
+    Ok(())
+}
+
+fn send_events(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let payload = cx.argument::<JsBuffer>(0).unwrap().as_slice(&mut cx).to_vec();
     let collector = COLLECTORS.get(&mut cx).unwrap();
 
@@ -17,7 +26,7 @@ pub fn send_events(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 }
 
 // TODO: Do we need an unsubscribe?
-pub fn receive_events(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+fn receive_events(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let collector = COLLECTORS.get(&mut cx).unwrap();
     let mut cb = cx.argument::<JsFunction>(0)?.root(&mut cx);
     let ch = cx.channel();
@@ -39,5 +48,3 @@ pub fn receive_events(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
     Ok(cx.undefined())
 }
-
-

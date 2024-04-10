@@ -8,6 +8,13 @@ use data_pipeline::trace_exporter::TraceExporterBuilder;
 
 static EXPORTER: Mutex<OnceCell<TraceExporter>> = Mutex::new(OnceCell::new());
 
+pub fn register (cx: &mut ModuleContext) -> NeonResult<()> {
+    cx.export_function("init_trace_exporter", init_trace_exporter)?;
+    cx.export_function("send_traces", send_traces)?;
+
+    Ok(())
+}
+
 fn trace_exporter_init(
     host: &str,
     port: u16,
@@ -32,7 +39,7 @@ fn trace_exporter_init(
     });
 }
 
-pub fn init_trace_exporter(mut cx: FunctionContext) -> JsResult<JsUndefined>{
+fn init_trace_exporter(mut cx: FunctionContext) -> JsResult<JsUndefined>{
     let host = cx.argument::<JsString>(0)?.value(cx.borrow_mut());
     let port = cx.argument::<JsNumber>(1)?.value(cx.borrow_mut());
     let timeout = cx.argument::<JsNumber>(2)?.value(cx.borrow_mut());
@@ -53,7 +60,7 @@ pub fn init_trace_exporter(mut cx: FunctionContext) -> JsResult<JsUndefined>{
     Ok(cx.undefined())
 }
 
-pub fn send_traces(mut cx: FunctionContext) -> JsResult<JsString> {
+fn send_traces(mut cx: FunctionContext) -> JsResult<JsString> {
     let trace_count = cx.argument::<JsNumber>(1)?.value(cx.borrow_mut());
     let data = cx.argument::<JsBuffer>(0)?.as_slice(cx.borrow_mut());
 
