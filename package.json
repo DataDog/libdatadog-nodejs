@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "cargo-cp-artifact -nc build/Debug/index.node -- cargo build --message-format=json-render-diagnostics",
+    "build": "cargo-cp-artifact -nc build/Release/index.node -- cargo build --message-format=json-render-diagnostics",
+    "build-all": "npm run build -- --all-features",
     "build-debug": "npm run build --",
     "build-release": "cargo-cp-artifact -nc build/Release/index.node -- cargo +nightly build -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort --message-format=json-render-diagnostics --release",
     "test": "node test"
