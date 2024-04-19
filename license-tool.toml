@@ -1,0 +1,5 @@
+[overrides]
+"collector-0.1.0" = { license = "Apache-2.0" }
+"ring-0.17.8" = { license = "OpenSSL license" }
+"ring-0.16.20" = { license = "OpenSSL license" }
+"webpki-0.22.4" = { license = "ISC-style" }
