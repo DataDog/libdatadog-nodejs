@@ -13,11 +13,15 @@ crate-type = ["cdylib"]
 
 [features]
 default = []
+collector = ["dep:collector"]
 data-pipeline = ["dep:data-pipeline"]
 
 [dependencies]
 data-pipeline = { git = "https://github.com/DataDog/libdatadog.git", branch = "julio/nodejs-integration", optional = true, default-features = false }
-collector = { git = "https://github.com/DataDog/libdatadog.git", branch = "rochdev/collector" }
+collector = { git = "https://github.com/DataDog/libdatadog.git", branch = "rochdev/collector", optional = true, default-features = false }
+datadog-crashtracker = { git = "https://github.com/DataDog/libdatadog.git", branch = "main" }
+ddcommon = { git = "https://github.com/DataDog/libdatadog.git", branch = "main" }
+hyper = { version = "0.14", features = [] }
 tokio = { version = "1.25.0", features = ["macros", "rt-multi-thread", "sync"] }
 
 [dependencies.neon]
