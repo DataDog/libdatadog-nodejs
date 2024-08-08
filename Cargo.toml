@@ -4,25 +4,31 @@ version = "0.1.0"
 authors = ["julio.gonzalez@datadoghq.com"]
 license = "Apache-2.0"
 edition = "2021"
-exclude = ["build/Debug/index.node", "build/Release/index.node"]
+exclude = ["build/Debug/index.node", "build/Debug/crashtracking-receiver", "build/Release/index.node", "build/Release/crashtracking-receiver"]
 
 [lib]
 crate-type = ["cdylib"]
 
+[[bin]]
+name = "crashtracker-receiver"
+path = "src/bin/crashtracker_receiver.rs"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = []
+default = ["crashtracker"]
 collector = ["dep:collector"]
+crashtracker = ["dep:datadog-crashtracker", "dep:ddcommon", "dep:serde", "dep:serde_json"]
 data-pipeline = ["dep:data-pipeline"]
 
 [dependencies]
-data-pipeline = { git = "https://github.com/DataDog/libdatadog.git", branch = "julio/nodejs-integration", optional = true, default-features = false }
-collector = { git = "https://github.com/DataDog/libdatadog.git", branch = "rochdev/collector", optional = true, default-features = false }
-datadog-crashtracker = { git = "https://github.com/DataDog/libdatadog.git", branch = "main" }
-ddcommon = { git = "https://github.com/DataDog/libdatadog.git", branch = "main" }
-hyper = { version = "0.14", features = [] }
-tokio = { version = "1.25.0", features = ["macros", "rt-multi-thread", "sync"] }
+anyhow = { version = "1.0" }
+collector = { git = "https://github.com/DataDog/libdatadog.git", branch = "rochdev/collector", optional = true }
+data-pipeline = { git = "https://github.com/DataDog/libdatadog.git", branch = "julio/nodejs-integration", optional = true }
+datadog-crashtracker = { git = "https://github.com/DataDog/libdatadog.git", branch = "main", optional = true }
+ddcommon = { git = "https://github.com/DataDog/libdatadog.git", branch = "main", optional = true }
+serde = { version = "1.0", optional = true }
+serde_json = { version = "1.0", optional = true }
 
 [dependencies.neon]
 version = "1.0.0"

@@ -9,8 +9,12 @@ use data_pipeline::trace_exporter::TraceExporterBuilder;
 static EXPORTER: Mutex<OnceCell<TraceExporter>> = Mutex::new(OnceCell::new());
 
 pub fn register (cx: &mut ModuleContext) -> NeonResult<()> {
-    cx.export_function("init_trace_exporter", init_trace_exporter)?;
-    cx.export_function("send_traces", send_traces)?;
+    let exports = cx.exports_object()?;
+    let init_trace_exporter_fn = JsFunction::new(cx, init_trace_exporter)?;
+    let send_traces_fn = JsFunction::new(cx, send_traces)?;
+
+    exports.set(cx, "init_trace_exporter", init_trace_exporter_fn)?;
+    exports.set(cx, "send_traces", send_traces_fn)?;
 
     Ok(())
 }

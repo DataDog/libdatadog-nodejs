@@ -10,8 +10,14 @@ static COLLECTORS: LocalKey<Collector> = LocalKey::new();
 pub fn register (cx: &mut ModuleContext) -> NeonResult<()> {
     COLLECTORS.get_or_init(cx, || Collector::new());
 
-    cx.export_function("send_events", send_events)?;
-    cx.export_function("receive_events", receive_events)?;
+    let exports = cx.exports_object()?;
+    let send_events_fn = JsFunction::new(cx, send_events)?;
+    let receive_events_fn = JsFunction::new(cx, receive_events)?;
+
+    exports.set(cx, "send_events", send_events_fn)?;
+    exports.set(cx, "receive_events", receive_events_fn)?;
+
+    cx.export_value("collector", exports)?;
 
     Ok(())
 }
