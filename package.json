@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "npm run build-receiver && npm run build-lib",
+    "build": "npm run build-lib",
     "build-lib": "cargo-cp-artifact -nc build/Debug/index.node -- cargo build --lib --message-format=json-render-diagnostics",
     "build-lib-release": "cargo-cp-artifact -nc build/Release/index.node -- cargo +nightly build --lib --message-format=json-render-diagnostics -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort --release",
     "build-receiver": "cargo-cp-artifact -a bin crashtracker-receiver build/Debug/crashtracker-receiver -- cargo +nightly build --bin crashtracker-receiver --message-format=json-render-diagnostics",
