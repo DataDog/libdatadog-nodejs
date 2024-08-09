@@ -2,14 +2,13 @@
 
 // TODO: Extract this file to an external library.
 
-const { fileExists, readdirSync } = require('fs')
+const { existsSync, readdirSync } = require('fs')
 const os = require('os')
 const path = require('path')
-const find = require('node-gyp-build').path
 
 const PLATFORM = os.platform()
-const ARCH = process.arch()
-const LIBC = fileExists('/etc/alpine-release') ? 'musl' : 'libc'
+const ARCH = process.arch
+const LIBC = existsSync('/etc/alpine-release') ? 'musl' : 'libc'
 const ABI = process.versions.modules
 
 const inWebpack = typeof __webpack_require__ === 'function'
