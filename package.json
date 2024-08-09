@@ -5,8 +5,8 @@
   "main": "index.js",
   "scripts": {
     "build": "npm run -s build-debug",
-    "build-debug": "npm run -s build-all && npm run -s copy-all",
-    "build-release": "npm run -s build-all-release && npm run -s copy-all",
+    "build-debug": "mkdir -p target && npm run -s build-all && npm run -s copy-all",
+    "build-release": "mkdir -p target && npm run -s build-all-release && npm run -s copy-all",
     "build-all": "cargo build --message-format=json-render-diagnostics > ./target/out.ndjson",
     "build-all-release": "cargo build --message-format=json-render-diagnostics -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort --release > ./target/out.ndjson",
     "copy-all": "rm -f build/Release/* && npm run -s copy-collector && npm run -s copy-pipeline",
