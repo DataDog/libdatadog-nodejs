@@ -12,7 +12,7 @@ jobs:
     uses: Datadog/action-prebuildify/.github/workflows/build.yml@rochdev/targets
     with:
       package-manager: 'npm'
-      cache: false
+      cache: true
       min-node-version: 14
       rust: true
   package-size:
