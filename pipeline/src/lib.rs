@@ -10,12 +10,12 @@ static EXPORTER: Mutex<OnceCell<TraceExporter>> = Mutex::new(OnceCell::new());
 
 #[neon::main]
 fn main (mut cx: ModuleContext) -> NeonResult<()> {
-    let exports = cx.exports_object()?;
-    let init_trace_exporter_fn = JsFunction::new(&mut cx, init_trace_exporter)?;
-    let send_traces_fn = JsFunction::new(&mut cx, send_traces)?;
+    register(&mut cx)
+}
 
-    exports.set(&mut cx, "init_trace_exporter", init_trace_exporter_fn)?;
-    exports.set(&mut cx, "send_traces", send_traces_fn)?;
+fn register (cx: &mut ModuleContext) -> NeonResult<()> {
+    cx.export_function("init_trace_exporter", init_trace_exporter)?;
+    cx.export_function("send_traces", send_traces)?;
 
     Ok(())
 }
