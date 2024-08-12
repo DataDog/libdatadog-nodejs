@@ -53,3 +53,5 @@ function findFile (root, folder, name) {
     || files.find(f => f === `${name}-napi.node`)
     || files.find(f => f === `${name}.node`)
 }
+
+module.exports = load
