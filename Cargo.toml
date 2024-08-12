@@ -1,7 +1,9 @@
 [workspace]
+default-members = [
+  "crates/pipeline"
+]
 members = [
-  "collector",
-  "pipeline"
+  "crates/*"
 ]
 
 [profile.release]

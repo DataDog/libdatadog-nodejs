@@ -40,13 +40,8 @@ function find (root, name) {
 function findFolder (root) {
   const folders = readdirSync(path.join(root, 'prebuilds'))
 
-  for (const folder in folders) {
-    if (folder === `${PLATFORM}-${ARCH}${LIBC}`) return folder
-  }
-
-  for (const folder in folders) {
-    if (folder === `${PLATFORM}-${ARCH}`) return folder
-  }
+  return folders.find(f => f === `${PLATFORM}${LIBC}-${ARCH}`)
+    || folders.find(f => f === `${PLATFORM}-${ARCH}`)
 }
 
 function findFile (root, folder, name) {
@@ -54,13 +49,7 @@ function findFile (root, folder, name) {
 
   const files = readdirSync(path.join(root, 'prebuilds', folder))
 
-  for (const file in files) {
-    if (file === `${name}-${ABI}.node`) return folder
-  }
-
-  for (const file in files) {
-    if (file === `${name}-napi.node`) return folder
-  }
+  return files.find(f => f === `${name}-${ABI}.node`)
+    || files.find(f => f === `${name}-napi.node`)
+    || files.find(f => f === `${name}.node`)
 }
-
-module.exports = load

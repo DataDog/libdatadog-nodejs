@@ -8,8 +8,7 @@ on:
 
 jobs:
   build:
-    # TODO: Update the action to support multiple binaries.
-    uses: Datadog/action-prebuildify/.github/workflows/build.yml@rochdev/targets
+    uses: Datadog/action-prebuildify/.github/workflows/build.yml@main
     with:
       package-manager: 'npm'
       cache: true
