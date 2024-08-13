@@ -11,7 +11,7 @@ jobs:
     uses: Datadog/action-prebuildify/.github/workflows/build.yml@main
     with:
       package-manager: 'npm'
-      cache: true
+      cache: false
       min-node-version: 14
       rust: true
   package-size:
