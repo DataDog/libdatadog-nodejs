@@ -1,33 +1,16 @@
-[package]
-name = "libdatadog"
-version = "0.1.0"
-authors = ["julio.gonzalez@datadoghq.com"]
-license = "Apache-2.0"
-edition = "2021"
-exclude = ["build/Debug/index.node", "build/Release/index.node"]
-
-[lib]
-crate-type = ["cdylib"]
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[features]
-default = []
-data-pipeline = ["dep:data-pipeline"]
-
-[dependencies]
-data-pipeline = { git = "https://github.com/DataDog/libdatadog.git", branch = "julio/nodejs-integration", optional = true, default-features = false }
-collector = { git = "https://github.com/DataDog/libdatadog.git", branch = "rochdev/collector" }
-tokio = { version = "1.25.0", features = ["macros", "rt-multi-thread", "sync"] }
-
-[dependencies.neon]
-version = "1.0.0"
-default-features = false
-features = ["napi-6"]
+[workspace]
+default-members = [
+  "crates/pipeline"
+]
+members = [
+  "crates/*"
+]
 
 [profile.release]
-strip = true
-opt-level = "z"
-lto = true
 codegen-units = 1
+lto = true
+opt-level = "z"
 panic = "abort"
+strip = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

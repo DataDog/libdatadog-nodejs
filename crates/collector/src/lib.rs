@@ -7,7 +7,12 @@ use collector::collector::Collector;
 // TODO: Use a single collector for all worker threads.
 static COLLECTORS: LocalKey<Collector> = LocalKey::new();
 
-pub fn register (cx: &mut ModuleContext) -> NeonResult<()> {
+#[neon::main]
+fn main (mut cx: ModuleContext) -> NeonResult<()> {
+    register(&mut cx)
+}
+
+fn register (cx: &mut ModuleContext) -> NeonResult<()> {
     COLLECTORS.get_or_init(cx, || Collector::new());
 
     cx.export_function("send_events", send_events)?;

@@ -1,8 +1,8 @@
-const sender = require('.')
+const { pipeline } = require('.')
 
-if (typeof sender.init_trace_exporter === 'function') {
-  sender.init_trace_exporter("127.0.0.1", 8126, 10000, "1.0", "nodejs", "18.0", "v8")
+if (pipeline) {
+  pipeline.init_trace_exporter("127.0.0.1", 8126, 10000, "1.0", "nodejs", "18.0", "v8")
 
-  let ret = sender.send_traces(Buffer.alloc(1), 1)
+  let ret = pipeline.send_traces(Buffer.alloc(1), 1)
   console.log(ret)
 }

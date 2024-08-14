@@ -4,17 +4,17 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "cargo-cp-artifact -nc build/Release/index.node -- cargo build --message-format=json-render-diagnostics",
-    "build-all": "npm run build -- --all-features",
-    "build-debug": "npm run build --",
-    "build-release": "cargo-cp-artifact -nc build/Release/index.node -- cargo +nightly build -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort --message-format=json-render-diagnostics --release",
+    "build": "npm run -s build-debug",
+    "build-debug": "mkdir -p target && npm run -s cargo-build > ./target/out.ndjson && npm run -s copy-artifacts",
+    "build-release": "mkdir -p target && npm run -s cargo-build-release > ./target/out.ndjson && npm run -s copy-artifacts",
+    "build-all": "mkdir -p target && npm run -s cargo-build -- --workspace > ./target/out.ndjson && npm run -s copy-artifacts",
+    "cargo-build-release": "npm run -s cargo-build -- -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort --release",
+    "cargo-build": "cargo build --message-format=json-render-diagnostics",
+    "copy-artifacts": "node ./scripts/copy-artifacts",
     "test": "node test"
   },
-  "author": "julio.gonzalez@datadoghq.com",
+  "author": "Datadog Inc. <info@datadoghq.com>",
   "license": "Apache-2.0",
-  "devDependencies": {
-    "cargo-cp-artifact": "^0.1"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/DataDog/libdatadog-nodejs.git"
@@ -22,8 +22,5 @@
   "bugs": {
     "url": "https://github.com/DataDog/libdatadog-nodejs/issues"
   },
-  "homepage": "https://github.com/DataDog/libdatadog-nodejs#readme",
-  "dependencies": {
-    "node-gyp-build": "^3.9.0"
-  }
+  "homepage": "https://github.com/DataDog/libdatadog-nodejs#readme"
 }

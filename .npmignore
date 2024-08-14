@@ -1,5 +1,6 @@
 *
 !prebuilds/**/*
 !index.js
+!load.js
 !LICENSE
 !README.md
