@@ -1,6 +1,6 @@
 [workspace]
 default-members = [
-  "crates/pipeline"
+  "crates/crashtracker"
 ]
 members = [
   "crates/*"
