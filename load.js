@@ -18,12 +18,8 @@ function load (name) {
   const root = __dirname
   const build = `${root}/build/Release/${name}.node`
 
-  return maybeRequire(build) || maybeRequire(find(root, name))
-}
-
-function maybeRequire (name) {
   try {
-    return runtimeRequire(path.join(root, `${name}.node`))
+    return runtimeRequire(build) || runtimeRequire(find(root, name))
   } catch (e) {
     // Not found, skip.
   }
@@ -34,7 +30,7 @@ function find (root, name) {
 
   if (!folder) return
 
-  return findFile (root, folder, name)
+  return findFile(root, folder, name)
 }
 
 function findFolder (root) {

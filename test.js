@@ -1,8 +1,7 @@
-const { pipeline } = require('.')
+'use strict'
 
-if (pipeline) {
-  pipeline.init_trace_exporter("127.0.0.1", 8126, 10000, "1.0", "nodejs", "18.0", "v8")
+const fs = require('fs')
 
-  let ret = pipeline.send_traces(Buffer.alloc(1), 1)
-  console.log(ret)
-}
+fs.readdirSync('test').forEach(file => {
+  require('./test/' + file)
+})
