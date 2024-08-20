@@ -15,22 +15,25 @@ const inWebpack = typeof __webpack_require__ === 'function'
 const runtimeRequire = inWebpack ? __non_webpack_require__ : require
 
 function load (name) {
-  const root = __dirname
-  const build = `${root}/build/Release/${name}.node`
-
   try {
-    return runtimeRequire(build) || runtimeRequire(find(root, name))
+    return runtimeRequire(find(name))
   } catch (e) {
     // Not found, skip.
   }
 }
 
-function find (root, name) {
+function find (name, binary = false) {
+  const root = __dirname
+  const filename = binary ? name : `${name}.node`
+  const build = `${root}/build/Release/${filename}`
+
+  if (existsSync(build)) return build
+
   const folder = findFolder(root)
 
   if (!folder) return
 
-  return findFile(root, folder, name)
+  return findFile(root, folder, name, binary)
 }
 
 function findFolder (root) {
@@ -40,14 +43,16 @@ function findFolder (root) {
     || folders.find(f => f === `${PLATFORM}-${ARCH}`)
 }
 
-function findFile (root, folder, name) {
+function findFile (root, folder, name, binary = false) {
   if (!folder) return
 
   const files = readdirSync(path.join(root, 'prebuilds', folder))
+
+  if (binary) return files.find(f => f === name)
 
   return files.find(f => f === `${name}-${ABI}.node`)
     || files.find(f => f === `${name}-napi.node`)
     || files.find(f => f === `${name}.node`)
 }
 
-module.exports = load
+module.exports = { find, load }

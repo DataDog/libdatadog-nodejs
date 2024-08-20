@@ -1,6 +1,6 @@
 'use strict'
 
-const { pipeline } = require('..')
+const pipeline = require('..').load('pipeline')
 
 if (pipeline) {
   pipeline.init_trace_exporter("127.0.0.1", 8126, 10000, "1.0", "nodejs", "18.0", "v8")
