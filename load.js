@@ -14,12 +14,22 @@ const ABI = process.versions.modules
 const inWebpack = typeof __webpack_require__ === 'function'
 const runtimeRequire = inWebpack ? __non_webpack_require__ : require
 
-function load (name) {
+function maybeLoad (name) {
   try {
-    return runtimeRequire(find(name))
+    return load(name)
   } catch (e) {
     // Not found, skip.
   }
+}
+
+function load (name) {
+  const filename = find(name)
+
+  if (!filename) {
+    throw new Error(`Could not find a ${name} binary for ${PLATFORM}${LIBC}-${ARCH}.`)
+  }
+
+  return runtimeRequire(filename)
 }
 
 function find (name, binary = false) {
@@ -55,4 +65,4 @@ function findFile (root, folder, name, binary = false) {
     || files.find(f => f === `${name}.node`)
 }
 
-module.exports = { find, load }
+module.exports = { find, load, maybeLoad }
