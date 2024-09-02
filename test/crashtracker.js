@@ -1,11 +1,10 @@
 'use strict'
 
 const path = require('path')
-const { crashtracker } = require('..')
+const libdatadog = require('..')
+const crashtracker = libdatadog.maybeLoad('crashtracker')
 
-const releaseFolder = path.normalize(path.join(__dirname, '..', 'build', 'Release'))
-
-crashtracker.start({
+crashtracker.initWithReceiver({
   additional_files: [],
   create_alt_stack: false,
   endpoint: {
@@ -21,7 +20,7 @@ crashtracker.start({
 }, {
   args: [],
   env: [],
-  path_to_receiver_binary: path.join(releaseFolder, 'crashtracker-receiver'),
+  path_to_receiver_binary: libdatadog.find('crashtracker-receiver', true),
   stderr_filename: null,
   stdout_filename: null,
 }, {
