@@ -43,7 +43,12 @@ function find (name, binary = false) {
 
   if (!folder) return
 
-  return findFile(root, folder, name, binary)
+  const prebuildFolder = path.join(root, 'prebuilds', folder)
+  const file = findFile(prebuildFolder, name, binary)
+
+  if (!file) return
+
+  return path.join(prebuildFolder, file)
 }
 
 function findFolder (root) {
@@ -53,10 +58,8 @@ function findFolder (root) {
     || folders.find(f => f === `${PLATFORM}-${ARCH}`)
 }
 
-function findFile (root, folder, name, binary = false) {
-  if (!folder) return
-
-  const files = readdirSync(path.join(root, 'prebuilds', folder))
+function findFile (root, name, binary = false) {
+  const files = readdirSync(root)
 
   if (binary) return files.find(f => f === name)
 
