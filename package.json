@@ -8,7 +8,7 @@
     "build-debug": "mkdir -p target && npm run -s cargo-build > ./target/out.ndjson && npm run -s copy-artifacts",
     "build-release": "mkdir -p target && npm run -s cargo-build-release > ./target/out.ndjson && npm run -s copy-artifacts",
     "build-all": "mkdir -p target && npm run -s cargo-build -- --workspace > ./target/out.ndjson && npm run -s copy-artifacts",
-    "cargo-build-release": "npm run -s cargo-build -- -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort --release",
+    "cargo-build-release": "npm run -s cargo-build -- --release",
     "cargo-build": "cargo build --message-format=json-render-diagnostics",
     "copy-artifacts": "node ./scripts/copy-artifacts",
     "test": "node test"
