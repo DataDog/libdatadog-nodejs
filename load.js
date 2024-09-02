@@ -8,7 +8,7 @@ const path = require('path')
 
 const PLATFORM = os.platform()
 const ARCH = process.arch
-const LIBC = existsSync('/etc/alpine-release') ? 'musl' : 'libc'
+const LIBC = PLATFORM === 'linux' ? existsSync('/etc/alpine-release') ? 'musl' : 'libc' : ''
 const ABI = process.versions.modules
 
 const inWebpack = typeof __webpack_require__ === 'function'
