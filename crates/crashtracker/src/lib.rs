@@ -3,6 +3,9 @@ use napi::{Env, JsUnknown};
 use napi_derive::napi;
 use std::{env::temp_dir, fs, path::{self, Path}};
 
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+
 #[napi]
 pub fn init_with_receiver(env: Env, config: JsUnknown, receiver_config: JsUnknown, metadata: JsUnknown) -> napi::Result<()> {
     let config = env.from_js_value(config)?;
@@ -45,7 +48,8 @@ pub fn copy_receiver (receiver_config: &mut CrashtrackerReceiverConfig) -> Resul
 
     let mut perms = fs::metadata(dest.clone())?.permissions();
 
-    perms.set_readonly(false);
+    #[cfg(unix)]
+    perms.set_mode(0o777);
 
     fs::set_permissions(dest.clone(), perms)?;
 
