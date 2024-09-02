@@ -1,8 +1,7 @@
 'use strict'
 
-const path = require('path')
 const libdatadog = require('..')
-const crashtracker = libdatadog.maybeLoad('crashtracker')
+const crashtracker = libdatadog.load('crashtracker')
 
 crashtracker.initWithReceiver({
   additional_files: [],
