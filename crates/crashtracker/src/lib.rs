@@ -1,7 +1,7 @@
 use datadog_crashtracker::CrashtrackerReceiverConfig;
 use napi::{Env, JsUnknown};
 use napi_derive::napi;
-use std::{env::temp_dir, fs, path::{self, Path}};
+use std::{env::temp_dir, fs, path::{self}};
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -38,22 +38,20 @@ pub fn update_metadata (env: Env, metadata: JsUnknown) -> napi::Result<()> {
 }
 
 pub fn copy_receiver (receiver_config: &mut CrashtrackerReceiverConfig) -> Result<(), anyhow::Error> {
-    let temp = temp_dir();
     let parts: Vec<_> = receiver_config.path_to_receiver_binary.rsplit(path::MAIN_SEPARATOR).collect();
-    let file = parts[0];
-    let dest = Path::join(temp.as_path(), file);
-    let path_to_receiver_binary = dest.clone().to_string_lossy().to_string();
+    let mut dest = temp_dir();
+    dest.push(parts[0]);
 
-    std::fs::copy(receiver_config.path_to_receiver_binary.clone(), dest.clone())?;
+    std::fs::copy(&receiver_config.path_to_receiver_binary, &dest).expect("failed to copy");
 
-    let mut perms = fs::metadata(dest.clone())?.permissions();
+    let mut perms = fs::metadata(&dest)?.permissions();
 
     #[cfg(unix)]
     perms.set_mode(0o777);
 
-    fs::set_permissions(dest.clone(), perms)?;
+    fs::set_permissions(&dest, perms)?;
 
-    receiver_config.path_to_receiver_binary = path_to_receiver_binary;
+    receiver_config.path_to_receiver_binary = dest.to_string_lossy().to_string();
 
     Ok(())
 }
