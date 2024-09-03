@@ -38,9 +38,8 @@ pub fn update_metadata (env: Env, metadata: JsUnknown) -> napi::Result<()> {
 }
 
 pub fn copy_receiver (receiver_config: &mut CrashtrackerReceiverConfig) -> Result<(), anyhow::Error> {
-        let parts: Vec<_> = receiver_config.path_to_receiver_binary.rsplit(path::MAIN_SEPARATOR).collect();
-    let mut dest = temp_dir();
-    dest.push(parts[0]);
+    let parts: Vec<_> = receiver_config.path_to_receiver_binary.rsplit(path::MAIN_SEPARATOR).collect();
+    let dest = temp_dir().join(parts[0]);
 
     std::fs::copy(&receiver_config.path_to_receiver_binary, &dest)?;
 
@@ -52,7 +51,6 @@ pub fn copy_receiver (receiver_config: &mut CrashtrackerReceiverConfig) -> Resul
     fs::set_permissions(&dest, perms)?;
 
     receiver_config.path_to_receiver_binary = dest.to_string_lossy().to_string();
-
 
     Ok(())
 }
