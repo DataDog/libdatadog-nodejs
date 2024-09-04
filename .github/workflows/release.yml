@@ -24,7 +24,7 @@ jobs:
     needs: build
     environment: npm
     permissions:
-      - contents: write
+      contents: write
     env:
       NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     outputs:
