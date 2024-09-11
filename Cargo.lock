@@ -18,6 +18,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f26201604c87b1e01bd3d98f8d5d9a8fcbb815e8cedb41ffccbeb4bf593a35fe"
 
 [[package]]
+name = "adler2"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "512761e0bb2578dd7380c6baaa0f4ce03e84f95e960231d1dec8bf4d7d6e2627"
+
+[[package]]
 name = "ahash"
 version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -101,7 +107,7 @@ dependencies = [
  "cc",
  "cfg-if",
  "libc",
- "miniz_oxide",
+ "miniz_oxide 0.7.4",
  "object",
  "rustc-demangle",
 ]
@@ -149,13 +155,15 @@ checksum = "b048fb63fd8b5923fc5aa7b340d8e156aec7ec02f0c78fa8a6ddc2613f6f71de"
 
 [[package]]
 name = "blazesym"
-version = "0.2.0-rc.0"
-source = "git+https://github.com/libbpf/blazesym.git?rev=v0.2.0-rc.0#2f393f66a448f46ea71889e81a8866799762463d"
+version = "0.2.0-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d750f0052cfee86c14cbc31eda95c14271e16347196fd4902df1a52e4411a090"
 dependencies = [
  "cpp_demangle",
- "gimli 0.30.0",
+ "gimli 0.31.0",
  "libc",
- "miniz_oxide",
+ "memmap2",
+ "miniz_oxide 0.8.0",
  "rustc-demangle",
 ]
 
@@ -341,7 +349,7 @@ dependencies = [
 [[package]]
 name = "datadog-crashtracker"
 version = "12.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=main#16528ffee456f7af5fe9ad80a6294fb5dcd38918"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=main#54ed2cfcc583e57b366078b5952793f9e6db0c8f"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -366,7 +374,7 @@ dependencies = [
 [[package]]
 name = "datadog-ddsketch"
 version = "12.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=main#16528ffee456f7af5fe9ad80a6294fb5dcd38918"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=main#54ed2cfcc583e57b366078b5952793f9e6db0c8f"
 dependencies = [
  "prost",
 ]
@@ -437,7 +445,7 @@ dependencies = [
 [[package]]
 name = "ddcommon"
 version = "12.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=main#16528ffee456f7af5fe9ad80a6294fb5dcd38918"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=main#54ed2cfcc583e57b366078b5952793f9e6db0c8f"
 dependencies = [
  "anyhow",
  "futures",
@@ -449,6 +457,7 @@ dependencies = [
  "hyper-rustls 0.27.2",
  "hyper-util",
  "lazy_static",
+ "libc",
  "log",
  "pin-project",
  "regex",
@@ -458,12 +467,13 @@ dependencies = [
  "static_assertions",
  "tokio",
  "tokio-rustls 0.26.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
 name = "ddtelemetry"
 version = "12.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=main#16528ffee456f7af5fe9ad80a6294fb5dcd38918"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=main#54ed2cfcc583e57b366078b5952793f9e6db0c8f"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -527,7 +537,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f211bbe8e69bbd0cfdea405084f128ae8b4aaa6b0b522fc8f2b009084797920"
 dependencies = [
  "crc32fast",
- "miniz_oxide",
+ "miniz_oxide 0.7.4",
 ]
 
 [[package]]
@@ -650,9 +660,9 @@ checksum = "40ecd4077b5ae9fd2e9e169b102c6c330d0605168eb0e8bf79952b256dbefffd"
 
 [[package]]
 name = "gimli"
-version = "0.30.0"
+version = "0.31.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2e1d97fbe9722ba9bbd0c97051c2956e726562b61f86a25a4360398a40edfc9"
+checksum = "32085ea23f3234fc7846555e85283ba4de91e21016dc0455a16286d87a292d64"
 dependencies = [
  "fallible-iterator",
  "indexmap",
@@ -974,6 +984,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 
 [[package]]
+name = "memmap2"
+version = "0.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe751422e4a8caa417e13c3ea66452215d7d63e19e604f4980461212f3ae1322"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "minimal-lexical"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -986,6 +1005,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8a240ddb74feaf34a79a7add65a741f3167852fba007066dcac1ca548d89c08"
 dependencies = [
  "adler",
+]
+
+[[package]]
+name = "miniz_oxide"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2d80299ef12ff69b16a84bb182e3b9df68b5a91574d3d4fa6e41b65deec4df1"
+dependencies = [
+ "adler2",
  "simd-adler32",
 ]
 
@@ -1046,8 +1074,6 @@ dependencies = [
  "once_cell",
  "proc-macro2",
  "quote",
- "regex",
- "semver",
  "syn 2.0.72",
 ]
 
