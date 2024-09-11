@@ -1,6 +1,12 @@
 'use strict'
 
-require('./setup')
+const { execSync } = require('child_process')
+
+const cwd = __dirname
+const stdio = ['inherit', 'inherit', 'inherit']
+
+execSync('npm install --silent', { cwd, stdio })
+execSync('npm run --silent build', { cwd, stdio })
 
 const express = require('express')
 const bodyParser = require('body-parser')
@@ -34,7 +40,7 @@ const server = app.listen(() => {
   try {
     execSync('node app', {
       cwd,
-      stdio: ['inherit', 'inherit', 'inherit'],
+      stdio,
       env: {
         ...process.env,
         PORT
