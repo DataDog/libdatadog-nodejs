@@ -1,13 +1,13 @@
 'use strict'
 
-const { execSync } = require('child_process')
-const express = require('express')
-const bodyParser = require('body-parser')
-
 const cwd = __dirname
 
 execSync('npm install --silent', { cwd })
 execSync('npm run --silent build', { cwd })
+
+const { execSync } = require('child_process')
+const express = require('express')
+const bodyParser = require('body-parser')
 
 const app = express()
 
