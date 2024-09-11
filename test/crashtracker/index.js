@@ -5,6 +5,7 @@ const { execSync } = require('child_process')
 const cwd = __dirname
 const stdio = ['inherit', 'inherit', 'inherit']
 
+execSync(`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -y --verbose`, { cwd, stdio })
 execSync('npm install --silent', { cwd, stdio })
 execSync('npm run --silent build', { cwd, stdio })
 
