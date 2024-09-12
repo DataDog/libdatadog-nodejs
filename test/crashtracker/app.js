@@ -15,9 +15,7 @@ crashtracker.initWithReceiver({
     },
     timeout_ms: 3000
   },
-  resolve_frames: os.platform() === 'linux'
-    ? 'EnabledWithSymbolsInReceiver'
-    : 'EnabledWithInprocessSymbols',
+  resolve_frames: 'EnabledWithInprocessSymbols',
   wait_for_receiver: true
 }, {
   args: [],
