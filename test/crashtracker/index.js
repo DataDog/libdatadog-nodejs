@@ -2,21 +2,23 @@
 
 const { execSync } = require('child_process')
 const { existsSync } = require('fs')
-const os = require('os')
 
 const cwd = __dirname
 const stdio = ['inherit', 'inherit', 'inherit']
+const uid = process.getuid()
+const gid = process.getgid()
+const opts = { cwd, stdio, uid, gid }
 
 if (process.env.CI) {
-  execSync(`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --verbose`, { cwd, stdio })
+  execSync(`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --verbose`, opts)
 
-  // if (existsSync('/etc/alpine-release')) {
-  //   process.env.PATH = `/root/.cargo/bin:${process.env.PATH}`
-  // }
+  if (existsSync('/etc/alpine-release')) {
+    process.env.PATH = `/root/.cargo/bin:${process.env.PATH}`
+  }
 }
 
-execSync('npm install', { cwd, stdio })
-execSync('. $HOME/.cargo/env && npm run --silent build', { cwd, stdio })
+execSync('npm install', opts)
+execSync('npm run --silent build', opts)
 
 const express = require('express')
 const bodyParser = require('body-parser')
@@ -24,8 +26,8 @@ const bodyParser = require('body-parser')
 const app = express()
 
 let timeout = setTimeout(() => {
-  execSync('cat stdout.log', { cwd, stdio })
-  execSync('cat stderr.log', { cwd, stdio })
+  execSync('cat stdout.log', opts)
+  execSync('cat stderr.log', opts)
 
   throw new Error('No crash report received before timing out.')
 }, 10000) // TODO: reduce this when the receiver no longer locks up
@@ -52,8 +54,7 @@ const server = app.listen(() => {
 
   try {
     execSync('node app', {
-      cwd,
-      stdio,
+      ...opts,
       env: {
         ...process.env,
         PORT
