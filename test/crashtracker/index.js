@@ -18,7 +18,7 @@ if (process.env.CI) {
 }
 
 execSync('npm install', opts)
-execSync('. $HOME/.cargo/bin && npm run --silent build', opts)
+execSync('. $HOME/.cargo/env && npm run --silent build', opts)
 
 const express = require('express')
 const bodyParser = require('body-parser')
