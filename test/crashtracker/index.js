@@ -9,6 +9,8 @@ const uid = process.getuid()
 const gid = process.getgid()
 const opts = { cwd, stdio, uid, gid }
 
+execSync('npm install', opts)
+
 if (process.env.CI) {
   execSync(`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --verbose`, opts)
 
@@ -17,7 +19,6 @@ if (process.env.CI) {
   // }
 }
 
-execSync('npm install', opts)
 execSync('. $HOME/.cargo/env && npm run --silent build', opts)
 
 const express = require('express')
