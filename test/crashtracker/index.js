@@ -10,13 +10,13 @@ const stdio = ['inherit', 'inherit', 'inherit']
 if (process.env.CI) {
   execSync(`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --verbose`, { cwd, stdio })
 
-  if (existsSync('/etc/alpine-release')) {
-    process.env.PATH = `/root/.cargo/bin:${process.env.PATH}`
-  }
+  // if (existsSync('/etc/alpine-release')) {
+  //   process.env.PATH = `/root/.cargo/bin:${process.env.PATH}`
+  // }
 }
 
 execSync('npm install --silent', { cwd, stdio })
-execSync('npm run --silent build', { cwd, stdio })
+execSync('. $HOME/.cargo/env && npm run --silent build', { cwd, stdio })
 
 const express = require('express')
 const bodyParser = require('body-parser')
