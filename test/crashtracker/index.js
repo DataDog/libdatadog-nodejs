@@ -22,7 +22,7 @@ let timeout = setTimeout(() => {
   execSync('cat stderr.log', { cwd, stdio })
 
   throw new Error('No crash report received before timing out.')
-}, 5000)
+}, 10000) // TODO: reduce this when the receiver no longer locks up
 
 app.use(bodyParser.json())
 
@@ -33,7 +33,7 @@ app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
 
   server.close(() => {
     const stackTrace = JSON.parse(req.body.payload[0].stack_trace)
-    const boomFrame = stackTrace.find(frame => frame.names[0].name.includes('boom'))
+    const boomFrame = stackTrace.find(frame => frame.names[0]?.name.includes('boom'))
 
     if (!boomFrame) {
       throw new Error('Could not find a stack frame for the crashing function.')

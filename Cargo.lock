@@ -307,6 +307,7 @@ dependencies = [
  "datadog-crashtracker",
  "napi",
  "napi-derive",
+ "rustls 0.23.12",
 ]
 
 [[package]]
