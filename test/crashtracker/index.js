@@ -54,6 +54,7 @@ const server = app.listen(() => {
       }
     })
   } catch (e) {
+    console.log(e)
     if (e.signal !== 'SIGSEGV' && e.status !== 139) {
       throw e
     }
