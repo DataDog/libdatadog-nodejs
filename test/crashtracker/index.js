@@ -1,12 +1,14 @@
 'use strict'
 
 const { execSync } = require('child_process')
+const os = require('os')
 
 const cwd = __dirname
 const stdio = ['inherit', 'inherit', 'inherit']
 
 if (process.env.CI) {
   execSync(`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --verbose`, { cwd, stdio })
+  process.env.PATH = `:${os.homedir()}/.cargo/bin:${process.env.PATH}"`
 }
 
 execSync('npm install --silent', { cwd, stdio })
