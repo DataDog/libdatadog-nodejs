@@ -18,8 +18,8 @@ const bodyParser = require('body-parser')
 const app = express()
 
 let timeout = setTimeout(() => {
-  execSync('cat stdout.json', { cwd, stdio })
-  execSync('cat stderr.json', { cwd, stdio })
+  execSync('cat stdout.log', { cwd, stdio })
+  execSync('cat stderr.log', { cwd, stdio })
 
   throw new Error('No crash report received before timing out.')
 }, 5000)
