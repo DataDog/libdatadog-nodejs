@@ -15,7 +15,7 @@ if (process.env.CI) {
   // }
 }
 
-execSync('npm install --silent', { cwd, stdio })
+execSync('npm install', { cwd, stdio })
 execSync('. $HOME/.cargo/env && npm run --silent build', { cwd, stdio })
 
 const express = require('express')
