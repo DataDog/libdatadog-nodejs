@@ -26,8 +26,15 @@ crashtracker.initWithReceiver({
 }, {
   library_name: 'dd-trace-js',
   library_version: '6.0.0-pre',
-  family: 'nodejs',
-  tags: ['foo:bar', 'baz:qux']
+  family: 'javascript',
+  tags: [
+    'language:javascript',
+    'runtime:nodejs',
+    'runtime-id:8a8fef6433a849b3bc3171198831d102',
+    'library_version:6.0.0-pre',
+    'is_crash:true',
+    'severity:crash'
+  ]
 })
 
 require('./index.node').boom()
