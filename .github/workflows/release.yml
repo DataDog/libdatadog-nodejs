@@ -31,6 +31,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           registry-url: 'https://registry.npmjs.org'
+      - run: chmod -R +x ./prebuilds
       - run: npm publish
       - id: pkg
         run: |
