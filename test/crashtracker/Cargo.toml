@@ -1,20 +1,15 @@
 [package]
-name = "crashtracker"
+name = "segfault"
 version = "0.1.0"
 edition = "2018"
 
 [lib]
 crate-type = ["cdylib"]
 
-[[bin]]
-name = "crashtracker-receiver"
-path = "src/bin/receiver.rs"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[workspace]
+
 [dependencies]
-anyhow = "1"
-datadog-crashtracker = { git = "https://github.com/DataDog/libdatadog.git", branch = "main"  }
 napi = { version = "2", features = ["serde-json"] }
 napi-derive = { version = "2", default-features = false }
-rustls = { version = "*", default-features = false, features = ["aws-lc-rs"] }

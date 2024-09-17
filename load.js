@@ -52,10 +52,15 @@ function find (name, binary = false) {
 }
 
 function findFolder (root) {
-  const folders = readdirSync(path.join(root, 'prebuilds'))
+  try {
+    const prebuilds = path.join(root, 'prebuilds')
+    const folders = readdirSync(prebuilds)
 
-  return folders.find(f => f === `${PLATFORM}${LIBC}-${ARCH}`)
-    || folders.find(f => f === `${PLATFORM}-${ARCH}`)
+    return folders.find(f => f === `${PLATFORM}${LIBC}-${ARCH}`)
+      || folders.find(f => f === `${PLATFORM}-${ARCH}`)
+  } catch (e) {
+    return null
+  }
 }
 
 function findFile (root, name, binary = false) {
