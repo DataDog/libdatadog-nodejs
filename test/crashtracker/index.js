@@ -1,7 +1,6 @@
 'use strict'
 
 const { execSync } = require('child_process')
-const { existsSync } = require('fs')
 
 const cwd = __dirname
 const stdio = ['inherit', 'inherit', 'inherit']
