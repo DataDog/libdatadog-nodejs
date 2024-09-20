@@ -13,7 +13,6 @@ if (process.env.CI) {
   execSync(`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --verbose`, opts)
 }
 
-execSync('npm install', opts)
 execSync('npm run --silent build', opts)
 
 const express = require('express')
