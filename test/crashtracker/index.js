@@ -1,7 +1,7 @@
 'use strict'
 
 const { execSync } = require('child_process')
-const { existsSync } = require('fs')
+const os = require('os')
 
 const cwd = __dirname
 const stdio = ['inherit', 'inherit', 'inherit']
@@ -11,6 +11,8 @@ const opts = { cwd, stdio, uid, gid }
 
 if (process.env.CI) {
   execSync(`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --verbose`, opts)
+
+  process.env.PATH = `${os.homedir()}:${process.env.PATH}`
 }
 
 execSync('npm run --silent build', opts)
