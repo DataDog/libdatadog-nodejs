@@ -10,12 +10,10 @@ const gid = process.getgid()
 const opts = { cwd, stdio, uid, gid }
 
 if (process.env.CI) {
-  execSync(`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --verbose`, opts)
-
-  process.env.PATH = `${os.homedir()}/.cargo:${process.env.PATH}`
+  execSync(`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --verbose && npm run --silent build`, opts)
+} else {
+  execSync('npm run --silent build', opts)
 }
-
-execSync('npm run --silent build', opts)
 
 const express = require('express')
 const bodyParser = require('body-parser')
