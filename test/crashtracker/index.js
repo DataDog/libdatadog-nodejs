@@ -1,6 +1,6 @@
 'use strict'
 
-const { execSync } = require('child_process')
+const { spawnSync } = require('child_process')
 // const os = require('os')
 
 const cwd = __dirname
@@ -9,7 +9,7 @@ const stdio = ['inherit', 'inherit', 'inherit']
 // const gid = process.getgid()
 const opts = { cwd, stdio }
 
-execSync('npm run --silent build', opts)
+spawnSync('./node_modules/.bin/napi', ['build'], { stdio })
 
 const express = require('express')
 const bodyParser = require('body-parser')
