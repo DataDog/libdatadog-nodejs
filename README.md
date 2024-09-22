@@ -9,6 +9,6 @@ and installing it directly is not supported at the moment.
 
 ## Building
 
-* `npm run build`: Build the default workspaces in debug mode.
-* `npm run build-release`: Build the default workspaces in release mode.
-* `npm run build-all`: Build all workspaces in debug mode. This is useful when working on a workspace that is not a default member yet.
+* `yarn run build`: Build the default workspaces in debug mode.
+* `yarn run build-release`: Build the default workspaces in release mode.
+* `yarn run build-all`: Build all workspaces in debug mode. This is useful when working on a workspace that is not a default member yet.
