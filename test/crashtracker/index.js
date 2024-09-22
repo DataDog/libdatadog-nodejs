@@ -28,6 +28,10 @@ app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
     const stackTrace = JSON.parse(req.body.payload[0].stack_trace)
     const killFrame = stackTrace.find(frame => frame.names[0]?.name.includes('_uv_kill'))
 
+    for (const frame of stackTrace) {
+      console.log(frame)
+    }
+
     if (!killFrame) {
       throw new Error('Could not find a stack frame for the crashing function.')
     }
