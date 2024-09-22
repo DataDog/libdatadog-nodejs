@@ -10,7 +10,6 @@ const stdio = ['inherit', 'inherit', 'inherit']
 const opts = { cwd, stdio }
 
 // spawnSync('./node_modules/.bin/napi', ['build'], opts)
-execSync('npm config set unsafe-perm true', opts)
 execSync('npm run --silent build', opts)
 
 const express = require('express')
