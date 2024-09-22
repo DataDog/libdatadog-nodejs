@@ -8,13 +8,13 @@ on:
 
 jobs:
   build:
-    uses: Datadog/action-prebuildify/.github/workflows/build.yml@main
+    uses: Datadog/action-prebuildify/.github/workflows/build.yml@rochdev/install-cargo-for-rust
     with:
-      package-manager: 'npm'
+      package-manager: 'yarn'
       cache: false
       min-node-version: 16
       rust: true
-      only: darwin-arm64,darwin-x64,linux-arm64,linux-x64
+      only: darwin-arm64,darwin-x64,linux-arm64,linux-x64,linuxmusl-arm64,linuxmusl-x64
 
   package-size:
     runs-on: ubuntu-latest

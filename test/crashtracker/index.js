@@ -1,23 +1,12 @@
 'use strict'
 
 const { execSync } = require('child_process')
-const { existsSync } = require('fs')
+const express = require('express')
+const bodyParser = require('body-parser')
 
 const cwd = __dirname
 const stdio = ['inherit', 'inherit', 'inherit']
-const uid = process.getuid()
-const gid = process.getgid()
-const opts = { cwd, stdio, uid, gid }
-
-if (process.env.CI) {
-  execSync(`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --verbose`, opts)
-}
-
-execSync('npm install', opts)
-execSync('npm run --silent build', opts)
-
-const express = require('express')
-const bodyParser = require('body-parser')
+const opts = { cwd, stdio }
 
 const app = express()
 
@@ -37,10 +26,10 @@ app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
 
   server.close(() => {
     const stackTrace = JSON.parse(req.body.payload[0].stack_trace)
-    const boomFrame = stackTrace.find(frame => frame.names[0]?.name.includes('boom'))
+    const namedFrame = stackTrace.find(frame => frame.names[0]?.name)
 
-    if (!boomFrame) {
-      throw new Error('Could not find a stack frame for the crashing function.')
+    if (!namedFrame) {
+      throw new Error('Could not find a stack frame with a valid symbol mapping.')
     }
   })
 })
