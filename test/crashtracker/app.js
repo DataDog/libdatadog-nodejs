@@ -36,10 +36,4 @@ crashtracker.initWithReceiver({
   ]
 })
 
-function boom () {
-  process.kill(process.pid, 'SIGSEGV')
-}
-
-boom()
-
-// require('./index.node').boom()
+process.kill(process.pid, 'SIGSEGV')
