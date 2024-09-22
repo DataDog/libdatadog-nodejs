@@ -1,13 +1,13 @@
 'use strict'
 
 const { execSync } = require('child_process')
-const os = require('os')
+// const os = require('os')
 
 const cwd = __dirname
 const stdio = ['inherit', 'inherit', 'inherit']
-const uid = process.getuid()
-const gid = process.getgid()
-const opts = { cwd, stdio, uid, gid }
+// const uid = process.getuid()
+// const gid = process.getgid()
+const opts = { cwd, stdio }
 
 execSync('npm run --silent build', opts)
 
