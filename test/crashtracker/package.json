@@ -1,7 +1,4 @@
 {
   "private": true,
-  "main": "index.js",
-  "scripts": {
-    "build": "napi build"
-  }
+  "main": "index.js"
 }

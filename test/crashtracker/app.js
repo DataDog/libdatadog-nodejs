@@ -1,6 +1,5 @@
 'use strict'
 
-const os = require('os')
 const libdatadog = require('../..')
 const crashtracker = libdatadog.load('crashtracker')
 
@@ -37,4 +36,10 @@ crashtracker.initWithReceiver({
   ]
 })
 
-require('./index.node').boom()
+function boom () {
+  process.kill(process.pid, 'SIGSEGV')
+}
+
+boom()
+
+// require('./index.node').boom()

@@ -1,20 +1,12 @@
 'use strict'
 
-const path = require('path')
-const { execSync, spawnSync } = require('child_process')
-// const os = require('os')
+const { execSync } = require('child_process')
+const express = require('express')
+const bodyParser = require('body-parser')
 
 const cwd = __dirname
 const stdio = ['inherit', 'inherit', 'inherit']
-// const uid = process.getuid()
-// const gid = process.getgid()
 const opts = { cwd, stdio }
-const napi = path.join(process.cwd(), 'node_modules', '.bin', 'napi')
-
-spawnSync(napi, ['build'], opts)
-
-const express = require('express')
-const bodyParser = require('body-parser')
 
 const app = express()
 
@@ -34,9 +26,9 @@ app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
 
   server.close(() => {
     const stackTrace = JSON.parse(req.body.payload[0].stack_trace)
-    const boomFrame = stackTrace.find(frame => frame.names[0]?.name.includes('boom'))
+    const killFrame = stackTrace.find(frame => frame.names[0]?.name.includes('_uv_kill'))
 
-    if (!boomFrame) {
+    if (!killFrame) {
       throw new Error('Could not find a stack frame for the crashing function.')
     }
   })

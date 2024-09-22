@@ -26,11 +26,8 @@
   "publishConfig": {
     "access": "public"
   },
-  "dependencies": {
+  "devDependencies": {
     "body-parser": "^1.20.3",
     "express": "^4.19.2"
-  },
-  "devDependencies": {
-    "@napi-rs/cli": "^2.18.4"
   }
 }
