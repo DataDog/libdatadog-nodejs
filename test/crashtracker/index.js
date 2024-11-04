@@ -8,7 +8,11 @@ const uid = process.getuid()
 const gid = process.getgid()
 const opts = { cwd, stdio, uid, gid }
 
-execSync('npm install', opts)
+if (process.env.CI) {
+  execSync('npm install --ignore-scripts', opts)
+} else {
+  execSync('npm install', opts)
+}
 
 const express = require('express')
 const bodyParser = require('body-parser')

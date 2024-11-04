@@ -7,8 +7,20 @@ on:
       - main
 
 jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker run -w /usr/app -v $(pwd):/usr/app node:12 npm install --unsafe-perm
+        working-directory: ./test/crashtracker
+      - uses: actions/upload-artifact@v4
+        with:
+          name: segfault
+          path: ./test/crashtracker/build/Release/segfault.node
+
   build:
     uses: Datadog/action-prebuildify/.github/workflows/build.yml@main
+    needs: build-test
     with:
       package-manager: 'npm'
       cache: false
