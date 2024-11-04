@@ -33,6 +33,8 @@ app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
     const stackTrace = JSON.parse(req.body.payload[0].stack_trace)
     const boomFrame = stackTrace.find(frame => frame.names[0]?.name.toLowerCase().includes('boom'))
 
+    console.log(stackTrace.map(st => st.names))
+
     if (!boomFrame) {
       throw new Error('Could not find a stack frame for the crashing function.')
     }
