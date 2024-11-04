@@ -4,9 +4,10 @@ const os = require('os')
 const libdatadog = require('../..')
 const crashtracker = libdatadog.load('crashtracker')
 
-crashtracker.initWithReceiver({
+crashtracker.init({
   additional_files: [],
   create_alt_stack: false,
+  use_alt_stack: false,
   endpoint: {
     url: {
       scheme: 'http',
@@ -15,6 +16,7 @@ crashtracker.initWithReceiver({
     },
     timeout_ms: 3000
   },
+  timeout_ms: 3000,
   resolve_frames: 'EnabledWithInprocessSymbols',
   wait_for_receiver: true
 }, {
