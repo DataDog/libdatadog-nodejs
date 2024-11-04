@@ -1,12 +1,15 @@
-#define NAPI_VERSION 1
+#define NAPI_VERSION 6
 
 #include <node_api.h>
 #include <signal.h>
 #include <stdio.h>
 
-// TODO: Figure out how to cause an actual segmentation fault.
 napi_value Boom(napi_env env, napi_callback_info info) {
-  raise(SIGSEGV);
+  int* data;
+
+  napi_get_instance_data(env, &data);
+
+  *data = 1234;
 }
 
 napi_value Init(napi_env env, napi_value exports) {
