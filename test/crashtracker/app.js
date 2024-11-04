@@ -39,4 +39,4 @@ crashtracker.init({
   ]
 })
 
-require('./index.node').boom()
+require('./build/Release/segfault.node').boom()
