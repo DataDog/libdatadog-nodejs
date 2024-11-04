@@ -7,9 +7,11 @@
 napi_value Boom(napi_env env, napi_callback_info info) {
   int* data;
 
-  napi_get_instance_data(env, &data);
+  napi_get_instance_data(env, (void**) &data);
 
   *data = 1234;
+
+  return NULL;
 }
 
 napi_value Init(napi_env env, napi_value exports) {
