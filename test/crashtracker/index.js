@@ -8,7 +8,7 @@ const uid = process.getuid()
 const gid = process.getgid()
 const opts = { cwd, stdio, uid, gid }
 
-execSync('npm install', opts)
+execSync('yarn install', opts)
 
 const express = require('express')
 const bodyParser = require('body-parser')

@@ -10,7 +10,7 @@ jobs:
   build:
     uses: Datadog/action-prebuildify/.github/workflows/build.yml@main
     with:
-      package-manager: 'npm'
+      package-manager: 'yarn'
       cache: false
       min-node-version: 16
       rust: true
