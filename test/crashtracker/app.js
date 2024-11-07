@@ -5,8 +5,8 @@ const crashtracker = libdatadog.load('crashtracker')
 
 crashtracker.init({
   additional_files: [],
-  create_alt_stack: false,
-  use_alt_stack: false,
+  create_alt_stack: true,
+  use_alt_stack: true,
   endpoint: {
     url: {
       scheme: 'http',

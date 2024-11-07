@@ -1,6 +1,6 @@
 'use strict'
 
-const { execSync } = require('child_process')
+const { execSync, exec } = require('child_process')
 const { inspect } = require('util')
 
 const cwd = __dirname
@@ -32,7 +32,7 @@ app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
 
   server.close(() => {
     const stackTrace = JSON.parse(req.body.payload[0].stack_trace)
-    const boomFrame = stackTrace.find(frame => frame.names[0]?.name.toLowerCase().includes('segfaultify'))
+    const boomFrame = stackTrace.find(frame => frame.names?.[0]?.name.toLowerCase().includes('segfaultify'))
 
     console.log(inspect(stackTrace, true, 5, true))
 
@@ -47,17 +47,15 @@ app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
 const server = app.listen(() => {
   const PORT = server.address().port
 
-  try {
-    execSync('node app', {
-      ...opts,
-      env: {
-        ...process.env,
-        PORT
-      }
-    })
-  } catch (e) {
+  exec('node app', {
+    ...opts,
+    env: {
+      ...process.env,
+      PORT
+    }
+  }, e => {
     if (e.signal !== 'SIGSEGV' && e.status !== 139) {
       throw e
     }
-  }
+  })
 })
