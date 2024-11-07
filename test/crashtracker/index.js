@@ -54,7 +54,7 @@ const server = app.listen(() => {
       PORT
     }
   }, e => {
-    if (e.signal !== 'SIGSEGV' && e.status !== 139) {
+    if (e.signal !== 'SIGSEGV' && e.code !== 139 && e.status !== 139) {
       throw e
     }
   })
