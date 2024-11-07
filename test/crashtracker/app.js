@@ -1,6 +1,5 @@
 'use strict'
 
-const os = require('os')
 const libdatadog = require('../..')
 const crashtracker = libdatadog.load('crashtracker')
 
@@ -39,4 +38,4 @@ crashtracker.init({
   ]
 })
 
-require('./build/Release/segfault.node').boom()
+require('@datadog/segfaultify').segfaultify()

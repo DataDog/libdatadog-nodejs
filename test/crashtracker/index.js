@@ -8,11 +8,7 @@ const uid = process.getuid()
 const gid = process.getgid()
 const opts = { cwd, stdio, uid, gid }
 
-if (process.env.CI) {
-  execSync('npm install --ignore-scripts', opts)
-} else {
-  execSync('npm install', opts)
-}
+execSync('npm install', opts)
 
 const express = require('express')
 const bodyParser = require('body-parser')
@@ -35,9 +31,12 @@ app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
 
   server.close(() => {
     const stackTrace = JSON.parse(req.body.payload[0].stack_trace)
-    const boomFrame = stackTrace.find(frame => frame.names[0]?.name.toLowerCase().includes('boom'))
+    const boomFrame = stackTrace.find(frame => frame.names[0]?.name.toLowerCase().includes('segfaultify'))
 
-    if (!boomFrame) {
+    if (boomFrame) {
+      console.log(boomFrame)
+      console.log('Stack frame for crashing function successfully received by the mock agent.')
+    } else {
       throw new Error('Could not find a stack frame for the crashing function.')
     }
   })
