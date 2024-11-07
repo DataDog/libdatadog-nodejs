@@ -2,6 +2,8 @@
 
 const fs = require('fs')
 
-fs.readdirSync('test').forEach(file => {
-  require('./test/' + file)
-})
+fs.readdirSync('test')
+  .filter(file => file.endsWith('.js') || !file.includes('.'))
+  .forEach(file => {
+    require('./test/' + file)
+  })

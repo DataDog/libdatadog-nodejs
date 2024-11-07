@@ -1,6 +1,7 @@
 'use strict'
 
 const { execSync } = require('child_process')
+const { inspect } = require('util')
 
 const cwd = __dirname
 const stdio = ['inherit', 'inherit', 'inherit']
@@ -33,8 +34,9 @@ app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
     const stackTrace = JSON.parse(req.body.payload[0].stack_trace)
     const boomFrame = stackTrace.find(frame => frame.names[0]?.name.toLowerCase().includes('segfaultify'))
 
+    console.log(inspect(stackTrace, true, 5, true))
+
     if (boomFrame) {
-      console.log(boomFrame)
       console.log('Stack frame for crashing function successfully received by the mock agent.')
     } else {
       throw new Error('Could not find a stack frame for the crashing function.')
