@@ -8,9 +8,9 @@ on:
 
 jobs:
   build:
-    uses: Datadog/action-prebuildify/.github/workflows/build.yml@rochdev/napi-no-headers
+    uses: Datadog/action-prebuildify/.github/workflows/build.yml@main
     with:
-      package-manager: 'npm'
+      package-manager: 'yarn'
       cache: false
       min-node-version: 16
       rust: true
@@ -27,7 +27,7 @@ jobs:
       - uses: actions/download-artifact@v4
       - name: Setup Node.js
         uses: actions/setup-node@v4
-      - run: npm install
+      - run: yarn install
       - name: Compute module size tree and report
         uses: qard/heaviest-objects-in-the-universe@v1
         with:
