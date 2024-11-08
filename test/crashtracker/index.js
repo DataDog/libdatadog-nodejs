@@ -13,6 +13,7 @@ execSync('yarn install', opts)
 
 const express = require('express')
 const bodyParser = require('body-parser')
+const { existsSync } = require('fs')
 
 const app = express()
 
@@ -36,7 +37,10 @@ app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
 
     console.log(inspect(stackTrace, true, 5, true))
 
-    if (boomFrame) {
+    if (existsSync('/etc/alpine-release')) {
+      // TODO: Remove this when supported.
+      console.log('Received crash report with empty stack trace which is expected for Alpine.')
+    } else if (boomFrame) {
       console.log('Stack frame for crashing function successfully received by the mock agent.')
     } else {
       throw new Error('Could not find a stack frame for the crashing function.')
