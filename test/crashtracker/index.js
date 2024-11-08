@@ -39,7 +39,7 @@ app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
 
     if (existsSync('/etc/alpine-release')) {
       // TODO: Remove this when supported.
-      console.log('Received crash report with empty stack trace which is expected for Alpine.')
+      console.log('Received crash report. Skipping stack trace test since it is currently unsupported for Alpine.')
     } else if (boomFrame) {
       console.log('Stack frame for crashing function successfully received by the mock agent.')
     } else {
