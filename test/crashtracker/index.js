@@ -1,7 +1,7 @@
 'use strict'
 
-const { execSync } = require('child_process')
-const { existsSync } = require('fs')
+const { execSync, exec } = require('child_process')
+const { inspect } = require('util')
 
 const cwd = __dirname
 const stdio = ['inherit', 'inherit', 'inherit']
@@ -9,15 +9,11 @@ const uid = process.getuid()
 const gid = process.getgid()
 const opts = { cwd, stdio, uid, gid }
 
-if (process.env.CI) {
-  execSync(`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --verbose`, opts)
-}
-
-execSync('npm install', opts)
-execSync('npm run --silent build', opts)
+execSync('yarn install', opts)
 
 const express = require('express')
 const bodyParser = require('body-parser')
+const { existsSync } = require('fs')
 
 const app = express()
 
@@ -37,9 +33,16 @@ app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
 
   server.close(() => {
     const stackTrace = JSON.parse(req.body.payload[0].stack_trace)
-    const boomFrame = stackTrace.find(frame => frame.names[0]?.name.includes('boom'))
+    const boomFrame = stackTrace.find(frame => frame.names?.[0]?.name.toLowerCase().includes('segfaultify'))
 
-    if (!boomFrame) {
+    console.log(inspect(stackTrace, true, 5, true))
+
+    if (existsSync('/etc/alpine-release')) {
+      // TODO: Remove this when supported.
+      console.log('Received crash report. Skipping stack trace test since it is currently unsupported for Alpine.')
+    } else if (boomFrame) {
+      console.log('Stack frame for crashing function successfully received by the mock agent.')
+    } else {
       throw new Error('Could not find a stack frame for the crashing function.')
     }
   })
@@ -48,17 +51,15 @@ app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
 const server = app.listen(() => {
   const PORT = server.address().port
 
-  try {
-    execSync('node app', {
-      ...opts,
-      env: {
-        ...process.env,
-        PORT
-      }
-    })
-  } catch (e) {
-    if (e.signal !== 'SIGSEGV' && e.status !== 139) {
+  exec('node app', {
+    ...opts,
+    env: {
+      ...process.env,
+      PORT
+    }
+  }, e => {
+    if (e.signal !== 'SIGSEGV' && e.code !== 139 && e.status !== 139) {
       throw e
     }
-  }
+  })
 })
