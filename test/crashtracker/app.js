@@ -1,12 +1,12 @@
 'use strict'
 
-const os = require('os')
 const libdatadog = require('../..')
 const crashtracker = libdatadog.load('crashtracker')
 
-crashtracker.initWithReceiver({
+crashtracker.init({
   additional_files: [],
-  create_alt_stack: false,
+  create_alt_stack: true,
+  use_alt_stack: true,
   endpoint: {
     url: {
       scheme: 'http',
@@ -15,6 +15,7 @@ crashtracker.initWithReceiver({
     },
     timeout_ms: 3000
   },
+  timeout_ms: 3000,
   resolve_frames: 'EnabledWithInprocessSymbols',
   wait_for_receiver: true
 }, {
@@ -37,4 +38,4 @@ crashtracker.initWithReceiver({
   ]
 })
 
-require('./index.node').boom()
+require('@datadog/segfaultify').segfaultify()
