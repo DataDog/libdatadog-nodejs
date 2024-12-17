@@ -351,14 +351,14 @@ dependencies = [
 
 [[package]]
 name = "datadog-crashtracker"
-version = "14.1.0"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v14.1.0#106fe1aee81c912e3201b7d138d57dabdfed4295"
+version = "14.3.1"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v14.3.1#48240f2588665a03c2061879345566ec7e70fabf"
 dependencies = [
  "anyhow",
  "backtrace",
  "blazesym",
  "chrono",
- "ddcommon 14.1.0",
+ "ddcommon 14.3.1",
  "ddtelemetry",
  "http 0.2.12",
  "hyper 0.14.31",
@@ -368,6 +368,7 @@ dependencies = [
  "page_size",
  "portable-atomic",
  "rand",
+ "schemars",
  "serde",
  "serde_json",
  "tokio",
@@ -376,8 +377,8 @@ dependencies = [
 
 [[package]]
 name = "datadog-ddsketch"
-version = "14.1.0"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v14.1.0#106fe1aee81c912e3201b7d138d57dabdfed4295"
+version = "14.3.1"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v14.3.1#48240f2588665a03c2061879345566ec7e70fabf"
 dependencies = [
  "prost",
 ]
@@ -447,8 +448,8 @@ dependencies = [
 
 [[package]]
 name = "ddcommon"
-version = "14.1.0"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v14.1.0#106fe1aee81c912e3201b7d138d57dabdfed4295"
+version = "14.3.1"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v14.3.1#48240f2588665a03c2061879345566ec7e70fabf"
 dependencies = [
  "anyhow",
  "cc",
@@ -476,13 +477,13 @@ dependencies = [
 
 [[package]]
 name = "ddtelemetry"
-version = "14.1.0"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v14.1.0#106fe1aee81c912e3201b7d138d57dabdfed4295"
+version = "14.3.1"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v14.3.1#48240f2588665a03c2061879345566ec7e70fabf"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
  "datadog-ddsketch",
- "ddcommon 14.1.0",
+ "ddcommon 14.3.1",
  "futures",
  "hashbrown 0.14.5",
  "http 0.2.12",
@@ -505,6 +506,12 @@ name = "dunce"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
+
+[[package]]
+name = "dyn-clone"
+version = "1.0.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d6ef0072f8a535281e4876be788938b528e9a1d43900b82c2569af7da799125"
 
 [[package]]
 name = "either"
@@ -1559,6 +1566,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "schemars"
+version = "0.8.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09c024468a378b7e36765cd36702b7a90cc3cba11654f6685c8f233408e89e92"
+dependencies = [
+ "dyn-clone",
+ "schemars_derive",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "schemars_derive"
+version = "0.8.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1eee588578aff73f856ab961cd2f79e36bc45d7ded33a7562adba4667aecc0e"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "serde_derive_internals",
+ "syn 2.0.87",
+]
+
+[[package]]
 name = "sct"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1626,6 +1657,17 @@ name = "serde_derive"
 version = "1.0.197"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7eb0b34b42edc17f6b7cac84a52a1c5f0e1bb2227e997ca9011ea3dd34e8610b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
+]
+
+[[package]]
+name = "serde_derive_internals"
+version = "0.29.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18d26a20a969b9e3fdf2fc2d9f21eda6c40e2de84c9408bb5d3b05d499aae711"
 dependencies = [
  "proc-macro2",
  "quote",
