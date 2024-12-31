@@ -1,6 +1,7 @@
 [workspace]
 default-members = [
-  "crates/crashtracker"
+  "crates/crashtracker",
+  "crates/library-config"
 ]
 members = [
   "crates/*"

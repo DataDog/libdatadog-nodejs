@@ -1,0 +1,25 @@
+[package]
+name = "library-config"
+version = "0.1.0"
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+anyhow = "1"
+# TODO: set the right dependencies
+# datadog-library-config-ffi = { git = "https://github.com/DataDog/libdatadog.git", tag = "v14.3.1" }
+datadog-library-config-ffi = { path = "../../../libdatadog/library-config-ffi" }
+
+wasm-bindgen = "0.2.84"
+serde = { version = "1.0", features = ["derive"] }
+serde-wasm-bindgen = "0.4"
+getrandom = { version = "0.2", features = ["js"] }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3.34"
+
+[profile.release]
+# Tell `rustc` to optimize for small code size.
+opt-level = "s"
