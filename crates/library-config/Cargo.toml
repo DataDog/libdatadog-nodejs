@@ -9,13 +9,12 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 anyhow = "1"
 # TODO: set the right dependencies
-# datadog-library-config-ffi = { git = "https://github.com/DataDog/libdatadog.git", tag = "v14.3.1" }
-datadog-library-config-ffi = { path = "../../../libdatadog/library-config-ffi" }
+# datadog-library-config = { git = "https://github.com/DataDog/libdatadog.git", tag = "v14.3.1" }
+datadog-library-config = { path = "../../../libdatadog/library-config" }
 
 wasm-bindgen = "0.2.84"
 serde = { version = "1.0", features = ["derive"] }
 serde-wasm-bindgen = "0.4"
-getrandom = { version = "0.2", features = ["js"] }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.34"

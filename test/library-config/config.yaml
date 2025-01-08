@@ -5,4 +5,4 @@ rules:
         - nodejs
       operator: equals
     configuration:
-      DD_SERVICE: my-service
+      DD_SERVICE: my-service-{{ environment[HOME] }}
