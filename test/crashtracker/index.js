@@ -45,6 +45,13 @@ app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
     } else {
       throw new Error('Could not find a stack frame for the crashing function.')
     }
+
+    const tags = req.body.payload[0].tags.split(',')
+    if (tags.includes('profiler_serializing:1')) {
+      console.log('Stack trace was marked as happened during profile serialization.')
+    } else {
+      throw new Error('Stack trace was not marked as happening during profile serialization.')
+    }
   })
 })
 
