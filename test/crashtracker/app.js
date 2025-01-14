@@ -38,4 +38,5 @@ crashtracker.init({
   ]
 })
 
+crashtracker.beginProfilerSerializing()
 require('@datadog/segfaultify').segfaultify()
