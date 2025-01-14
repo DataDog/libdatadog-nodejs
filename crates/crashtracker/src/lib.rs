@@ -29,3 +29,17 @@ pub fn update_metadata (env: Env, metadata: JsUnknown) -> napi::Result<()> {
 
     Ok(())
 }
+
+#[napi]
+pub fn begin_profiler_serializing (_env: Env) -> napi::Result<()> {
+    let _ = datadog_crashtracker::begin_op(datadog_crashtracker::OpTypes::ProfilerSerializing);
+
+    Ok(())
+}
+
+#[napi]
+pub fn end_profiler_serializing (_env: Env) -> napi::Result<()> {
+    let _ = datadog_crashtracker::end_op(datadog_crashtracker::OpTypes::ProfilerSerializing);
+
+    Ok(())
+}
