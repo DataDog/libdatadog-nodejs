@@ -14,16 +14,30 @@ const ABI = process.versions.modules
 const inWebpack = typeof __webpack_require__ === 'function'
 const runtimeRequire = inWebpack ? __non_webpack_require__ : require
 
-function maybeLoad (name, binary = false) {
+function maybeLoadWASM(name) {
   try {
-    return load(name, binary)
+    const root = __dirname
+    const prebuilds = path.join(root, 'prebuilds')
+    const folders = readdirSync(prebuilds)
+    if (folders.find(f => f === name)) {
+      return runtimeRequire(path.join(prebuilds, name, `${name}.js`))
+    }
   } catch (e) {
     // Not found, skip.
   }
 }
 
-function load (name, binary = false) {
-  const filename = find(name, binary)
+function maybeLoad (name) {
+  try {
+    return load(name)
+  } catch (e) {
+    // Not found, skip.
+  }
+}
+
+function load (name) {
+  const filename = find(name)
+
   if (!filename) {
     throw new Error(`Could not find a ${name} binary for ${PLATFORM}${LIBC}-${ARCH}.`)
   }
@@ -44,6 +58,7 @@ function find (name, binary = false) {
 
   const prebuildFolder = path.join(root, 'prebuilds', folder)
   const file = findFile(prebuildFolder, name, binary)
+
   if (!file) return
 
   return path.join(prebuildFolder, file)
@@ -71,4 +86,4 @@ function findFile (root, name, binary = false) {
     || files.find(f => f === `${name}.node`)
 }
 
-module.exports = { find, load, maybeLoad }
+module.exports = { find, load, maybeLoad, maybeLoadWASM }

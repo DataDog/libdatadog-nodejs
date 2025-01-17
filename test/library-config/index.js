@@ -2,7 +2,7 @@ const path = require('path');
 const fs = require('fs');
 const loader = require('../../load.js');
 
-const libconfig = loader.maybeLoad('library_config.js', true);
+const libconfig = loader.maybeLoadWASM('library_config');
 
 const rawConfig = fs.readFileSync(path.join(__dirname, 'config.yaml'));
 let configurator = new libconfig.JsConfigurator();
