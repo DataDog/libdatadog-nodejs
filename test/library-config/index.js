@@ -1,10 +1,11 @@
-import * as libconfig from '/Users/baptiste.foy/go/src/github.com/DataDog/libdatadog-nodejs/test/library-config/pkg/library_config.js';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
+const path = require('path');
+const fs = require('fs');
+const loader = require('../../load.js');
 
-const rawConfig = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'config.yaml'));
-let configurator = new libconfig.JsConfigurator(false);
+const libconfig = loader.maybeLoad('library_config.js', true);
+
+const rawConfig = fs.readFileSync(path.join(__dirname, 'config.yaml'));
+let configurator = new libconfig.JsConfigurator();
 
 configurator.set_envp(Object.entries(process.env).map(([key, value]) => `${key}=${value}`))
 configurator.set_args(process.argv)

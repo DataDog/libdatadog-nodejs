@@ -12,9 +12,9 @@ pub struct JsConfigurator {
 #[wasm_bindgen]
 impl JsConfigurator {
     #[wasm_bindgen(constructor)]
-    pub fn new(debug_logs: bool) -> Self {
+    pub fn new() -> Self {
         JsConfigurator {
-            configurator: Box::new(datadog_library_config::Configurator::new(debug_logs)),
+            configurator: Box::new(datadog_library_config::Configurator::new(false)), // No debug log as WASM can't write to stdout
             envp: Vec::new(),
             args: Vec::new(),
         }
