@@ -14,6 +14,19 @@ const ABI = process.versions.modules
 const inWebpack = typeof __webpack_require__ === 'function'
 const runtimeRequire = inWebpack ? __non_webpack_require__ : require
 
+function maybeLoadWASM(name) {
+  try {
+    const root = __dirname
+    const prebuilds = path.join(root, 'prebuilds')
+    const folders = readdirSync(prebuilds)
+    if (folders.find(f => f === name)) {
+      return runtimeRequire(path.join(prebuilds, name, `${name}.js`))
+    }
+  } catch (e) {
+    // Not found, skip.
+  }
+}
+
 function maybeLoad (name) {
   try {
     return load(name)
@@ -73,4 +86,4 @@ function findFile (root, name, binary = false) {
     || files.find(f => f === `${name}.node`)
 }
 
-module.exports = { find, load, maybeLoad }
+module.exports = { find, load, maybeLoad, maybeLoadWASM }
