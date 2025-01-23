@@ -1,8 +1,10 @@
 const path = require('path');
 const fs = require('fs');
-const loader = require('../../load.js');
+const loader = require('../../../load.js');
+const assert = require('assert');
 
 const libconfig = loader.maybeLoadWASM('library_config');
+assert(libconfig !== undefined);
 
 const rawConfig = fs.readFileSync(path.join(__dirname, 'config.yaml'));
 let configurator = new libconfig.JsConfigurator();
@@ -11,7 +13,9 @@ configurator.set_envp(Object.entries(process.env).map(([key, value]) => `${key}=
 configurator.set_args(process.argv)
 
 // Apply each configuration as an environment variable
-console.log("Configuration:")
+let values = {}
 configurator.get_configuration(rawConfig.toString()).forEach((value, key, map) => {
-    console.log(` - ${key}: ${value}`)
+    values[key] = value
 });
+
+assert.strictEqual(values['DD_SERVICE'], 'my-service')

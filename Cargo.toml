@@ -1,10 +1,9 @@
 [workspace]
 default-members = [
-  "crates/crashtracker",
-  "crates/library-config"
+  "crates/crashtracker"
 ]
 members = [
-  "crates/*"
+  "crates/*",
 ]
 
 [profile.release]

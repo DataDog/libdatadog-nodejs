@@ -7,8 +7,35 @@ on:
       - main
 
 jobs:
+  build-test-wasm:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        crate:
+          - library_config
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+      - run: yarn install
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - name: Build WASM
+        run: |
+          mkdir -p ./prebuilds/${{ matrix.crate }}
+          wasm-pack build --target nodejs ./crates/${{ matrix.crate }} --out-dir ../../prebuilds/${{ matrix.crate }}
+      - name: Test WASM
+        run: node test_wasm.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prebuilds-wasm
+          if-no-files-found: ignore
+          path: ./prebuilds/*
+
   build:
     uses: Datadog/action-prebuildify/.github/workflows/build.yml@main
+    needs: build-test-wasm
     with:
       package-manager: 'yarn'
       cache: false
