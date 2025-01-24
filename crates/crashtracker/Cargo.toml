@@ -18,3 +18,9 @@ datadog-crashtracker = { git = "https://github.com/DataDog/libdatadog.git", tag 
 napi = { version = "2", features = ["serde-json"] }
 napi-derive = { version = "2", default-features = false }
 rustls = { version = "*", default-features = false, features = ["aws-lc-rs"] }
+
+[profile.release]
+# Tell `rustc` to optimize for small code size.
+opt-level = "z"
+lto = true
+strip = "debuginfo"
