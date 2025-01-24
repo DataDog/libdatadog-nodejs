@@ -361,14 +361,14 @@ dependencies = [
 
 [[package]]
 name = "datadog-crashtracker"
-version = "14.3.1"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v14.3.1#48240f2588665a03c2061879345566ec7e70fabf"
+version = "15.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v15.0.0#0ef49864317b0728648b2b7f26fe2f1deeeeebc4"
 dependencies = [
  "anyhow",
  "backtrace",
  "blazesym",
  "chrono",
- "ddcommon 14.3.1",
+ "ddcommon 15.0.0",
  "ddtelemetry",
  "http 0.2.12",
  "hyper 0.14.31",
@@ -387,8 +387,8 @@ dependencies = [
 
 [[package]]
 name = "datadog-ddsketch"
-version = "14.3.1"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v14.3.1#48240f2588665a03c2061879345566ec7e70fabf"
+version = "15.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v15.0.0#0ef49864317b0728648b2b7f26fe2f1deeeeebc4"
 dependencies = [
  "prost",
 ]
@@ -468,8 +468,8 @@ dependencies = [
 
 [[package]]
 name = "ddcommon"
-version = "14.3.1"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v14.3.1#48240f2588665a03c2061879345566ec7e70fabf"
+version = "15.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v15.0.0#0ef49864317b0728648b2b7f26fe2f1deeeeebc4"
 dependencies = [
  "anyhow",
  "cc",
@@ -497,13 +497,13 @@ dependencies = [
 
 [[package]]
 name = "ddtelemetry"
-version = "14.3.1"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v14.3.1#48240f2588665a03c2061879345566ec7e70fabf"
+version = "15.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v15.0.0#0ef49864317b0728648b2b7f26fe2f1deeeeebc4"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
  "datadog-ddsketch",
- "ddcommon 14.3.1",
+ "ddcommon 15.0.0",
  "futures",
  "hashbrown 0.14.5",
  "http 0.2.12",
