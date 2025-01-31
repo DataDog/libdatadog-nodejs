@@ -16,6 +16,7 @@ configurator.set_args(process.argv)
 let values = {}
 configurator.get_configuration(rawConfig.toString()).forEach((value, key, map) => {
     values[key] = value
+    console.log(`Got ${key}=${value}`)
 });
 
 assert.strictEqual(values['DD_SERVICE'], 'my-service')
