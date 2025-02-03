@@ -15,9 +15,3 @@ collector = { git = "https://github.com/DataDog/libdatadog.git", branch = "rochd
 version = "1.0.0"
 default-features = false
 features = ["napi-6"]
-
-[profile.release]
-# Tell `rustc` to optimize for small code size.
-opt-level = "z"
-lto = true
-strip = "debuginfo"
