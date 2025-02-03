@@ -3,7 +3,7 @@ const fs = require('fs');
 const loader = require('../../../load.js');
 const assert = require('assert');
 
-const libconfig = loader.maybeLoadWASM('library_config');
+const libconfig = loader.load('library_config');
 assert(libconfig !== undefined);
 
 const rawConfig = fs.readFileSync(path.join(__dirname, 'config.yaml'));
