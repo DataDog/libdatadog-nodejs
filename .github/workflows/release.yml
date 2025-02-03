@@ -14,23 +14,10 @@ jobs:
           - library_config
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-      - run: yarn install
-      - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-      - name: Build WASM
-        run: |
-          mkdir -p ./prebuilds/${{ matrix.crate }}
-          wasm-pack build --target nodejs ./crates/${{ matrix.crate }} --out-dir ../../prebuilds/${{ matrix.crate }}
-      - name: Test WASM
-        run: node test_wasm.js
-      - uses: actions/upload-artifact@v4
+      - name: 'Use composite action'
+        uses: ./.github/actions/build-test-wasm
         with:
-          name: prebuilds-wasm
-          if-no-files-found: ignore
-          path: ./prebuilds/*
+          crate: '${{ matrix.crate }}'
 
   build:
     uses: Datadog/action-prebuildify/.github/workflows/build.yml@main
