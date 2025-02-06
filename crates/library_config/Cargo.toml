@@ -8,7 +8,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 anyhow = "1"
-datadog-library-config = { git = "https://github.com/DataDog/libdatadog.git", tag = "v15.0.0" }
+datadog-library-config = { git = "https://github.com/DataDog/libdatadog.git", rev = "v16.0.2" }
 
 wasm-bindgen = "0.2.84"
 serde = { version = "1.0", features = ["derive"] }

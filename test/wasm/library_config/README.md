@@ -1,6 +1,6 @@
 # Libconfig example
 
-## How to run
+## How to run
 From repository root 
 ```bash
 yarn build-wasm
