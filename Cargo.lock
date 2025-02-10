@@ -396,7 +396,7 @@ dependencies = [
 [[package]]
 name = "datadog-library-config"
 version = "0.0.1"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=v16.0.2#52bd068269da43fb216e278a8576184bf6307177"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v16.0.2#52bd068269da43fb216e278a8576184bf6307177"
 dependencies = [
  "anyhow",
  "serde",
