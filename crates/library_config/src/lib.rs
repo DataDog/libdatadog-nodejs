@@ -19,7 +19,12 @@ pub struct ConfigEntry {
 impl ConfigEntry {
     #[wasm_bindgen(constructor)]
     pub fn new(name: String, value: String, source: String, config_id: String) -> ConfigEntry {
-        ConfigEntry { name, value, source, config_id }
+        ConfigEntry {
+            name,
+            value,
+            source,
+            config_id,
+        }
     }
     #[wasm_bindgen(getter)]
     pub fn name(&self) -> String {
@@ -52,17 +57,13 @@ impl JsConfigurator {
 
     #[wasm_bindgen]
     pub fn set_envp(&mut self, envp: Box<[JsValue]>) -> Result<(), JsValue> {
-        self.envp = envp.iter()
-            .filter_map(|val| val.as_string())
-            .collect();
+        self.envp = envp.iter().filter_map(|val| val.as_string()).collect();
         Ok(())
     }
 
     #[wasm_bindgen]
     pub fn set_args(&mut self, args: Box<[JsValue]>) -> Result<(), JsValue> {
-        self.args = args.iter()
-            .filter_map(|val| val.as_string())
-            .collect();
+        self.args = args.iter().filter_map(|val| val.as_string()).collect();
         Ok(())
     }
 
@@ -74,7 +75,10 @@ impl JsConfigurator {
             "darwin" => datadog_library_config::Target::Macos,
             _ => return Err(JsValue::from_str("Unsupported target")),
         };
-        Ok(datadog_library_config::Configurator::local_stable_configuration_path(target_enum).to_string())
+        Ok(
+            datadog_library_config::Configurator::local_stable_configuration_path(target_enum)
+                .to_string(),
+        )
     }
 
     #[wasm_bindgen]
@@ -85,7 +89,10 @@ impl JsConfigurator {
             "darwin" => datadog_library_config::Target::Macos,
             _ => return Err(JsValue::from_str("Unsupported target")),
         };
-        Ok(datadog_library_config::Configurator::fleet_stable_configuration_path(target_enum).to_string())
+        Ok(
+            datadog_library_config::Configurator::fleet_stable_configuration_path(target_enum)
+                .to_string(),
+        )
     }
 
     #[wasm_bindgen]
@@ -94,17 +101,9 @@ impl JsConfigurator {
         config_string_local: String,
         config_string_managed: String,
     ) -> Result<Vec<ConfigEntry>, JsValue> {
-        let envp: Vec<Vec<u8>> = self
-            .envp
-            .iter()
-            .map(|s| s.as_bytes().to_vec())
-            .collect();
+        let envp: Vec<Vec<u8>> = self.envp.iter().map(|s| s.as_bytes().to_vec()).collect();
 
-        let args: Vec<Vec<u8>> = self
-            .args
-            .iter()
-            .map(|s| s.as_bytes().to_vec())
-            .collect();
+        let args: Vec<Vec<u8>> = self.args.iter().map(|s| s.as_bytes().to_vec()).collect();
 
         let res_config = self.configurator.get_config_from_bytes(
             config_string_local.as_bytes(),
@@ -118,16 +117,17 @@ impl JsConfigurator {
 
         match res_config {
             Ok(config) => {
-                let config_entries: Vec<ConfigEntry> = config.into_iter().map(|c| {
-                    ConfigEntry {
+                let config_entries: Vec<ConfigEntry> = config
+                    .into_iter()
+                    .map(|c| ConfigEntry {
                         name: c.name.to_str().into(),
                         value: c.value,
                         source: c.source.to_str().into(),
                         config_id: c.config_id.unwrap_or_default(),
-                    }
-                }).collect();
+                    })
+                    .collect();
                 Ok(config_entries)
-            },
+            }
             Err(e) => Err(JsValue::from_str(&format!(
                 "Failed to get configuration: {:?}",
                 e
