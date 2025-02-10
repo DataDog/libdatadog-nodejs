@@ -1,8 +1,0 @@
-rules:
-  - selectors:
-    - origin: language
-      matches:
-        - nodejs
-      operator: equals
-    configuration:
-      DD_SERVICE: my-service
