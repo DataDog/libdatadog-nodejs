@@ -1,0 +1,2 @@
+apm_configuration_default:
+  DD_RUNTIME_METRICS_ENABLED: true

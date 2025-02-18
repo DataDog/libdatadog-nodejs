@@ -7,8 +7,22 @@ on:
       - main
 
 jobs:
+  build-test-wasm:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        crate:
+          - library_config
+    steps:
+      - uses: actions/checkout@v4
+      - name: 'Use composite action'
+        uses: ./.github/actions/build-test-wasm
+        with:
+          crate: '${{ matrix.crate }}'
+
   build:
     uses: Datadog/action-prebuildify/.github/workflows/build.yml@main
+    needs: build-test-wasm
     with:
       package-manager: 'yarn'
       cache: false

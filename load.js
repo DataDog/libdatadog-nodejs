@@ -24,12 +24,23 @@ function maybeLoad (name) {
 
 function load (name) {
   const filename = find(name)
+  const filenameWASM = findWASM(name)
 
-  if (!filename) {
-    throw new Error(`Could not find a ${name} binary for ${PLATFORM}${LIBC}-${ARCH}.`)
+  if (filename) {
+    return runtimeRequire(filename)
+  } else if (filenameWASM) {
+    return runtimeRequire(filenameWASM)
   }
+  throw new Error(`Could not find a ${name} binary for ${PLATFORM}${LIBC}-${ARCH} nor a ${name} WASM module.`)
+}
 
-  return runtimeRequire(filename)
+function findWASM (name) {
+  const root = __dirname
+  const prebuilds = path.join(root, 'prebuilds')
+  const folders = readdirSync(prebuilds)
+  if (folders.find(f => f === name)) {
+    return path.join(prebuilds, name, `${name}.js`)
+  }
 }
 
 function find (name, binary = false) {
