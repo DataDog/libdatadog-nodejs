@@ -268,6 +268,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "console_error_panic_hook"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a06aeb73f470f66dcdbf7223caeebb85984942f22f1adb2a088cf9668146bbbc"
+dependencies = [
+ "cfg-if",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "convert_case"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -351,14 +361,14 @@ dependencies = [
 
 [[package]]
 name = "datadog-crashtracker"
-version = "14.3.1"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v14.3.1#48240f2588665a03c2061879345566ec7e70fabf"
+version = "15.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v15.0.0#0ef49864317b0728648b2b7f26fe2f1deeeeebc4"
 dependencies = [
  "anyhow",
  "backtrace",
  "blazesym",
  "chrono",
- "ddcommon 14.3.1",
+ "ddcommon 15.0.0",
  "ddtelemetry",
  "http 0.2.12",
  "hyper 0.14.31",
@@ -377,10 +387,20 @@ dependencies = [
 
 [[package]]
 name = "datadog-ddsketch"
-version = "14.3.1"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v14.3.1#48240f2588665a03c2061879345566ec7e70fabf"
+version = "15.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v15.0.0#0ef49864317b0728648b2b7f26fe2f1deeeeebc4"
 dependencies = [
  "prost",
+]
+
+[[package]]
+name = "datadog-library-config"
+version = "0.0.1"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v16.0.3#ce8c536ddef78a49142fe4a6c77ab0a1263c1018"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_yaml",
 ]
 
 [[package]]
@@ -448,8 +468,8 @@ dependencies = [
 
 [[package]]
 name = "ddcommon"
-version = "14.3.1"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v14.3.1#48240f2588665a03c2061879345566ec7e70fabf"
+version = "15.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v15.0.0#0ef49864317b0728648b2b7f26fe2f1deeeeebc4"
 dependencies = [
  "anyhow",
  "cc",
@@ -477,13 +497,13 @@ dependencies = [
 
 [[package]]
 name = "ddtelemetry"
-version = "14.3.1"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v14.3.1#48240f2588665a03c2061879345566ec7e70fabf"
+version = "15.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v15.0.0#0ef49864317b0728648b2b7f26fe2f1deeeeebc4"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
  "datadog-ddsketch",
- "ddcommon 14.3.1",
+ "ddcommon 15.0.0",
  "futures",
  "hashbrown 0.14.5",
  "http 0.2.12",
@@ -980,6 +1000,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "library-config"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "datadog-library-config",
+ "serde",
+ "serde-wasm-bindgen",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
+]
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1013,6 +1045,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "488016bfae457b036d996092f6cb448677611ce4449e970ceaf42695203f218a"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "minicov"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f27fe9f1cc3c22e1687f9446c2083c4c5fc7f0bcf1c7a86bdbded14985895b4b"
+dependencies = [
+ "cc",
+ "walkdir",
 ]
 
 [[package]]
@@ -1557,6 +1599,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f3cb5ba0dc43242ce17de99c180e96db90b235b8a9fdc9543c96d2209116bd9f"
 
 [[package]]
+name = "same-file"
+version = "1.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
+dependencies = [
+ "winapi-util",
+]
+
+[[package]]
 name = "schannel"
 version = "0.1.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1588,6 +1639,12 @@ dependencies = [
  "serde_derive_internals",
  "syn 2.0.87",
 ]
+
+[[package]]
+name = "scoped-tls"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1cf6437eb19a8f4a6cc0f7dca544973b0b78843adbfeb3683d1a94a0024a294"
 
 [[package]]
 name = "sct"
@@ -1644,6 +1701,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-wasm-bindgen"
+version = "0.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3b4c031cd0d9014307d82b8abf653c0290fbdaeb4c02d00c63cf52f728628bf"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "serde_bytes"
 version = "0.11.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1684,6 +1752,19 @@ dependencies = [
  "memchr",
  "ryu",
  "serde",
+]
+
+[[package]]
+name = "serde_yaml"
+version = "0.9.34+deprecated"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a8b1a1a2ebf674015cc02edccce75287f1a0130d394307b36743c2f5d504b47"
+dependencies = [
+ "indexmap",
+ "itoa",
+ "ryu",
+ "serde",
+ "unsafe-libyaml",
 ]
 
 [[package]]
@@ -1902,6 +1983,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f6ccf251212114b54433ec949fd6a7841275f9ada20dddd2f29e9ceea4501493"
 
 [[package]]
+name = "unsafe-libyaml"
+version = "0.2.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "673aac59facbab8a9007c7f6108d11f63b603f7cabff99fabf650fea5c32b861"
+
+[[package]]
 name = "untrusted"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1928,6 +2015,16 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "walkdir"
+version = "2.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29790946404f91d9c5d06f9874efddea1dc06c5efe94541a7d6863108e3a5e4b"
+dependencies = [
+ "same-file",
+ "winapi-util",
+]
 
 [[package]]
 name = "want"
@@ -1971,6 +2068,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "wasm-bindgen-futures"
+version = "0.4.45"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc7ec4f8827a71586374db3e87abdb5a2bb3a15afed140221307c3ec06b1f63b"
+dependencies = [
+ "cfg-if",
+ "js-sys",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
 name = "wasm-bindgen-macro"
 version = "0.2.95"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1998,6 +2107,32 @@ name = "wasm-bindgen-shared"
 version = "0.2.95"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "65fc09f10666a9f147042251e0dda9c18f166ff7de300607007e96bdebc1068d"
+
+[[package]]
+name = "wasm-bindgen-test"
+version = "0.3.45"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d381749acb0943d357dcbd8f0b100640679883fcdeeef04def49daf8d33a5426"
+dependencies = [
+ "console_error_panic_hook",
+ "js-sys",
+ "minicov",
+ "scoped-tls",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-bindgen-test-macro",
+]
+
+[[package]]
+name = "wasm-bindgen-test-macro"
+version = "0.3.45"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c97b2ef2c8d627381e51c071c2ab328eac606d3f69dd82bcbca20a9e389d95f0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
+]
 
 [[package]]
 name = "web-sys"
@@ -2046,6 +2181,15 @@ name = "winapi-i686-pc-windows-gnu"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac3b87c63620426dd9b991e5ce0329eff545bccbbb34f3be09ff6fb6ab51b7b6"
+
+[[package]]
+name = "winapi-util"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
+dependencies = [
+ "windows-sys 0.59.0",
+]
 
 [[package]]
 name = "winapi-x86_64-pc-windows-gnu"
