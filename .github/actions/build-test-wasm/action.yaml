@@ -1,0 +1,31 @@
+name: 'Build/Test WASM'
+description: 'A simple composite GitHub Action sets-up WASM; then test & build relevant crates'
+inputs:
+  cate:
+    description: 'The crate name. Must be in ./crates'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+      - run: yarn install
+        shell: bash
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        shell: bash
+      - name: Build WASM
+        run: |
+          mkdir -p ./prebuilds/${{ inputs.crate }}
+          wasm-pack build --target nodejs ./crates/${{ inputs.crate }} --out-dir ../../prebuilds/${{ inputs.crate }}
+        shell: bash
+      - name: Test WASM
+        run: node test_wasm.js
+        shell: bash
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prebuilds-wasm
+          if-no-files-found: ignore
+          path: ./prebuilds/*

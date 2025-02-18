@@ -3,7 +3,7 @@ default-members = [
   "crates/crashtracker"
 ]
 members = [
-  "crates/*"
+  "crates/*",
 ]
 
 [profile.release]
