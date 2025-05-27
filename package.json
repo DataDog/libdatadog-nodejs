@@ -9,7 +9,7 @@
     "build-debug": "mkdir -p target && yarn -s cargo-build > ./target/out.ndjson && yarn -s copy-artifacts",
     "build-release": "mkdir -p target && yarn -s cargo-build-release > ./target/out.ndjson && yarn -s copy-artifacts",
     "build-all": "mkdir -p target && yarn -s cargo-build -- --workspace > ./target/out.ndjson && yarn -s copy-artifacts && yarn -s build-wasm",
-    "build-wasm": "yarn -s install-wasm-pack && wasm-pack build --target nodejs ./crates/library_config --out-dir ../../prebuilds/library_config",
+    "build-wasm": "yarn -s install-wasm-pack && wasm-pack build --target nodejs ./crates/library_config --out-dir ../../prebuilds/library_config && wasm-pack build --target nodejs ./crates/datadog-js-zstd --out-dir ../../prebuilds/datadog-js-zstd",
     "cargo-build-release": "yarn -s cargo-build -- --release",
     "cargo-build": "cargo build --message-format=json-render-diagnostics",
     "copy-artifacts": "node ./scripts/copy-artifacts",
