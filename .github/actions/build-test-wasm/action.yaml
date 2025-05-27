@@ -22,10 +22,10 @@ runs:
           wasm-pack build --target nodejs ./crates/${{ inputs.crate }} --out-dir ../../prebuilds/${{ inputs.crate }}
         shell: bash
       - name: Test WASM
-        run: node test_wasm.js
+        run: node test_wasm.js ${{ inputs.crate }}
         shell: bash
       - uses: actions/upload-artifact@v4
         with:
-          name: prebuilds-wasm
+          name: prebuilds-wasm-${{ inputs.crate }}
           if-no-files-found: ignore
           path: ./prebuilds/*
