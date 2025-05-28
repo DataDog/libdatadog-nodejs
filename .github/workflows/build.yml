@@ -13,6 +13,7 @@ jobs:
       matrix:
         crate:
           - library_config
+          - datadog-js-zstd
     steps:
       - uses: actions/checkout@v4
       - name: 'Use composite action'
