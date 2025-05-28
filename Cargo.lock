@@ -395,10 +395,14 @@ dependencies = [
 
 [[package]]
 name = "datadog-library-config"
-version = "0.0.1"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v18.0.0#60583218a8de6768f67d04fcd5bc6443f67f516b"
+version = "0.0.2"
+source = "git+https://github.com/DataDog/libdatadog.git?rev=cb69bee1dea3d084d24084437bcfc01a7abd4bf8#cb69bee1dea3d084d24084437bcfc01a7abd4bf8"
 dependencies = [
  "anyhow",
+ "memfd",
+ "rand",
+ "rmp",
+ "rmp-serde",
  "serde",
  "serde_yaml",
 ]
@@ -679,8 +683,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c4567c8db10ae91089c99af84c68c38da3ec2f087c3f82960bcdbf3656b6f4d7"
 dependencies = [
  "cfg-if",
+ "js-sys",
  "libc",
  "wasi",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -1005,6 +1011,7 @@ version = "0.2.0"
 dependencies = [
  "anyhow",
  "datadog-library-config",
+ "getrandom",
  "serde",
  "serde-wasm-bindgen",
  "wasm-bindgen",
@@ -1028,6 +1035,15 @@ name = "memchr"
 version = "2.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
+
+[[package]]
+name = "memfd"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2cffa4ad52c6f791f4f8b15f0c05f9824b2ced1160e88cc393d64fff9a8ac64"
+dependencies = [
+ "rustix",
+]
 
 [[package]]
 name = "memmap2"
@@ -1321,6 +1337,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f139b0662de085916d1fb67d2b4169d1addddda1919e696f3252b740b629986e"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "process-discovery"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "datadog-library-config",
+ "napi",
+ "napi-derive",
 ]
 
 [[package]]
