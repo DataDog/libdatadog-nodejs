@@ -40,9 +40,12 @@ function test_service_selector() {
   });
 
   assert.strictEqual(values.length, 2)
-  assert.strictEqual(values[0].name, 'DD_RUNTIME_METRICS_ENABLED')
-  assert.strictEqual(values[0].value, 'true')
-  assert.strictEqual(values[0].source, 'local_stable_config')
+  assert.strictEqual(values[0].name, 'DD_SERVICE')
+  assert.strictEqual(values[0].value, 'my-service_butremote')
+  assert.strictEqual(values[0].source, 'fleet_stable_config')
+  assert.strictEqual(values[1].name, 'DD_RUNTIME_METRICS_ENABLED')
+  assert.strictEqual(values[1].value, 'true')
+  assert.strictEqual(values[1].source, 'local_stable_config')
 
   if (process.platform == 'linux') {
     assert.strictEqual(configurator.get_config_local_path(process.platform), "/etc/datadog-agent/application_monitoring.yaml");
