@@ -39,7 +39,7 @@ function findWASM (name) {
   const prebuilds = path.join(root, 'prebuilds')
   const folders = readdirSync(prebuilds)
   if (folders.find(f => f === name)) {
-    return path.join(prebuilds, name, `${name}.js`)
+    return path.join(prebuilds, name, `${name.replaceAll('-', '_')}.js`)
   }
 }
 
