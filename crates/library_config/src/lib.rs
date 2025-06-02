@@ -120,7 +120,7 @@ impl JsConfigurator {
                 let config_entries: Vec<ConfigEntry> = config
                     .into_iter()
                     .map(|c| ConfigEntry {
-                        name: c.name.to_string().into(),
+                        name: c.name.to_str().into(),
                         value: c.value,
                         source: c.source.to_str().into(),
                         config_id: c.config_id.unwrap_or_default(),
