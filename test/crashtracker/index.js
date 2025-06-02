@@ -36,8 +36,8 @@ app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
   res.status(200).send()
 
   server.close(() => {
-    const stackTrace = JSON.parse(req.body.payload[0].stack_trace)
-    const boomFrame = stackTrace.find(frame => frame.names?.[0]?.name.toLowerCase().includes('segfaultify'))
+    const stackTrace = JSON.parse(req.body.payload[0].stack_trace).frames
+    const boomFrame = stackTrace.find(frame => frame.function?.toLowerCase().includes('segfaultify'))
 
     console.log(inspect(stackTrace, true, 5, true))
 
