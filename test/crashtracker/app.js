@@ -13,9 +13,9 @@ crashtracker.init({
       authority: `127.0.0.1:${process.env.PORT || 8126}`,
       path_and_query: ''
     },
-    timeout_ms: 3000
+    timeout_ms: 10000
   },
-  timeout_ms: 3000,
+  timeout_ms: 10000,
   resolve_frames: 'EnabledWithInprocessSymbols',
   wait_for_receiver: true,
   demangle_names: false,
