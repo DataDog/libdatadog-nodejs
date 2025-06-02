@@ -13,9 +13,13 @@ execSync('yarn install', opts)
 
 const express = require('express')
 const bodyParser = require('body-parser')
-const { existsSync } = require('fs')
+const { existsSync, rmSync } = require('fs')
+const path = require('path')
 
 const app = express()
+
+rmSync(path.join(cwd, 'stdout.log'), { force: true })
+rmSync(path.join(cwd, 'stderr.log'), { force: true })
 
 let timeout = setTimeout(() => {
   execSync('cat stdout.log', opts)
