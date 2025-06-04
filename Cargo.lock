@@ -1347,6 +1347,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "process-discovery"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "datadog-library-config",
+ "napi",
+ "napi-derive",
+]
+
+[[package]]
 name = "prost"
 version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
