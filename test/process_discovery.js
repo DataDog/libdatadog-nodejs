@@ -21,6 +21,20 @@ const cfg_handle = process_discovery.storeMetadata(metadata)
 assert(cfg_handle !== undefined)
 
 if (process.platform === "linux") {
+  const contains_datadog_memfd = (fds) => {
+    for (const fd in fds) {
+      try {
+        const fd_name = fs.readlinkSync(`/proc/${process.pid}/fd/${fd}`);
+        if (fd_name.indexOf("datadog-tracer-info-") !== -1) {
+            return true;
+        }
+      } catch {
+        continue;
+      }
+    }
+    return false
+  };
+
   const fds = fs.readdirSync(`/proc/${process.pid}/fd`)
-  assert.ok(fds.some((fd) => fd.startsWith("datadog-tracer-info-")))
+  assert(contains_datadog_memfd(fds))
 }
