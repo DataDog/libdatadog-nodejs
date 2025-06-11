@@ -5,7 +5,7 @@ const fs = require('fs');
 const process = require('process');
 
 const libdatadog = require('..')
-const process_discovery = libdatadog.load('process_discovery')
+const process_discovery = libdatadog.load('process-discovery')
 assert(process_discovery !== undefined)
 
 const metadata = new process_discovery.TracerMetadata(
