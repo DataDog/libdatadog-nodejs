@@ -1,6 +1,7 @@
 [workspace]
 default-members = [
-  "crates/crashtracker"
+  "crates/crashtracker",
+  "crates/process_discovery",
 ]
 members = [
   "crates/*",
