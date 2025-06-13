@@ -13,9 +13,13 @@ execSync('yarn install', opts)
 
 const express = require('express')
 const bodyParser = require('body-parser')
-const { existsSync } = require('fs')
+const { existsSync, rmSync } = require('fs')
+const path = require('path')
 
 const app = express()
+
+rmSync(path.join(cwd, 'stdout.log'), { force: true })
+rmSync(path.join(cwd, 'stderr.log'), { force: true })
 
 let timeout = setTimeout(() => {
   execSync('cat stdout.log', opts)
@@ -32,8 +36,8 @@ app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
   res.status(200).send()
 
   server.close(() => {
-    const stackTrace = JSON.parse(req.body.payload[0].stack_trace)
-    const boomFrame = stackTrace.find(frame => frame.names?.[0]?.name.toLowerCase().includes('segfaultify'))
+    const stackTrace = JSON.parse(req.body.payload[0].stack_trace).frames
+    const boomFrame = stackTrace.find(frame => frame.function?.toLowerCase().includes('segfaultify'))
 
     console.log(inspect(stackTrace, true, 5, true))
 
