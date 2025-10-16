@@ -8,7 +8,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 anyhow = "1"
-datadog-library-config = { git = "https://github.com/DataDog/libdatadog.git", tag = "v18.1.0" }
+datadog-library-config = { git = "https://github.com/DataDog/libdatadog.git", rev = "e9902114a482cb04a3b5018ba54b0ba407168ab4" }
 
-napi = { version = "2" }
-napi-derive = { version = "2", default-features = false }
+napi = { version = "3" }
+napi-derive = { version = "3", default-features = false }

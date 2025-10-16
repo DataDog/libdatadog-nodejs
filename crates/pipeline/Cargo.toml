@@ -9,9 +9,8 @@ crate-type = ["cdylib"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-data-pipeline = { git = "https://github.com/DataDog/libdatadog.git", branch = "julio/nodejs-integration" }
-
-[dependencies.neon]
-version = "1.0.0"
-default-features = false
-features = ["napi-6"]
+data-pipeline = { git = "https://github.com/DataDog/libdatadog.git", rev = "e9902114a482cb04a3b5018ba54b0ba407168ab4" }
+datadog-trace-utils = { git = "https://github.com/DataDog/libdatadog.git", rev = "e9902114a482cb04a3b5018ba54b0ba407168ab4" }
+serde = { version = "1.0", features = ["derive"] }
+napi = { version = "3.3", features = ["napi6"] }
+napi-derive = { version = "3", default-features = false }

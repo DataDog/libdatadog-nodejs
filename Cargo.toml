@@ -2,6 +2,7 @@
 default-members = [
   "crates/crashtracker",
   "crates/process_discovery",
+  "crates/pipeline",
 ]
 members = [
   "crates/*",
