@@ -4,6 +4,9 @@ const libdatadog = require('../..')
 const crashtracker = libdatadog.load('crashtracker')
 
 crashtracker.init({
+  demangle_names: false,
+  signals: [4, 6, 7, 11],
+  timeout: { secs: 30, nanos: 0 },
   additional_files: [],
   create_alt_stack: true,
   use_alt_stack: true,

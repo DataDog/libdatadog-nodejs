@@ -30,13 +30,26 @@ let timeout = setTimeout(() => {
 
 app.use(bodyParser.json())
 
+let pingReceived = false
+
 app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
   clearTimeout(timeout)
 
   res.status(200).send()
 
+  console.log(req.body)
+
+  if (req.body.payload[0].tags.indexOf('is_crash_ping:true') !== -1) {
+    pingReceived = true
+    return
+  }
+
   server.close(() => {
-    const stackTrace = JSON.parse(req.body.payload[0].stack_trace).frames
+    if (!pingReceived) {
+      throw new Error('Ping was not received before another message')
+    }
+
+    const stackTrace = JSON.parse(req.body.payload[0].message).error.stack.frames
     const boomFrame = stackTrace.find(frame => frame.function?.toLowerCase().includes('segfaultify'))
 
     console.log(inspect(stackTrace, true, 5, true))
