@@ -20,10 +20,15 @@ const app = express()
 
 rmSync(path.join(cwd, 'stdout.log'), { force: true })
 rmSync(path.join(cwd, 'stderr.log'), { force: true })
+execSync('touch stdout.log', opts)
+execSync('touch stderr.log', opts)
 
 let timeout = setTimeout(() => {
+  console.log('===== stdout')
   execSync('cat stdout.log', opts)
+  console.log('===== stderr')
   execSync('cat stderr.log', opts)
+  console.log('=====')
 
   throw new Error('No crash report received before timing out.')
 }, 10000) // TODO: reduce this when the receiver no longer locks up

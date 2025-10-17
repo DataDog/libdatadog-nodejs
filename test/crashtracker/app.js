@@ -23,7 +23,7 @@ crashtracker.init({
   wait_for_receiver: true
 }, {
   args: [],
-  env: [],
+  env: [['RUST_BACKTRACE','full']],
   path_to_receiver_binary: libdatadog.find('crashtracker-receiver', true),
   stderr_filename: 'stderr.log',
   stdout_filename: 'stdout.log',
