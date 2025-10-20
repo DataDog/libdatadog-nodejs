@@ -9,7 +9,7 @@ crate-type = ["cdylib"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-data-pipeline = { git = "https://github.com/DataDog/libdatadog.git", branch = "julio/nodejs-integration" }
+data-pipeline = { git = "https://github.com/DataDog/libdatadog.git", tag = "v22.1.0" }
 
 [dependencies.neon]
 version = "1.0.0"

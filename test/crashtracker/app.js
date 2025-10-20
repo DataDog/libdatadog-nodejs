@@ -6,7 +6,9 @@ const crashtracker = libdatadog.load('crashtracker')
 crashtracker.init({
   additional_files: [],
   create_alt_stack: true,
+  demangle_names: false,
   use_alt_stack: true,
+  signals: [],
   endpoint: {
     url: {
       scheme: 'http',
@@ -15,9 +17,11 @@ crashtracker.init({
     },
     timeout_ms: 3000
   },
-  timeout_ms: 3000,
+  timeout: {
+    secs: 3,
+    nanos:0,
+  },
   resolve_frames: 'EnabledWithInprocessSymbols',
-  wait_for_receiver: true
 }, {
   args: [],
   env: [],

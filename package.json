@@ -27,5 +27,8 @@
   "homepage": "https://github.com/DataDog/libdatadog-nodejs#readme",
   "publishConfig": {
     "access": "public"
+  },
+  "devDependencies": {
+    "yarn": "^1.22.22"
   }
 }

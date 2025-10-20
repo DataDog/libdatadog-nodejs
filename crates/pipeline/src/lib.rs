@@ -1,6 +1,7 @@
 use std::borrow::BorrowMut;
 use std::sync::Mutex;
 use std::cell::OnceCell;
+use data_pipeline::trace_exporter::agent_response::AgentResponse;
 use neon::prelude::*;
 use neon::types::buffer::TypedArray;
 use data_pipeline::trace_exporter::TraceExporter;
@@ -21,8 +22,7 @@ fn register (cx: &mut ModuleContext) -> NeonResult<()> {
 }
 
 fn trace_exporter_init(
-    host: &str,
-    port: u16,
+    url: &str,
     timeout: u64,
     tracer_version: &str,
     lang: &str,
@@ -30,32 +30,30 @@ fn trace_exporter_init(
     lang_interpreter: &str) {
 
     EXPORTER.lock().unwrap().get_or_init(|| {
-        TraceExporterBuilder::default()
-            .set_host(host)
-            .set_port(port)
+        let mut builder = TraceExporterBuilder::default();
+        builder
+            .set_url(url)
             .set_tracer_version(tracer_version)
             .set_language(lang)
             .set_language_version(lang_version)
             .set_language_interpreter(lang_interpreter)
-            .set_timeout(timeout)
-            .build()
-            .unwrap()
+            .set_connection_timeout(Some(timeout));
+
+        builder.build().unwrap()
 
     });
 }
 
 fn init_trace_exporter(mut cx: FunctionContext) -> JsResult<JsUndefined>{
-    let host = cx.argument::<JsString>(0)?.value(cx.borrow_mut());
-    let port = cx.argument::<JsNumber>(1)?.value(cx.borrow_mut());
-    let timeout = cx.argument::<JsNumber>(2)?.value(cx.borrow_mut());
-    let tracer_version = cx.argument::<JsString>(3)?.value(cx.borrow_mut());
-    let lang = cx.argument::<JsString>(4)?.value(cx.borrow_mut());
-    let lang_version = cx.argument::<JsString>(5)?.value(cx.borrow_mut());
+    let url = cx.argument::<JsString>(0)?.value(cx.borrow_mut());
+    let timeout = cx.argument::<JsNumber>(1)?.value(cx.borrow_mut());
+    let tracer_version = cx.argument::<JsString>(2)?.value(cx.borrow_mut());
+    let lang = cx.argument::<JsString>(3)?.value(cx.borrow_mut());
+    let lang_version = cx.argument::<JsString>(4)?.value(cx.borrow_mut());
     let lang_interpreter = cx.argument::<JsString>(5)?.value(cx.borrow_mut());
 
     trace_exporter_init(
-        &host,
-        port as u16,
+        &url,
         timeout as u64,
         &tracer_version,
         &lang,
@@ -71,7 +69,15 @@ fn send_traces(mut cx: FunctionContext) -> JsResult<JsString> {
 
     let response = EXPORTER.lock().unwrap().get().unwrap().send(data, trace_count as usize);
 
-    Ok(cx.string(response.unwrap_or("Error sending traces".to_string())))
+    let ret = match response {
+        Ok(r) => match r {
+            AgentResponse::Unchanged => "".to_string(),
+            AgentResponse::Changed{body} =>  body,
+        },
+        Err(_) => "Error sending traces".to_string(),
+    };
+
+    Ok(cx.string(ret))
 }
 
 
