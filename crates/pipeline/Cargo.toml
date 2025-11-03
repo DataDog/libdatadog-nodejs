@@ -9,8 +9,8 @@ crate-type = ["cdylib"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-data-pipeline = { git = "https://github.com/DataDog/libdatadog.git", rev = "e9902114a482cb04a3b5018ba54b0ba407168ab4" }
-datadog-trace-utils = { git = "https://github.com/DataDog/libdatadog.git", rev = "e9902114a482cb04a3b5018ba54b0ba407168ab4" }
+data-pipeline = { git = "https://github.com/DataDog/libdatadog.git", rev = "3e4c8acba64317de11ccd85e44bf1d07ff06a4d7" }
+datadog-trace-utils = { git = "https://github.com/DataDog/libdatadog.git", rev = "3e4c8acba64317de11ccd85e44bf1d07ff06a4d7" }
 serde = { version = "1.0", features = ["derive"] }
-napi = { version = "3.3", features = ["napi6"] }
+napi = { version = "3.3", features = ["napi6", "async"] }
 napi-derive = { version = "3", default-features = false }

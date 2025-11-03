@@ -14,7 +14,7 @@ path = "src/bin/receiver.rs"
 
 [dependencies]
 anyhow = "1"
-datadog-crashtracker = { git = "https://github.com/DataDog/libdatadog.git", rev = "e9902114a482cb04a3b5018ba54b0ba407168ab4" }
+datadog-crashtracker = { git = "https://github.com/DataDog/libdatadog.git", rev = "3e4c8acba64317de11ccd85e44bf1d07ff06a4d7" }
 napi = { version = "2", features = ["serde-json"] }
 napi-derive = { version = "2", default-features = false }
 rustls = { version = "*", default-features = false, features = ["aws-lc-rs"] }
