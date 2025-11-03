@@ -22,18 +22,19 @@ const state = new NativeSpanState(
 )
 
 function flushChangeQueue() {
-  state.flushChangeQueue(cqbCount);
+  const result = state.flushChangeQueue(cqbCount);
 }
 
 const flushBuffer = Buffer.alloc(10 * 1024)
-function flushSpans(...spans) {
+async function flushSpans(...spans) {
   flushChangeQueue()
   let index = 0
   for (const span of spans) {
     flushBuffer.writeBigUint64LE(span.spanId, index)
     index += 8
   }
-  state.flushChunk(spans.length, flushBuffer)
+  const result = await state.flushChunk(spans.length, flushBuffer)
+  console.log(result)
 }
 
 function getStringId(str) {

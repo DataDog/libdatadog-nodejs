@@ -72,6 +72,8 @@ pub struct NativeSpanState {
     exporter: TraceExporter
 }
 
+unsafe impl Send for NativeSpanState {}
+
 #[napi]
 impl NativeSpanState {
     #[napi(constructor)]
@@ -102,7 +104,7 @@ impl NativeSpanState {
     }
 
     #[napi]
-    pub fn flush_chunk(&mut self, len: u32, chunk: Buffer) -> String {
+    pub async unsafe fn flush_chunk(&mut self, len: u32, chunk: Buffer) -> String {
         let mut count = len;
         let mut spans_vec = Vec::with_capacity(count as usize);
         let chunk_vec: Vec<u8> = chunk.into();
@@ -113,7 +115,7 @@ impl NativeSpanState {
             count -= 1;
         }
         // TODO(bengl) we need an async version of this.
-        let resp = self.exporter.send_trace_chunks(vec![spans_vec]);
+        let resp = self.exporter.send_trace_chunks_async(vec![spans_vec]).await;
         let response_str = resp.map(|resp| match resp {
             AgentResponse::Unchanged => "unchanged".to_string(),
             AgentResponse::Changed { body } => body,
