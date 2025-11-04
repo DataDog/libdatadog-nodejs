@@ -152,6 +152,10 @@ impl NativeSpanState {
         self.spans.get(id).unwrap()
     }
 
+    fn get_span_bigint(&self, id: BigInt) -> &Span<SpanString> {
+        self.get_span(&id.get_u64().1)
+    }
+
     fn interpret_operation(&mut self, index: &mut usize, op: &BufferedOperation) {
         match op.opcode {
             OpCode::Create => {
@@ -239,15 +243,52 @@ impl NativeSpanState {
 
     #[napi]
     pub fn get_service_name(&self, id: BigInt) -> String {
-        self.get_span(&id.get_u64().1).service.0.clone()
+        self.get_span_bigint(id).service.0.clone()
     }
 
     #[napi]
     pub fn get_resource_name(&self, id: BigInt) -> String {
-        self.get_span(&id.get_u64().1).resource.0.clone()
+        self.get_span_bigint(id).resource.0.clone()
     }
 
-    // TODO(bengl) all read operations
+    #[napi]
+    pub fn get_meta_attr(&self, id: BigInt, name: String) -> String {
+        let name: SpanString = name.clone().into();
+        let result = self.get_span_bigint(id).meta.get(&name).unwrap();
+        result.0.clone()
+    }
+
+    #[napi]
+    pub fn get_metric_attr(&self, id: BigInt, name: String) -> f64 {
+        let name: SpanString = name.clone().into();
+        let result = self.get_span_bigint(id).metrics.get(&name).unwrap();
+        result.clone()
+    }
+
+    #[napi]
+    pub fn get_error(&self, id: BigInt) -> i32 {
+        self.get_span_bigint(id).error
+    }
+
+    #[napi]
+    pub fn get_start(&self, id: BigInt) -> i64 {
+        self.get_span_bigint(id).start
+    }
+
+    #[napi]
+    pub fn get_duration(&self, id: BigInt) -> i64 {
+        self.get_span_bigint(id).duration
+    }
+
+    #[napi]
+    pub fn get_type(&self, id: BigInt) -> String {
+        self.get_span_bigint(id).r#type.0.clone()
+    }
+
+    #[napi]
+    pub fn get_name(&self, id: BigInt) -> String {
+        self.get_span_bigint(id).name.0.clone()
+    }
 }
 
 trait FromBytes: Sized {
