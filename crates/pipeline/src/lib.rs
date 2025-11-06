@@ -1,37 +1,19 @@
 use data_pipeline::trace_exporter::agent_response::AgentResponse;
 use data_pipeline::trace_exporter::TraceExporter;
 use data_pipeline::trace_exporter::TraceExporterBuilder;
-use serde::Serialize;
-use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::ffi::CStr;
 
-use datadog_trace_utils::span::{Span, SpanText};
+use datadog_trace_utils::span::Span;
 
-use napi::bindgen_prelude::*;
+mod native_span;
+use native_span::*;
+
+mod trace;
+
 use napi::bindgen_prelude::BigInt;
+use napi::bindgen_prelude::*;
 use napi_derive::napi;
-
-#[derive(Default, Eq, PartialEq, Serialize, Hash, Clone)]
-struct SpanString(String);
-
-impl Borrow<str> for SpanString {
-    fn borrow(&self) -> &str {
-        self.0.as_str()
-    }
-}
-
-impl SpanText for SpanString {
-    fn from_static_str(value: &'static str) -> Self {
-        SpanString(String::from(value))
-    }
-}
-
-impl From<String> for SpanString {
-    fn from(s: String) -> SpanString {
-        SpanString(s)
-    }
-}
 
 #[napi]
 #[repr(u64)]
@@ -45,7 +27,9 @@ pub enum OpCode {
     SetStart = 6,
     SetDuration = 7,
     SetType = 8,
-    SetName = 9
+    SetName = 9,
+    SetTraceMetaAttr = 10,
+    SetTraceMetricsAttr = 11,
     // TODO: SpanLinks, SpanEvents, StructAttr
 }
 
@@ -55,7 +39,6 @@ impl OpCode {
     }
 }
 
-#[repr(C)]
 struct BufferedOperation {
     opcode: OpCode,
     span_id: u64,
@@ -66,10 +49,12 @@ pub struct NativeSpanState {
     // TODO(bengl) currently storing change buffer as raw pointer to avoid dealing with slice lifetime.
     // This isn't ideal.
     change_buffer: *const u8, // [BufOp Arg0 Arg1...  BufOp Arg0 Arg1 ... ]
-    spans: HashMap<u64, Span<SpanString>>,
+    spans: HashMap<u64, NativeSpan>,
     string_table: HashMap<u32, SpanString>,
     string_table_input: Vec<u8>,
-    exporter: TraceExporter
+    exporter: TraceExporter,
+    pid: f64,
+    tracer_service: String,
 }
 
 unsafe impl Send for NativeSpanState {}
@@ -85,6 +70,8 @@ impl NativeSpanState {
         lang_interpreter: String,
         change_queue_buffer: Buffer,
         string_table_input_buffer: Buffer,
+        pid: f64,
+        tracer_service: String,
     ) -> Self {
         let mut builder = TraceExporterBuilder::default();
         builder
@@ -100,6 +87,8 @@ impl NativeSpanState {
             string_table: HashMap::new(),
             string_table_input: string_table_input_buffer.into(),
             exporter: builder.build().unwrap(),
+            pid,
+            tracer_service,
         }
     }
 
@@ -110,11 +99,15 @@ impl NativeSpanState {
         let chunk_vec: Vec<u8> = chunk.into();
         let mut index: usize = 0;
         while count > 0 {
+            let needs_trace = index == 0;
             let span_id: u64 = get_num(&chunk_vec, &mut index);
-            spans_vec.push(self.spans.remove(&span_id).unwrap());
+            let mut span = self.spans.remove(&span_id).unwrap();
+            if needs_trace {
+                span.copy_in_trace_data();
+            }
+            spans_vec.push(self.process_one_span(span));
             count -= 1;
         }
-        // TODO(bengl) we need an async version of this.
         let resp = self.exporter.send_trace_chunks_async(vec![spans_vec]).await;
         let response_str = resp.map(|resp| match resp {
             AgentResponse::Unchanged => "unchanged".to_string(),
@@ -133,10 +126,7 @@ impl NativeSpanState {
             let opcode: u64 = get_num_raw(self.change_buffer, &mut index);
             let opcode = OpCode::from_num(opcode);
             let span_id: u64 = get_num_raw(self.change_buffer, &mut index);
-            let op = BufferedOperation {
-                opcode,
-                span_id
-            };
+            let op = BufferedOperation { opcode, span_id };
             self.interpret_operation(&mut index, &op);
             count -= 1;
         }
@@ -144,30 +134,25 @@ impl NativeSpanState {
         true
     }
 
-    fn get_mut_span(&mut self, id: &u64) -> &mut Span<SpanString> {
+    fn get_mut_span(&mut self, id: &u64) -> &mut NativeSpan {
         self.spans.get_mut(id).unwrap()
     }
 
-    fn get_span(&self, id: &u64) -> &Span<SpanString> {
+    fn get_span(&self, id: &u64) -> &NativeSpan {
         self.spans.get(id).unwrap()
     }
 
-    fn get_span_bigint(&self, id: BigInt) -> &Span<SpanString> {
+    fn get_span_bigint(&self, id: BigInt) -> &NativeSpan {
         self.get_span(&id.get_u64().1)
     }
 
     fn interpret_operation(&mut self, index: &mut usize, op: &BufferedOperation) {
         match op.opcode {
             OpCode::Create => {
-                self.spans.insert(
-                    op.span_id,
-                    Span::<SpanString> {
-                        span_id: op.span_id,
-                        trace_id: self.get_num_arg(index),
-                        parent_id: self.get_num_arg(index),
-                        ..Default::default()
-                    },
-                );
+                let trace_id = self.get_num_arg(index);
+                let parent_id = self.get_num_arg(index);
+                let span = NativeSpan::new(&self.spans, op.span_id, trace_id, parent_id);
+                self.spans.insert(op.span_id, span);
             }
             OpCode::SetMetaAttr => {
                 let name = self.get_string_arg(index);
@@ -196,10 +181,24 @@ impl NativeSpanState {
             }
             OpCode::SetType => {
                 self.get_mut_span(&op.span_id).r#type = self.get_string_arg(index);
-            },
+            }
             OpCode::SetName => {
                 self.get_mut_span(&op.span_id).name = self.get_string_arg(index);
-            }//_ => panic!("Unsupported opcode")
+            }
+            OpCode::SetTraceMetaAttr => {
+                let name = self.get_string_arg(index);
+                let val = self.get_string_arg(index);
+
+                let span = self.get_mut_span(&op.span_id);
+                span.trace.borrow_mut().meta.insert(name, val);
+            }
+            OpCode::SetTraceMetricsAttr => {
+                let name = self.get_string_arg(index);
+                let val = self.get_num_arg(index);
+
+                let span = self.get_mut_span(&op.span_id);
+                span.trace.borrow_mut().metrics.insert(name, val);
+            }
         };
     }
 
@@ -289,6 +288,32 @@ impl NativeSpanState {
     pub fn get_name(&self, id: BigInt) -> String {
         self.get_span_bigint(id).name.0.clone()
     }
+
+    fn process_one_span(&self, mut span: NativeSpan) -> Span<SpanString> {
+        let kind_key: SpanString = String::from("kind").into();
+        if let Some(kind) = span.meta.get(&kind_key) {
+            let internal_val = String::from("internal");
+            if kind.0 != internal_val {
+                span.metrics
+                    .insert(String::from("_dd.measured").into(), 1.0);
+            }
+        }
+        if span.service.0 != self.tracer_service {
+            span.meta.insert(
+                String::from("_dd.base_service").into(),
+                self.tracer_service.clone().into(),
+            );
+            // TODO span.service should be added to the "extra services" used by RC, which is not
+            // yet imlemented here on the Rust side.
+        }
+        span.meta.insert(
+            String::from("language").into(),
+            String::from("javascript").into(),
+        );
+        span.metrics
+            .insert(String::from("process_id").into(), self.pid);
+        span.span
+    }
 }
 
 trait FromBytes: Sized {
@@ -310,7 +335,7 @@ macro_rules! impl_from_bytes {
                 <$ty>::from_le_bytes(code_buf)
             }
         }
-    }
+    };
 }
 
 impl_from_bytes!(u128, 16);
@@ -323,7 +348,7 @@ impl_from_bytes!(u32, 4);
 fn get_num<T: Copy + FromBytes>(buf: &Vec<u8>, index: &mut usize) -> T {
     let id: usize = index.clone();
     let size = std::mem::size_of::<T>();
-    let result = &buf[id..(id+size)];
+    let result = &buf[id..(id + size)];
     let result: T = T::from_bytes(&result);
     *index += size;
     result
@@ -331,11 +356,9 @@ fn get_num<T: Copy + FromBytes>(buf: &Vec<u8>, index: &mut usize) -> T {
 
 fn get_num_raw<T: Copy + FromBytes>(buf: *const u8, index: &mut usize) -> T {
     let size = std::mem::size_of::<T>();
-    let result: &[u8] = unsafe {
-        std::slice::from_raw_parts((buf as usize + *index) as *const u8, size)
-    };
+    let result: &[u8] =
+        unsafe { std::slice::from_raw_parts((buf as usize + *index) as *const u8, size) };
     let result = T::from_bytes(result);
     *index += size;
     result
 }
-
