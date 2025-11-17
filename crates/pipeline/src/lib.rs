@@ -94,13 +94,13 @@ impl NativeSpanState {
     }
 
     #[napi]
-    pub async unsafe fn flush_chunk(&mut self, len: u32, first_is_local_root: bool, first_is_chunk_root: bool, chunk: Buffer) -> String {
+    pub async unsafe fn flush_chunk(&mut self, len: u32, first_is_local_root: bool, chunk: Buffer) -> String {
         let mut count = len;
         let mut spans_vec = Vec::with_capacity(count as usize);
         let chunk_vec: Vec<u8> = chunk.into();
         let mut index: usize = 0;
         let mut is_local_root = first_is_local_root;
-        let mut is_chunk_root = first_is_chunk_root;
+        let mut is_chunk_root = true;
         while count > 0 {
             let span_id: u64 = get_num(&chunk_vec, &mut index);
             let mut span = self.spans.remove(&span_id).unwrap();

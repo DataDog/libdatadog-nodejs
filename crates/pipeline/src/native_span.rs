@@ -36,7 +36,7 @@ impl From<&str> for SpanString {
 
 pub struct NativeSpan {
     pub span: Span<SpanString>,
-    pub trace: Rc<RefCell<Trace>>,
+    pub trace: Rc<RefCell<Trace<SpanString>>>,
 }
 
 impl NativeSpan {
