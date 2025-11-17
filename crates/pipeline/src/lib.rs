@@ -49,7 +49,8 @@ struct BufferedOperation {
 pub struct NativeSpanState {
     // TODO(bengl) currently storing change buffer as raw pointer to avoid dealing with slice lifetime.
     // This isn't ideal.
-    change_buffer: *const u8, // [BufOp Arg0 Arg1...  BufOp Arg0 Arg1 ... ]
+    change_buffer: *const u8, // [Length BufOp Arg0 Arg1...  BufOp Arg0 Arg1 ... ]
+                              // (Length is u64 number of BufOps)
     spans: HashMap<u64, NativeSpan>,
     string_table: HashMap<u32, SpanString>,
     string_table_input: Vec<u8>,
@@ -95,6 +96,7 @@ impl NativeSpanState {
 
     #[napi]
     pub async unsafe fn flush_chunk(&mut self, len: u32, first_is_local_root: bool, chunk: Buffer) -> String {
+        self.flush_change_queue();
         let mut count = len;
         let mut spans_vec = Vec::with_capacity(count as usize);
         let chunk_vec: Vec<u8> = chunk.into();
@@ -126,9 +128,9 @@ impl NativeSpanState {
     }
 
     #[napi]
-    pub fn flush_change_queue(&mut self, operation_count: u32) -> bool {
-        let mut count = operation_count;
+    pub fn flush_change_queue(&mut self) -> bool {
         let mut index = 0;
+        let mut count: u64 = get_num_raw(self.change_buffer, &mut index);
 
         while count > 0 {
             let opcode: u64 = get_num_raw(self.change_buffer, &mut index);
@@ -254,51 +256,60 @@ impl NativeSpanState {
     }
 
     #[napi]
-    pub fn get_service_name(&self, id: BigInt) -> String {
+    pub fn get_service_name(&mut self, id: BigInt) -> String {
+        self.flush_change_queue();
         self.get_span_bigint(id).service.0.clone()
     }
 
     #[napi]
-    pub fn get_resource_name(&self, id: BigInt) -> String {
+    pub fn get_resource_name(&mut self, id: BigInt) -> String {
+        self.flush_change_queue();
         self.get_span_bigint(id).resource.0.clone()
     }
 
     #[napi]
-    pub fn get_meta_attr(&self, id: BigInt, name: String) -> String {
+    pub fn get_meta_attr(&mut self, id: BigInt, name: String) -> String {
+        self.flush_change_queue();
         let name: SpanString = name.clone().into();
         let result = self.get_span_bigint(id).meta.get(&name).unwrap();
         result.0.clone()
     }
 
     #[napi]
-    pub fn get_metric_attr(&self, id: BigInt, name: String) -> f64 {
+    pub fn get_metric_attr(&mut self, id: BigInt, name: String) -> f64 {
+        self.flush_change_queue();
         let name: SpanString = name.clone().into();
         let result = self.get_span_bigint(id).metrics.get(&name).unwrap();
         result.clone()
     }
 
     #[napi]
-    pub fn get_error(&self, id: BigInt) -> i32 {
+    pub fn get_error(&mut self, id: BigInt) -> i32 {
+        self.flush_change_queue();
         self.get_span_bigint(id).error
     }
 
     #[napi]
-    pub fn get_start(&self, id: BigInt) -> i64 {
+    pub fn get_start(&mut self, id: BigInt) -> i64 {
+        self.flush_change_queue();
         self.get_span_bigint(id).start
     }
 
     #[napi]
-    pub fn get_duration(&self, id: BigInt) -> i64 {
+    pub fn get_duration(&mut self, id: BigInt) -> i64 {
+        self.flush_change_queue();
         self.get_span_bigint(id).duration
     }
 
     #[napi]
-    pub fn get_type(&self, id: BigInt) -> String {
+    pub fn get_type(&mut self, id: BigInt) -> String {
+        self.flush_change_queue();
         self.get_span_bigint(id).r#type.0.clone()
     }
 
     #[napi]
-    pub fn get_name(&self, id: BigInt) -> String {
+    pub fn get_name(&mut self, id: BigInt) -> String {
+        self.flush_change_queue();
         self.get_span_bigint(id).name.0.clone()
     }
 
