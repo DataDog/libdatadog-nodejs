@@ -30,6 +30,7 @@ pub enum OpCode {
     SetName = 9,
     SetTraceMetaAttr = 10,
     SetTraceMetricsAttr = 11,
+    SetTraceOrigin = 12,
     // TODO: SpanLinks, SpanEvents, StructAttr
 }
 
@@ -93,17 +94,24 @@ impl NativeSpanState {
     }
 
     #[napi]
-    pub async unsafe fn flush_chunk(&mut self, len: u32, chunk: Buffer) -> String {
+    pub async unsafe fn flush_chunk(&mut self, len: u32, first_is_local_root: bool, first_is_chunk_root: bool, chunk: Buffer) -> String {
         let mut count = len;
         let mut spans_vec = Vec::with_capacity(count as usize);
         let chunk_vec: Vec<u8> = chunk.into();
         let mut index: usize = 0;
+        let mut is_local_root = first_is_local_root;
+        let mut is_chunk_root = first_is_chunk_root;
         while count > 0 {
-            let needs_trace = index == 0;
             let span_id: u64 = get_num(&chunk_vec, &mut index);
             let mut span = self.spans.remove(&span_id).unwrap();
-            if needs_trace {
-                span.copy_in_trace_data();
+            if is_local_root {
+                span.copy_in_sampling_tags();
+                span.metrics.insert("_dd.top_level".into(), 1.0);
+                is_local_root = false;
+            }
+            if is_chunk_root {
+                span.copy_in_chunk_tags();
+                is_chunk_root = false;
             }
             spans_vec.push(self.process_one_span(span));
             count -= 1;
@@ -199,6 +207,11 @@ impl NativeSpanState {
                 let span = self.get_mut_span(&op.span_id);
                 span.trace.borrow_mut().metrics.insert(name, val);
             }
+            OpCode::SetTraceOrigin => {
+                let origin = self.get_string_arg(index);
+                let span = self.get_mut_span(&op.span_id);
+                span.trace.borrow_mut().origin = Some(origin);
+            }
         };
     }
 
@@ -290,28 +303,37 @@ impl NativeSpanState {
     }
 
     fn process_one_span(&self, mut span: NativeSpan) -> Span<SpanString> {
-        let kind_key: SpanString = String::from("kind").into();
+        let kind_key: SpanString = "kind".into();
         if let Some(kind) = span.meta.get(&kind_key) {
             let internal_val = String::from("internal");
             if kind.0 != internal_val {
                 span.metrics
-                    .insert(String::from("_dd.measured").into(), 1.0);
+                    .insert("_dd.measured".into(), 1.0);
             }
         }
         if span.service.0 != self.tracer_service {
             span.meta.insert(
-                String::from("_dd.base_service").into(),
+                "_dd.base_service".into(),
                 self.tracer_service.clone().into(),
             );
             // TODO span.service should be added to the "extra services" used by RC, which is not
             // yet imlemented here on the Rust side.
         }
-        span.meta.insert(
-            String::from("language").into(),
-            String::from("javascript").into(),
-        );
+
+        // SKIP setting single-span ingestion tags. They should be set when sampling is finalized
+        // for the span.
+
+        span.meta.insert("language".into(), "javascript".into());
         span.metrics
-            .insert(String::from("process_id").into(), self.pid);
+            .insert("process_id".into(), self.pid);
+        let origin = &span.trace.borrow().origin.clone();
+        if let Some(origin) = origin {
+            span.meta.insert("_dd.origin".into(), origin.clone());
+        }
+        // SKIP hostname. This can be an option to the span constructor, so we'll set the tag at
+        // that point.
+
+        // TODO Sampling priority, if we're not doing that ahead of time.
         span.span
     }
 }

@@ -28,13 +28,19 @@ impl From<String> for SpanString {
     }
 }
 
+impl From<&str> for SpanString {
+    fn from(s: &str) -> SpanString {
+        String::from(s).into()
+    }
+}
+
 pub struct NativeSpan {
     pub span: Span<SpanString>,
     pub trace: Rc<RefCell<Trace>>,
 }
 
 impl NativeSpan {
-    pub fn copy_in_trace_data(&mut self) {
+    pub fn copy_in_chunk_tags(&mut self) {
         // TODO(bengl) can we avoid doing two loops each, somehow?
         let mut meta = HashMap::new();
         for (key, value) in (*self.trace).borrow().meta.iter() {
@@ -50,6 +56,21 @@ impl NativeSpan {
         }
         for (key, value) in metrics.into_iter() {
             self.metrics.insert(key, value);
+        }
+    }
+
+    pub fn copy_in_sampling_tags(&mut self) {
+        let rule = (*self.trace).borrow().sampling_rule_decision.clone();
+        if let Some(rule) = rule {
+            self.metrics.insert(String::from("_dd.rule_psr").into(), rule);
+        }
+        let limit = (*self.trace).borrow().sampling_limit_decision.clone();
+        if let Some(limit) = limit {
+            self.metrics.insert(String::from("_dd.limit_psr").into(), limit);
+        }
+        let agent = (*self.trace).borrow().sampling_agent_decision.clone();
+        if let Some(agent) = agent {
+            self.metrics.insert(String::from("_dd.agent_psr").into(), agent);
         }
     }
 }
