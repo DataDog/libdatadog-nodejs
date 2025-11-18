@@ -57,6 +57,7 @@ pub struct NativeSpanState {
     exporter: TraceExporter,
     pid: f64,
     tracer_service: String,
+    sampling_buffer: Vec<u8>,
 }
 
 unsafe impl Send for NativeSpanState {}
@@ -74,6 +75,7 @@ impl NativeSpanState {
         string_table_input_buffer: Buffer,
         pid: f64,
         tracer_service: String,
+        sampling_buffer: Buffer,
     ) -> Self {
         let mut builder = TraceExporterBuilder::default();
         builder
@@ -91,6 +93,7 @@ impl NativeSpanState {
             exporter: builder.build().unwrap(),
             pid,
             tracer_service,
+            sampling_buffer: sampling_buffer.into(),
         }
     }
 
@@ -143,6 +146,21 @@ impl NativeSpanState {
 
         true
     }
+
+    #[napi]
+    pub fn sample(&mut self) -> bool {
+        self.flush_change_queue();
+        let span_id: u64 = get_num(&self.sampling_buffer, &mut 0);
+        let span = self.get_mut_span(&span_id);
+        let result = span.sample();
+        if let Some(result) = result {
+            for (i, elem) in result.iter().enumerate() {
+                self.sampling_buffer[i] = elem.clone();
+            }
+        }
+        result.is_some()
+    }
+
 
     fn get_mut_span(&mut self, id: &u64) -> &mut NativeSpan {
         self.spans.get_mut(id).unwrap()
@@ -314,6 +332,10 @@ impl NativeSpanState {
     }
 
     fn process_one_span(&self, mut span: NativeSpan) -> Span<SpanString> {
+        // TODO Is this the correct time to do this? In the JS implementation, this is done on span
+        // finish. Maybe this is equivalent enough? When does sampling _have_ to be done?
+        span.sample();
+
         let kind_key: SpanString = "kind".into();
         if let Some(kind) = span.meta.get(&kind_key) {
             let internal_val = String::from("internal");

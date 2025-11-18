@@ -37,6 +37,7 @@ impl From<&str> for SpanString {
 pub struct NativeSpan {
     pub span: Span<SpanString>,
     pub trace: Rc<RefCell<Trace<SpanString>>>,
+    pub sampling_finalized: bool,
 }
 
 impl NativeSpan {
@@ -116,6 +117,23 @@ impl NativeSpan {
                 ..Default::default()
             },
             trace,
+            sampling_finalized: false
         }
+    }
+
+    pub fn sample(&mut self) -> Option<[u8;8]> {
+        if self.sampling_finalized {
+            // TODO can we also do this check before flushing the queue, in case we don't have to?
+            return None;
+        }
+
+        // TODO Something correct here. This is all just a placeholder until
+        // we actually implement sampling.
+        // BEGIN PLACEHOLDER
+        let sampling_info: u64 = self.span_id + self.trace_id as u64;
+        let sampling_info_bytes = sampling_info.to_be_bytes();
+        // END PLACEHOLDER
+
+        Some(sampling_info_bytes)
     }
 }
