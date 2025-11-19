@@ -43,8 +43,12 @@ pub struct NativeSpan {
 impl NativeSpan {
     pub fn copy_in_chunk_tags(&mut self) {
         let trace = (*self.trace).borrow();
-        self.span.meta.extend(trace.meta.iter().map(|(k,v)| (k.clone(), v.clone())));
-        self.span.metrics.extend(trace.metrics.iter().map(|(k,v)| (k.clone(), *v)));
+        self.span
+            .meta
+            .extend(trace.meta.iter().map(|(k, v)| (k.clone(), v.clone())));
+        self.span
+            .metrics
+            .extend(trace.metrics.iter().map(|(k, v)| (k.clone(), *v)));
     }
 
     pub fn copy_in_sampling_tags(&mut self) {
@@ -103,11 +107,11 @@ impl NativeSpan {
                 ..Default::default()
             },
             trace,
-            sampling_finalized: false
+            sampling_finalized: false,
         }
     }
 
-    pub fn sample(&mut self) -> Option<[u8;8]> {
+    pub fn sample(&mut self) -> Option<[u8; 8]> {
         if self.sampling_finalized {
             // TODO can we also do this check before flushing the queue, in case we don't have to?
             return None;
