@@ -111,7 +111,7 @@ impl NativeSpanState {
             let mut span = self.spans.remove(&span_id).unwrap();
             if is_local_root {
                 span.copy_in_sampling_tags();
-                span.metrics.insert("_dd.top_level".into(), 1.0);
+                span.set_metric("_dd.top_level", 1);
                 is_local_root = false;
             }
             if is_chunk_root {
@@ -155,7 +155,7 @@ impl NativeSpanState {
         let result = span.sample();
         if let Some(result) = result {
             for (i, elem) in result.iter().enumerate() {
-                self.sampling_buffer[i] = elem.clone();
+                self.sampling_buffer[i] = *elem;
             }
         }
         result.is_some()
@@ -185,12 +185,12 @@ impl NativeSpanState {
             OpCode::SetMetaAttr => {
                 let name = self.get_string_arg(index);
                 let val = self.get_string_arg(index);
-                self.get_mut_span(&op.span_id).meta.insert(name, val);
+                self.get_mut_span(&op.span_id).set_meta(name, val);
             }
             OpCode::SetMetricAttr => {
                 let name = self.get_string_arg(index);
-                let val = self.get_num_arg(index);
-                self.get_mut_span(&op.span_id).metrics.insert(name, val);
+                let val: f64 = self.get_num_arg(index);
+                self.get_mut_span(&op.span_id).set_metric(name, val);
             }
             OpCode::SetServiceName => {
                 self.get_mut_span(&op.span_id).service = self.get_string_arg(index);
@@ -298,7 +298,7 @@ impl NativeSpanState {
         self.flush_change_queue();
         let name: SpanString = name.clone().into();
         let result = self.get_span_bigint(id).metrics.get(&name).unwrap();
-        result.clone()
+        *result
     }
 
     #[napi]
@@ -340,14 +340,13 @@ impl NativeSpanState {
         if let Some(kind) = span.meta.get(&kind_key) {
             let internal_val = String::from("internal");
             if kind.0 != internal_val {
-                span.metrics
-                    .insert("_dd.measured".into(), 1.0);
+                span.set_metric("_dd.measured", 1);
             }
         }
         if span.service.0 != self.tracer_service {
-            span.meta.insert(
-                "_dd.base_service".into(),
-                self.tracer_service.clone().into(),
+            span.set_meta(
+                "_dd.base_service",
+                self.tracer_service.clone(),
             );
             // TODO span.service should be added to the "extra services" used by RC, which is not
             // yet imlemented here on the Rust side.
@@ -356,12 +355,11 @@ impl NativeSpanState {
         // SKIP setting single-span ingestion tags. They should be set when sampling is finalized
         // for the span.
 
-        span.meta.insert("language".into(), "javascript".into());
-        span.metrics
-            .insert("process_id".into(), self.pid);
+        span.set_meta("language", "javascript");
+        span.set_metric("process_id", self.pid);
         let origin = &span.trace.borrow().origin.clone();
         if let Some(origin) = origin {
-            span.meta.insert("_dd.origin".into(), origin.clone());
+            span.set_meta("_dd.origin", origin.clone());
         }
         // SKIP hostname. This can be an option to the span constructor, so we'll set the tag at
         // that point.
@@ -400,11 +398,11 @@ impl_from_bytes!(i64, 8);
 impl_from_bytes!(i32, 4);
 impl_from_bytes!(u32, 4);
 
-fn get_num<T: Copy + FromBytes>(buf: &Vec<u8>, index: &mut usize) -> T {
-    let id: usize = index.clone();
+fn get_num<T: Copy + FromBytes>(buf: &[u8], index: &mut usize) -> T {
+    let id: usize = *index;
     let size = std::mem::size_of::<T>();
     let result = &buf[id..(id + size)];
-    let result: T = T::from_bytes(&result);
+    let result: T = T::from_bytes(result);
     *index += size;
     result
 }

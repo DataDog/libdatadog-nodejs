@@ -29,8 +29,8 @@ impl From<String> for SpanString {
 }
 
 impl From<&str> for SpanString {
-    fn from(s: &str) -> SpanString {
-        String::from(s).into()
+    fn from(value: &str) -> SpanString {
+        SpanString(String::from(value))
     }
 }
 
@@ -42,36 +42,22 @@ pub struct NativeSpan {
 
 impl NativeSpan {
     pub fn copy_in_chunk_tags(&mut self) {
-        // TODO(bengl) can we avoid doing two loops each, somehow?
-        let mut meta = HashMap::new();
-        for (key, value) in (*self.trace).borrow().meta.iter() {
-            meta.insert(key.clone(), value.clone());
-        }
-        for (key, value) in meta.into_iter() {
-            self.meta.insert(key, value);
-        }
-
-        let mut metrics = HashMap::new();
-        for (key, value) in (*self.trace).borrow().metrics.iter() {
-            metrics.insert(key.clone(), value.clone());
-        }
-        for (key, value) in metrics.into_iter() {
-            self.metrics.insert(key, value);
-        }
+        let trace = (*self.trace).borrow();
+        self.span.meta.extend(trace.meta.iter().map(|(k,v)| (k.clone(), v.clone())));
+        self.span.metrics.extend(trace.metrics.iter().map(|(k,v)| (k.clone(), *v)));
     }
 
     pub fn copy_in_sampling_tags(&mut self) {
-        let rule = (*self.trace).borrow().sampling_rule_decision.clone();
-        if let Some(rule) = rule {
-            self.metrics.insert(String::from("_dd.rule_psr").into(), rule);
+        // TODO can we just do this when they're set, when sampling?
+        let trace = (*self.trace).borrow();
+        if let Some(rule) = trace.sampling_rule_decision {
+            self.span.metrics.insert("_dd.rule_psr".into(), rule);
         }
-        let limit = (*self.trace).borrow().sampling_limit_decision.clone();
-        if let Some(limit) = limit {
-            self.metrics.insert(String::from("_dd.limit_psr").into(), limit);
+        if let Some(limit) = trace.sampling_limit_decision {
+            self.span.metrics.insert("_dd.limit_psr".into(), limit);
         }
-        let agent = (*self.trace).borrow().sampling_agent_decision.clone();
-        if let Some(agent) = agent {
-            self.metrics.insert(String::from("_dd.agent_psr").into(), agent);
+        if let Some(agent) = trace.sampling_agent_decision {
+            self.span.metrics.insert("_dd.agent_psr".into(), agent);
         }
     }
 }
@@ -135,5 +121,13 @@ impl NativeSpan {
         // END PLACEHOLDER
 
         Some(sampling_info_bytes)
+    }
+
+    pub fn set_metric<T: Into<SpanString>, U: Into<f64>>(&mut self, name: T, val: U) {
+        self.span.metrics.insert(name.into(), val.into());
+    }
+
+    pub fn set_meta<T: Into<SpanString>, U: Into<SpanString>>(&mut self, name: T, val: U) {
+        self.span.meta.insert(name.into(), val.into());
     }
 }
