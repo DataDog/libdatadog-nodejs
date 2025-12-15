@@ -33,7 +33,7 @@ pub(crate) struct BufferedOperation {
 }
 
 impl BufferedOperation {
-    pub fn from_buf(buf: *const u8, index: &mut usize) -> Self {
+    pub fn from_buf(buf: &Vec<u8>, index: &mut usize) -> Self {
         let opcode: u64 = get_num_raw(buf, index);
         let opcode = OpCode::from_num(opcode);
         let span_id: u64 = get_num_raw(buf, index);

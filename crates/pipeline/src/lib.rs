@@ -24,9 +24,7 @@ use utils::*;
 
 #[napi]
 pub struct NativeSpanState {
-    // TODO(bengl) currently storing change buffer as raw pointer to avoid dealing with slice lifetime.
-    // This isn't ideal.
-    change_buffer: *const u8, // [Length BufOp Arg0 Arg1...  BufOp Arg0 Arg1 ... ]
+    change_buffer: Vec<u8>, // [Length BufOp Arg0 Arg1...  BufOp Arg0 Arg1 ... ]
     // (Length is u64 number of BufOps)
     spans: HashMap<u64, NativeSpan>,
     string_table: HashMap<u32, SpanString>,
@@ -63,7 +61,7 @@ impl NativeSpanState {
             .set_language_interpreter(&lang_interpreter);
 
         Ok(NativeSpanState {
-            change_buffer: change_queue_buffer.as_ref().as_ptr(),
+            change_buffer: change_queue_buffer.into(),
             spans: HashMap::new(),
             string_table: HashMap::new(),
             string_table_input: string_table_input_buffer.into(),
@@ -124,10 +122,10 @@ impl NativeSpanState {
     #[napi]
     pub fn flush_change_queue(&mut self) -> Result<bool> {
         let mut index = 0;
-        let mut count: u64 = get_num_raw(self.change_buffer, &mut index);
+        let mut count: u64 = get_num_raw(&self.change_buffer, &mut index);
 
         while count > 0 {
-            let op = BufferedOperation::from_buf(self.change_buffer, &mut index);
+            let op = BufferedOperation::from_buf(&self.change_buffer, &mut index);
             self.interpret_operation(&mut index, &op)?;
             count -= 1;
         }
@@ -245,7 +243,7 @@ impl NativeSpanState {
     }
 
     fn get_num_arg<T: Copy + FromBytes>(&self, index: &mut usize) -> T {
-        get_num_raw(self.change_buffer, index)
+        get_num_raw(&self.change_buffer, index)
     }
 
     #[napi]
