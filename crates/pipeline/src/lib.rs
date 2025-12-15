@@ -15,35 +15,12 @@ use napi::bindgen_prelude::BigInt;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-#[napi]
-#[repr(u64)]
-pub enum OpCode {
-    Create = 0,
-    SetMetaAttr = 1,
-    SetMetricAttr = 2,
-    SetServiceName = 3,
-    SetResourceName = 4,
-    SetError = 5,
-    SetStart = 6,
-    SetDuration = 7,
-    SetType = 8,
-    SetName = 9,
-    SetTraceMetaAttr = 10,
-    SetTraceMetricsAttr = 11,
-    SetTraceOrigin = 12,
-    // TODO: SpanLinks, SpanEvents, StructAttr
-}
+mod change_buffer;
+use change_buffer::{OpCode, BufferedOperation};
 
-impl OpCode {
-    fn from_num(num: u64) -> Self {
-        unsafe { std::mem::transmute(num) }
-    }
-}
+mod utils;
+use utils::*;
 
-struct BufferedOperation {
-    opcode: OpCode,
-    span_id: u64,
-}
 
 #[napi]
 pub struct NativeSpanState {
@@ -150,10 +127,7 @@ impl NativeSpanState {
         let mut count: u64 = get_num_raw(self.change_buffer, &mut index);
 
         while count > 0 {
-            let opcode: u64 = get_num_raw(self.change_buffer, &mut index);
-            let opcode = OpCode::from_num(opcode);
-            let span_id: u64 = get_num_raw(self.change_buffer, &mut index);
-            let op = BufferedOperation { opcode, span_id };
+            let op = BufferedOperation::from_buf(self.change_buffer, &mut index);
             self.interpret_operation(&mut index, &op)?;
             count -= 1;
         }
@@ -398,51 +372,4 @@ impl NativeSpanState {
         // TODO Sampling priority, if we're not doing that ahead of time.
         span.span
     }
-}
-
-trait FromBytes: Sized {
-    type Bytes: ?Sized;
-    fn from_bytes(bytes: &[u8]) -> Self;
-}
-
-macro_rules! impl_from_bytes {
-    ($ty:ty, $len:expr) => {
-        impl FromBytes for $ty {
-            type Bytes = $ty;
-
-            // Note that this always does a copy into a new variable. This is
-            // because the values in the buffer are not aligned. We could save
-            // ourselves a copy by ensuring alignment from the managed side.
-            fn from_bytes(bytes: &[u8]) -> Self {
-                let mut code_buf = [0u8; $len];
-                code_buf.copy_from_slice(bytes);
-                <$ty>::from_le_bytes(code_buf)
-            }
-        }
-    };
-}
-
-impl_from_bytes!(u128, 16);
-impl_from_bytes!(u64, 8);
-impl_from_bytes!(f64, 8);
-impl_from_bytes!(i64, 8);
-impl_from_bytes!(i32, 4);
-impl_from_bytes!(u32, 4);
-
-fn get_num<T: Copy + FromBytes>(buf: &[u8], index: &mut usize) -> T {
-    let id: usize = *index;
-    let size = std::mem::size_of::<T>();
-    let result = &buf[id..(id + size)];
-    let result: T = T::from_bytes(result);
-    *index += size;
-    result
-}
-
-fn get_num_raw<T: Copy + FromBytes>(buf: *const u8, index: &mut usize) -> T {
-    let size = std::mem::size_of::<T>();
-    let result: &[u8] =
-        unsafe { std::slice::from_raw_parts((buf as usize + *index) as *const u8, size) };
-    let result = T::from_bytes(result);
-    *index += size;
-    result
 }
