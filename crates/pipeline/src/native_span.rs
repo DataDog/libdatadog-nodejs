@@ -2,50 +2,59 @@ use crate::trace::Trace;
 use datadog_trace_utils::span::{Span, SpanText};
 use serde::Serialize;
 use std::borrow::Borrow;
-use std::cell::RefCell;
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
-use std::rc::Rc;
+use std::sync::{Arc, RwLock};
 
-#[derive(Default, Eq, PartialEq, Serialize, Hash, Clone)]
-pub struct SpanString(pub String);
+#[derive(Default, Eq, PartialEq, Serialize, Clone)]
+pub struct SpanString(pub Arc<str>);
+
+impl Hash for SpanString {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        // Hash the string content, not the Arc pointer
+        self.0.as_ref().hash(state);
+    }
+}
 
 impl Borrow<str> for SpanString {
     fn borrow(&self) -> &str {
-        self.0.as_str()
+        &self.0
     }
 }
 
 impl SpanText for SpanString {
     fn from_static_str(value: &'static str) -> Self {
-        SpanString(String::from(value))
+        SpanString(Arc::from(value))
     }
 }
 
 impl From<String> for SpanString {
     fn from(s: String) -> SpanString {
-        SpanString(s)
+        SpanString(Arc::from(s))
     }
 }
 
 impl From<&str> for SpanString {
     fn from(value: &str) -> SpanString {
-        SpanString(String::from(value))
+        SpanString(Arc::from(value))
     }
 }
 
 pub struct NativeSpan {
     pub span: Span<SpanString>,
-    pub trace: Rc<RefCell<Trace<SpanString>>>,
+    pub trace: Arc<RwLock<Trace<SpanString>>>,
     pub sampling_finalized: bool,
 }
 
 impl NativeSpan {
     pub fn copy_in_chunk_tags(&mut self) {
-        let trace = (*self.trace).borrow();
+        let trace = self.trace.read().unwrap();
+        self.span.meta.reserve(trace.meta.len());
         self.span
             .meta
             .extend(trace.meta.iter().map(|(k, v)| (k.clone(), v.clone())));
+        self.span.metrics.reserve(trace.metrics.len());
         self.span
             .metrics
             .extend(trace.metrics.iter().map(|(k, v)| (k.clone(), *v)));
@@ -53,7 +62,7 @@ impl NativeSpan {
 
     pub fn copy_in_sampling_tags(&mut self) {
         // TODO can we just do this when they're set, when sampling?
-        let trace = (*self.trace).borrow();
+        let trace = self.trace.read().unwrap();
         if let Some(rule) = trace.sampling_rule_decision {
             self.span.metrics.insert("_dd.rule_psr".into(), rule);
         }
@@ -96,7 +105,7 @@ impl NativeSpan {
         let trace = if let Some(parent) = maybe_parent {
             parent.trace.clone()
         } else {
-            Rc::new(RefCell::new(Trace::new()))
+            Arc::new(RwLock::new(Trace::new()))
         };
 
         NativeSpan {

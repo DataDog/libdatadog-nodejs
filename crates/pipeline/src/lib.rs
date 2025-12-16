@@ -35,8 +35,6 @@ pub struct NativeSpanState {
     sampling_buffer: Vec<u8>,
 }
 
-unsafe impl Send for NativeSpanState {}
-
 #[napi]
 impl NativeSpanState {
     #[napi(constructor)]
@@ -213,19 +211,19 @@ impl NativeSpanState {
                 let val = self.get_string_arg(index)?;
 
                 let span = self.get_mut_span(&op.span_id)?;
-                span.trace.borrow_mut().meta.insert(name, val);
+                span.trace.write().unwrap().meta.insert(name, val);
             }
             OpCode::SetTraceMetricsAttr => {
                 let name = self.get_string_arg(index)?;
                 let val = self.get_num_arg(index);
 
                 let span = self.get_mut_span(&op.span_id)?;
-                span.trace.borrow_mut().metrics.insert(name, val);
+                span.trace.write().unwrap().metrics.insert(name, val);
             }
             OpCode::SetTraceOrigin => {
                 let origin = self.get_string_arg(index)?;
                 let span = self.get_mut_span(&op.span_id)?;
-                span.trace.borrow_mut().origin = Some(origin);
+                span.trace.write().unwrap().origin = Some(origin);
             }
         };
 
@@ -280,30 +278,30 @@ impl NativeSpanState {
     #[napi]
     pub fn get_service_name(&mut self, id: BigInt) -> Result<String> {
         self.flush_change_queue()?;
-        Ok(self.get_span_bigint(id)?.service.0.clone())
+        Ok(self.get_span_bigint(id)?.service.0.to_string())
     }
 
     #[napi]
     pub fn get_resource_name(&mut self, id: BigInt) -> Result<String> {
         self.flush_change_queue()?;
-        Ok(self.get_span_bigint(id)?.resource.0.clone())
+        Ok(self.get_span_bigint(id)?.resource.0.to_string())
     }
 
     #[napi]
     pub fn get_meta_attr(&mut self, id: BigInt, name: String) -> Result<Option<String>> {
         self.flush_change_queue()?;
-        let name: SpanString = name.clone().into();
+        let name: SpanString = name.into();
         Ok(self
             .get_span_bigint(id)?
             .meta
             .get(&name)
-            .map(|v| v.0.clone()))
+            .map(|v| v.0.to_string()))
     }
 
     #[napi]
     pub fn get_metric_attr(&mut self, id: BigInt, name: String) -> Result<Option<f64>> {
         self.flush_change_queue()?;
-        let name: SpanString = name.clone().into();
+        let name: SpanString = name.into();
         Ok(self.get_span_bigint(id)?.metrics.get(&name).copied())
     }
 
@@ -328,13 +326,13 @@ impl NativeSpanState {
     #[napi]
     pub fn get_type(&mut self, id: BigInt) -> Result<String> {
         self.flush_change_queue()?;
-        Ok(self.get_span_bigint(id)?.r#type.0.clone())
+        Ok(self.get_span_bigint(id)?.r#type.0.to_string())
     }
 
     #[napi]
     pub fn get_name(&mut self, id: BigInt) -> Result<String> {
         self.flush_change_queue()?;
-        Ok(self.get_span_bigint(id)?.name.0.clone())
+        Ok(self.get_span_bigint(id)?.name.0.to_string())
     }
 
     fn process_one_span(&self, mut span: NativeSpan) -> Span<SpanString> {
@@ -344,13 +342,12 @@ impl NativeSpanState {
 
         let kind_key: SpanString = "kind".into();
         if let Some(kind) = span.meta.get(&kind_key) {
-            let internal_val = String::from("internal");
-            if kind.0 != internal_val {
+            if &*kind.0 != "internal" {
                 span.set_metric("_dd.measured", 1);
             }
         }
-        if span.service.0 != self.tracer_service {
-            span.set_meta("_dd.base_service", self.tracer_service.clone());
+        if &*span.service.0 != &self.tracer_service {
+            span.set_meta("_dd.base_service", self.tracer_service.as_str());
             // TODO span.service should be added to the "extra services" used by RC, which is not
             // yet imlemented here on the Rust side.
         }
@@ -360,9 +357,9 @@ impl NativeSpanState {
 
         span.set_meta("language", "javascript");
         span.set_metric("process_id", self.pid);
-        let origin = &span.trace.borrow().origin.clone();
+        let origin = span.trace.read().unwrap().origin.clone();
         if let Some(origin) = origin {
-            span.set_meta("_dd.origin", origin.clone());
+            span.set_meta("_dd.origin", origin);
         }
         // SKIP hostname. This can be an option to the span constructor, so we'll set the tag at
         // that point.
