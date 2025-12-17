@@ -80,7 +80,7 @@ impl NativeSpan {
         // TODO Something correct here. This is all just a placeholder until
         // we actually implement sampling.
         // BEGIN PLACEHOLDER
-        let sampling_info: u64 = self.span_id + self.trace_id as u64;
+        let sampling_info: u64 = self.span_id.wrapping_add(self.trace_id as u64);
         let sampling_info_bytes = sampling_info.to_be_bytes();
         // END PLACEHOLDER
 

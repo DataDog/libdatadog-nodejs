@@ -24,9 +24,23 @@ use utils::*;
 
 use trace::Trace;
 
+// Wrapper to make raw pointer Send-safe for async NAPI methods.
+// Safety: The JS Buffer memory is pinned and lives as long as the NativeSpanState.
+#[derive(Clone, Copy)]
+struct SendPtr(*const u8);
+unsafe impl Send for SendPtr {}
+unsafe impl Sync for SendPtr {}
+
+impl std::ops::Deref for SendPtr {
+    type Target = *const u8;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 #[napi]
 pub struct NativeSpanState {
-    change_buffer: Vec<u8>, // [Length BufOp Arg0 Arg1...  BufOp Arg0 Arg1 ... ]
+    change_buffer: SendPtr, // [Length BufOp Arg0 Arg1...  BufOp Arg0 Arg1 ... ]
     // (Length is u64 number of BufOps)
     spans: HashMap<u64, NativeSpan>,
     traces: HashMap<u128, Trace<SpanString>>,
@@ -63,7 +77,7 @@ impl NativeSpanState {
             .set_language_interpreter(&lang_interpreter);
 
         Ok(NativeSpanState {
-            change_buffer: change_queue_buffer.into(),
+            change_buffer: SendPtr(change_queue_buffer.as_ref().as_ptr()),
             spans: HashMap::new(),
             traces: HashMap::new(),
             trace_span_counts: HashMap::new(),
@@ -142,12 +156,19 @@ impl NativeSpanState {
     #[napi]
     pub fn flush_change_queue(&mut self) -> Result<bool> {
         let mut index = 0;
-        let mut count: u64 = get_num_raw(&self.change_buffer, &mut index);
+        let buf = *self.change_buffer;
+        let mut count: u64 = get_num_raw(buf, &mut index);
 
         while count > 0 {
-            let op = BufferedOperation::from_buf(&self.change_buffer, &mut index);
+            let op = BufferedOperation::from_buf(buf, &mut index);
             self.interpret_operation(&mut index, &op)?;
             count -= 1;
+        }
+
+        // Write 0 back to the count position so JS knows the queue was flushed
+        let buf_mut = *self.change_buffer as *mut u8;
+        unsafe {
+            std::ptr::copy_nonoverlapping([0u8; 8].as_ptr(), buf_mut, 8);
         }
 
         Ok(true)
@@ -270,7 +291,7 @@ impl NativeSpanState {
     }
 
     fn get_num_arg<T: Copy + FromBytes>(&self, index: &mut usize) -> T {
-        get_num_raw(&self.change_buffer, index)
+        get_num_raw(*self.change_buffer, index)
     }
 
     #[napi]
@@ -362,6 +383,41 @@ impl NativeSpanState {
     pub fn get_name(&mut self, id: BigInt) -> Result<String> {
         self.flush_change_queue()?;
         Ok(self.get_span_bigint(id)?.name.0.to_string())
+    }
+
+    #[napi]
+    pub fn get_trace_meta_attr(&mut self, id: BigInt, name: String) -> Result<Option<String>> {
+        self.flush_change_queue()?;
+        let trace_id = self.get_span_bigint(id)?.trace_id;
+        let name: SpanString = name.into();
+        Ok(self
+            .traces
+            .get(&trace_id)
+            .and_then(|t| t.meta.get(&name))
+            .map(|v| v.0.to_string()))
+    }
+
+    #[napi]
+    pub fn get_trace_metric_attr(&mut self, id: BigInt, name: String) -> Result<Option<f64>> {
+        self.flush_change_queue()?;
+        let trace_id = self.get_span_bigint(id)?.trace_id;
+        let name: SpanString = name.into();
+        Ok(self
+            .traces
+            .get(&trace_id)
+            .and_then(|t| t.metrics.get(&name))
+            .copied())
+    }
+
+    #[napi]
+    pub fn get_trace_origin(&mut self, id: BigInt) -> Result<Option<String>> {
+        self.flush_change_queue()?;
+        let trace_id = self.get_span_bigint(id)?.trace_id;
+        Ok(self
+            .traces
+            .get(&trace_id)
+            .and_then(|t| t.origin.as_ref())
+            .map(|v| v.0.to_string()))
     }
 
     fn process_one_span(&self, mut span: NativeSpan) -> Span<SpanString> {
