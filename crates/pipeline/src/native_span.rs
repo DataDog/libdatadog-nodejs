@@ -1,11 +1,9 @@
-use crate::trace::Trace;
 use datadog_trace_utils::span::{Span, SpanText};
 use serde::Serialize;
 use std::borrow::Borrow;
-use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 #[derive(Default, Eq, PartialEq, Serialize, Clone)]
 pub struct SpanString(pub Arc<str>);
@@ -43,36 +41,7 @@ impl From<&str> for SpanString {
 
 pub struct NativeSpan {
     pub span: Span<SpanString>,
-    pub trace: Arc<RwLock<Trace<SpanString>>>,
     pub sampling_finalized: bool,
-}
-
-impl NativeSpan {
-    pub fn copy_in_chunk_tags(&mut self) {
-        let trace = self.trace.read().unwrap();
-        self.span.meta.reserve(trace.meta.len());
-        self.span
-            .meta
-            .extend(trace.meta.iter().map(|(k, v)| (k.clone(), v.clone())));
-        self.span.metrics.reserve(trace.metrics.len());
-        self.span
-            .metrics
-            .extend(trace.metrics.iter().map(|(k, v)| (k.clone(), *v)));
-    }
-
-    pub fn copy_in_sampling_tags(&mut self) {
-        // TODO can we just do this when they're set, when sampling?
-        let trace = self.trace.read().unwrap();
-        if let Some(rule) = trace.sampling_rule_decision {
-            self.span.metrics.insert("_dd.rule_psr".into(), rule);
-        }
-        if let Some(limit) = trace.sampling_limit_decision {
-            self.span.metrics.insert("_dd.limit_psr".into(), limit);
-        }
-        if let Some(agent) = trace.sampling_agent_decision {
-            self.span.metrics.insert("_dd.agent_psr".into(), agent);
-        }
-    }
 }
 
 impl Deref for NativeSpan {
@@ -90,24 +59,7 @@ impl DerefMut for NativeSpan {
 }
 
 impl NativeSpan {
-    pub fn new(
-        all_spans: &HashMap<u64, NativeSpan>,
-        span_id: u64,
-        parent_id: u64,
-        trace_id: u128,
-    ) -> Self {
-        let maybe_parent = if parent_id == 0 {
-            None
-        } else {
-            all_spans.get(&parent_id)
-        };
-
-        let trace = if let Some(parent) = maybe_parent {
-            parent.trace.clone()
-        } else {
-            Arc::new(RwLock::new(Trace::new()))
-        };
-
+    pub fn new(span_id: u64, parent_id: u64, trace_id: u128) -> Self {
         NativeSpan {
             span: Span {
                 span_id,
@@ -115,7 +67,6 @@ impl NativeSpan {
                 parent_id,
                 ..Default::default()
             },
-            trace,
             sampling_finalized: false,
         }
     }

@@ -22,11 +22,14 @@ mod utils;
 use utils::*;
 
 
+use trace::Trace;
+
 #[napi]
 pub struct NativeSpanState {
     change_buffer: Vec<u8>, // [Length BufOp Arg0 Arg1...  BufOp Arg0 Arg1 ... ]
     // (Length is u64 number of BufOps)
     spans: HashMap<u64, NativeSpan>,
+    traces: HashMap<u128, Trace<SpanString>>,
     string_table: HashMap<u32, SpanString>,
     string_table_input: Vec<u8>,
     exporter: TraceExporter,
@@ -61,6 +64,7 @@ impl NativeSpanState {
         Ok(NativeSpanState {
             change_buffer: change_queue_buffer.into(),
             spans: HashMap::new(),
+            traces: HashMap::new(),
             string_table: HashMap::new(),
             string_table_input: string_table_input_buffer.into(),
             exporter: builder
@@ -97,12 +101,12 @@ impl NativeSpanState {
                 )
             })?;
             if is_local_root {
-                span.copy_in_sampling_tags();
+                self.copy_in_sampling_tags(&mut span);
                 span.set_metric("_dd.top_level", 1);
                 is_local_root = false;
             }
             if is_chunk_root {
-                span.copy_in_chunk_tags();
+                self.copy_in_chunk_tags(&mut span);
                 is_chunk_root = false;
             }
             spans_vec.push(self.process_one_span(span));
@@ -170,10 +174,12 @@ impl NativeSpanState {
     fn interpret_operation(&mut self, index: &mut usize, op: &BufferedOperation) -> Result<()> {
         match op.opcode {
             OpCode::Create => {
-                let trace_id = self.get_num_arg(index);
+                let trace_id: u128 = self.get_num_arg(index);
                 let parent_id = self.get_num_arg(index);
-                let span = NativeSpan::new(&self.spans, op.span_id, trace_id, parent_id);
+                let span = NativeSpan::new(op.span_id, parent_id, trace_id);
                 self.spans.insert(op.span_id, span);
+                // Ensure trace exists (creates new one if this is the first span for this trace)
+                self.traces.entry(trace_id).or_insert_with(Trace::new);
             }
             OpCode::SetMetaAttr => {
                 let name = self.get_string_arg(index)?;
@@ -209,21 +215,25 @@ impl NativeSpanState {
             OpCode::SetTraceMetaAttr => {
                 let name = self.get_string_arg(index)?;
                 let val = self.get_string_arg(index)?;
-
-                let span = self.get_mut_span(&op.span_id)?;
-                span.trace.write().unwrap().meta.insert(name, val);
+                let trace_id = self.get_span(&op.span_id)?.trace_id;
+                if let Some(trace) = self.traces.get_mut(&trace_id) {
+                    trace.meta.insert(name, val);
+                }
             }
             OpCode::SetTraceMetricsAttr => {
                 let name = self.get_string_arg(index)?;
                 let val = self.get_num_arg(index);
-
-                let span = self.get_mut_span(&op.span_id)?;
-                span.trace.write().unwrap().metrics.insert(name, val);
+                let trace_id = self.get_span(&op.span_id)?.trace_id;
+                if let Some(trace) = self.traces.get_mut(&trace_id) {
+                    trace.metrics.insert(name, val);
+                }
             }
             OpCode::SetTraceOrigin => {
                 let origin = self.get_string_arg(index)?;
-                let span = self.get_mut_span(&op.span_id)?;
-                span.trace.write().unwrap().origin = Some(origin);
+                let trace_id = self.get_span(&op.span_id)?.trace_id;
+                if let Some(trace) = self.traces.get_mut(&trace_id) {
+                    trace.origin = Some(origin);
+                }
             }
         };
 
@@ -357,14 +367,42 @@ impl NativeSpanState {
 
         span.set_meta("language", "javascript");
         span.set_metric("process_id", self.pid);
-        let origin = span.trace.read().unwrap().origin.clone();
-        if let Some(origin) = origin {
-            span.set_meta("_dd.origin", origin);
+        if let Some(trace) = self.traces.get(&span.trace_id) {
+            if let Some(ref origin) = trace.origin {
+                span.set_meta("_dd.origin", origin.clone());
+            }
         }
         // SKIP hostname. This can be an option to the span constructor, so we'll set the tag at
         // that point.
 
         // TODO Sampling priority, if we're not doing that ahead of time.
         span.span
+    }
+
+    fn copy_in_chunk_tags(&self, span: &mut NativeSpan) {
+        if let Some(trace) = self.traces.get(&span.trace_id) {
+            span.span.meta.reserve(trace.meta.len());
+            span.span
+                .meta
+                .extend(trace.meta.iter().map(|(k, v)| (k.clone(), v.clone())));
+            span.span.metrics.reserve(trace.metrics.len());
+            span.span
+                .metrics
+                .extend(trace.metrics.iter().map(|(k, v)| (k.clone(), *v)));
+        }
+    }
+
+    fn copy_in_sampling_tags(&self, span: &mut NativeSpan) {
+        if let Some(trace) = self.traces.get(&span.trace_id) {
+            if let Some(rule) = trace.sampling_rule_decision {
+                span.span.metrics.insert("_dd.rule_psr".into(), rule);
+            }
+            if let Some(limit) = trace.sampling_limit_decision {
+                span.span.metrics.insert("_dd.limit_psr".into(), limit);
+            }
+            if let Some(agent) = trace.sampling_agent_decision {
+                span.span.metrics.insert("_dd.agent_psr".into(), agent);
+            }
+        }
     }
 }
