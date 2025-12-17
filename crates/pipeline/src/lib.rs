@@ -30,6 +30,7 @@ pub struct NativeSpanState {
     // (Length is u64 number of BufOps)
     spans: HashMap<u64, NativeSpan>,
     traces: HashMap<u128, Trace<SpanString>>,
+    trace_span_counts: HashMap<u128, u32>,
     string_table: HashMap<u32, SpanString>,
     string_table_input: Vec<u8>,
     exporter: TraceExporter,
@@ -65,6 +66,7 @@ impl NativeSpanState {
             change_buffer: change_queue_buffer.into(),
             spans: HashMap::new(),
             traces: HashMap::new(),
+            trace_span_counts: HashMap::new(),
             string_table: HashMap::new(),
             string_table_input: string_table_input_buffer.into(),
             exporter: builder
@@ -90,6 +92,7 @@ impl NativeSpanState {
         let mut index: usize = 0;
         let mut is_local_root = first_is_local_root;
         let mut is_chunk_root = true;
+        let mut chunk_trace_id: Option<u128> = None;
         while count > 0 {
             let span_id: u64 = get_num(&chunk_vec, &mut index);
             let maybe_span = self.spans.remove(&span_id);
@@ -100,6 +103,7 @@ impl NativeSpanState {
                     format!("span not found internally: {}", span_id),
                 )
             })?;
+            chunk_trace_id = Some(span.trace_id);
             if is_local_root {
                 self.copy_in_sampling_tags(&mut span);
                 span.set_metric("_dd.top_level", 1);
@@ -112,6 +116,20 @@ impl NativeSpanState {
             spans_vec.push(self.process_one_span(span));
             count -= 1;
         }
+
+        // Clean up trace if no spans remain for it
+        if let Some(trace_id) = chunk_trace_id {
+            if let Some(count) = self.trace_span_counts.get_mut(&trace_id) {
+                if *count <= len {
+                    // All spans for this trace have been flushed
+                    self.traces.remove(&trace_id);
+                    self.trace_span_counts.remove(&trace_id);
+                } else {
+                    *count -= len;
+                }
+            }
+        }
+
         let resp = self.exporter.send_trace_chunks_async(vec![spans_vec]).await;
         let response_str = resp.map(|resp| match resp {
             AgentResponse::Unchanged => "unchanged".to_string(),
@@ -180,6 +198,7 @@ impl NativeSpanState {
                 self.spans.insert(op.span_id, span);
                 // Ensure trace exists (creates new one if this is the first span for this trace)
                 self.traces.entry(trace_id).or_insert_with(Trace::new);
+                *self.trace_span_counts.entry(trace_id).or_insert(0) += 1;
             }
             OpCode::SetMetaAttr => {
                 let name = self.get_string_arg(index)?;
