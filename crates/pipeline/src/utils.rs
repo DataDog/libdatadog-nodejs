@@ -35,11 +35,3 @@ pub fn get_num<T: Copy + FromBytes>(buf: &[u8], index: &mut usize) -> T {
     *index += size;
     result
 }
-
-pub fn get_num_raw<T: Copy + FromBytes>(buf: *const u8, index: &mut usize) -> T {
-    let size = std::mem::size_of::<T>();
-    let result = unsafe { std::slice::from_raw_parts(buf.add(*index), size) };
-    let result = T::from_bytes(result);
-    *index += size;
-    result
-}

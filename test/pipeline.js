@@ -350,6 +350,19 @@ describe('pipeline', () => {
     })
   })
 
+  describe('sampling', () => {
+    it('should call sample without failing', () => {
+      const span = nativeSpans.createSpan()
+      span.name = 'sample-test-span'
+
+      // Write span ID to sampling buffer (shared via SendPtr)
+      nativeSpans.samplingBuffer.writeBigUInt64LE(span.spanId, 0)
+
+      const result = nativeSpans.state.sample()
+      assert.strictEqual(typeof result, 'boolean')
+    })
+  })
+
   describe('string table', () => {
     it('should evict strings from the table', () => {
       const testKey = 'eviction-test-key-' + Math.random()
