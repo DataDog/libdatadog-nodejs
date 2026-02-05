@@ -4,7 +4,8 @@ default-members = [
   "crates/process_discovery",
 ]
 members = [
-  "crates/*",
+  "crates/crashtracker",
+  "crates/process_discovery",
 ]
 
 [profile.release]

@@ -30,16 +30,22 @@ let timeout = setTimeout(() => {
 
 app.use(bodyParser.json())
 
-app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
-  clearTimeout(timeout)
+let requestCount = 0
 
+app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
+  requestCount++
   res.status(200).send()
 
-  server.close(() => {
-    const stackTrace = JSON.parse(req.body.payload[0].stack_trace).frames
-    const boomFrame = stackTrace.find(frame => frame.function?.toLowerCase().includes('segfaultify'))
+  // First request is ping, second is the crash report
+  if (requestCount < 2) return
 
-    console.log(inspect(stackTrace, true, 5, true))
+  clearTimeout(timeout)
+
+  server.close(() => {
+    console.log('Payload:', inspect(req.body.payload[0], true, 10, true))
+    const stackTrace = JSON.parse(req.body.payload[0].message).error.stack.frames
+
+    const boomFrame = stackTrace.find(frame => frame.function?.toLowerCase().includes('segfaultify'))
 
     if (existsSync('/etc/alpine-release')) {
       // TODO: Remove this when supported.
