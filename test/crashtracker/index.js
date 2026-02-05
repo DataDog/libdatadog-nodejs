@@ -30,20 +30,21 @@ let timeout = setTimeout(() => {
 
 app.use(bodyParser.json())
 
-let requestCount = 0
-
 app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
-  requestCount++
   res.status(200).send()
 
-  // First request is ping, second is the crash report
-  if (requestCount < 2) return
+  const payload = req.body.payload[0]
+  const tags = payload.tags ? payload.tags.split(',') : []
+
+  // Only process crash reports (not pings)
+  if (!tags.some(tag => tag === 'is_crash:true')) {
+    return
+  }
 
   clearTimeout(timeout)
 
   server.close(() => {
-    console.log('Payload:', inspect(req.body.payload[0], true, 10, true))
-    const stackTrace = JSON.parse(req.body.payload[0].message).error.stack.frames
+    const stackTrace = JSON.parse(payload.message).error.stack.frames
 
     const boomFrame = stackTrace.find(frame => frame.function?.toLowerCase().includes('segfaultify'))
 
@@ -56,7 +57,6 @@ app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
       throw new Error('Could not find a stack frame for the crashing function.')
     }
 
-    const tags = req.body.payload[0].tags.split(',')
     if (tags.includes('profiler_serializing:1')) {
       console.log('Stack trace was marked as happened during profile serialization.')
     } else {
