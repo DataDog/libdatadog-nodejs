@@ -31,15 +31,22 @@ let timeout = setTimeout(() => {
 app.use(bodyParser.json())
 
 app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
-  clearTimeout(timeout)
-
   res.status(200).send()
 
-  server.close(() => {
-    const stackTrace = JSON.parse(req.body.payload[0].stack_trace).frames
-    const boomFrame = stackTrace.find(frame => frame.function?.toLowerCase().includes('segfaultify'))
+  const payload = req.body.payload[0]
+  const tags = payload.tags ? payload.tags.split(',') : []
 
-    console.log(inspect(stackTrace, true, 5, true))
+  // Only process crash reports (not pings)
+  if (!tags.some(tag => tag === 'is_crash:true')) {
+    return
+  }
+
+  clearTimeout(timeout)
+
+  server.close(() => {
+    const stackTrace = JSON.parse(payload.message).error.stack.frames
+
+    const boomFrame = stackTrace.find(frame => frame.function?.toLowerCase().includes('segfaultify'))
 
     if (existsSync('/etc/alpine-release')) {
       // TODO: Remove this when supported.
@@ -50,7 +57,6 @@ app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
       throw new Error('Could not find a stack frame for the crashing function.')
     }
 
-    const tags = req.body.payload[0].tags.split(',')
     if (tags.includes('profiler_serializing:1')) {
       console.log('Stack trace was marked as happened during profile serialization.')
     } else {
