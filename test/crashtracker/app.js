@@ -15,9 +15,11 @@ crashtracker.init({
     },
     timeout_ms: 3000
   },
-  timeout_ms: 3000,
+  timeout: { secs: 3, nanos: 0 },
   resolve_frames: 'EnabledWithInprocessSymbols',
-  wait_for_receiver: true
+  wait_for_receiver: true,
+  demangle_names: false,
+  signals: []
 }, {
   args: [],
   env: [],

@@ -14,8 +14,7 @@ path = "src/bin/receiver.rs"
 
 [dependencies]
 anyhow = "1"
-datadog-crashtracker = { git = "https://github.com/DataDog/libdatadog.git", tag = "v16.0.3"  }
+libdd-crashtracker = { git = "https://github.com/DataDog/libdatadog.git", tag = "v26.0.0"  }
 napi = { version = "2", features = ["serde-json"] }
 napi-derive = { version = "2", default-features = false }
 rustls = { version = "*", default-features = false, features = ["aws-lc-rs"] }
-backtrace = { version = "=0.3.74" } # Can be removed when libdatadog is updated to 18.1.0 or later
