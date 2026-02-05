@@ -1,0 +1,14 @@
+[package]
+name = "napi-constructor-test"
+version = "0.1.0"
+edition = "2018"
+
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+napi = { version = "2", features = ["serde-json"] }
+napi-derive = { version = "2", default-features = false }
+serde = { version = "1", features = ["derive"] }
