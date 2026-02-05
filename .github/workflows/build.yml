@@ -30,7 +30,6 @@ jobs:
       min-node-version: 16
       rust: true
       only: darwin-arm64,darwin-x64,linux-arm64,linux-x64
-      pre-test-script: 'cargo build && node scripts/copy-artifacts.js'
 
   package-size:
     runs-on: ubuntu-latest
