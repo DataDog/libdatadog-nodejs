@@ -44,6 +44,9 @@ function findWASM (name) {
 }
 
 function find (name, binary = false) {
+  // see https://github.com/rust-lang/cargo/issues/12780
+  name = name.replaceAll('-', '_')
+
   const root = __dirname
   const filename = binary ? name : `${name}.node`
   const build = `${root}/build/Release/${filename}`
