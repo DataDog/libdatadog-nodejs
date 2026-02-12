@@ -40,6 +40,8 @@ function test_service_selector() {
   });
 
   assert.strictEqual(values.length, 2)
+  // We can't rely on ordering, so sort it by name to make it deterministic
+  values.sort((a, b) => a.name.localeCompare(b.name))
   assert.strictEqual(values[0].name, 'DD_RUNTIME_METRICS_ENABLED')
   assert.strictEqual(values[0].value, 'true')
   assert.strictEqual(values[0].source, 'local_stable_config')
