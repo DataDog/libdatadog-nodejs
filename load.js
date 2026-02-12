@@ -45,7 +45,12 @@ function findWASM (name) {
 
 function find (name, binary = false) {
   const root = __dirname
-  const filename = binary ? name : `${name}.node`
+
+  // see https://github.com/rust-lang/cargo/issues/12780
+  // Only apply hyphen-to-underscore conversion for .node libraries, not binaries
+  const transformedName = binary ? name : name.replaceAll('-', '_')
+
+  const filename = binary ? transformedName : `${transformedName}.node`
   const build = `${root}/build/Release/${filename}`
 
   if (existsSync(build)) return build
@@ -55,7 +60,7 @@ function find (name, binary = false) {
   if (!folder) return
 
   const prebuildFolder = path.join(root, 'prebuilds', folder)
-  const file = findFile(prebuildFolder, name, binary)
+  const file = findFile(prebuildFolder, transformedName, binary)
 
   if (!file) return
 
