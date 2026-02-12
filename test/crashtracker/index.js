@@ -33,18 +33,18 @@ app.use(bodyParser.json())
 app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
   res.status(200).send()
 
-  const payload = req.body.payload[0]
-  const tags = payload.tags ? payload.tags.split(',') : []
+  const logPayload = req.body.payload.logs[0]
+  const tags = logPayload.tags ? logPayload.tags.split(',') : []
 
   // Only process crash reports (not pings)
-  if (!tags.some(tag => tag === 'is_crash:true')) {
+  if (!logPayload.is_crash) {
     return
   }
 
   clearTimeout(timeout)
 
   server.close(() => {
-    const stackTrace = JSON.parse(payload.message).error.stack.frames
+    const stackTrace = JSON.parse(logPayload.message).error.stack.frames
 
     const boomFrame = stackTrace.find(frame => frame.function?.toLowerCase().includes('segfaultify'))
 
