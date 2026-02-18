@@ -33,8 +33,13 @@ extern "C" {
 pub struct DefaultHttpClient;
 
 impl HttpClientTrait for DefaultHttpClient {
+    fn new_client() -> Self {
+        Self
+    }
+
     #[allow(clippy::manual_async_fn)]
     fn request(
+        &self,
         req: HttpRequest,
     ) -> impl Future<Output = Result<HttpResponse, HttpError>> + MaybeSend {
         async move {
