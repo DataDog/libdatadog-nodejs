@@ -22,6 +22,7 @@ module.exports.httpRequest = function (method, url, headersJson, body) {
         res.on('end', () => {
           resolve({
             status: res.statusCode,
+            headers: res.headers,
             body: new Uint8Array(Buffer.concat(chunks)),
           });
         });

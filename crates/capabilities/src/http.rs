@@ -28,9 +28,11 @@ extern "C" {
 }
 
 /// Wasm [`HttpClientTrait`] implementation that delegates to Node.js HTTP.
-pub struct WasmHttpClient;
+///
+/// Named `DefaultHttpClient` to match the native version's public API.
+pub struct DefaultHttpClient;
 
-impl HttpClientTrait for WasmHttpClient {
+impl HttpClientTrait for DefaultHttpClient {
     #[allow(clippy::manual_async_fn)]
     fn request(
         req: HttpRequest,
@@ -51,6 +53,8 @@ impl HttpClientTrait for WasmHttpClient {
                 .ok_or_else(|| HttpError::Other("status is not a number".into()))?
                 as u16;
 
+            let headers = parse_response_headers(&result)?;
+
             let body_js = js_sys::Reflect::get(&result, &JsValue::from_str("body"))
                 .map_err(|_| HttpError::Other("missing body in response".into()))?;
 
@@ -60,9 +64,31 @@ impl HttpClientTrait for WasmHttpClient {
                 js_sys::Uint8Array::new(&body_js).to_vec()
             };
 
-            Ok(HttpResponse { status, body })
+            Ok(HttpResponse { status, headers, body })
         }
     }
+}
+
+/// Parse response headers from a JS object `{ "header-name": "value", ... }`.
+///
+/// Node.js `res.headers` returns lowercased header names with string values.
+fn parse_response_headers(result: &JsValue) -> Result<Vec<(String, String)>, HttpError> {
+    let headers_js = js_sys::Reflect::get(result, &JsValue::from_str("headers"))
+        .map_err(|_| HttpError::Other("missing headers in response".into()))?;
+
+    if headers_js.is_undefined() || headers_js.is_null() {
+        return Ok(Vec::new());
+    }
+
+    let entries = js_sys::Object::entries(&js_sys::Object::unchecked_from_js(headers_js));
+    let mut headers = Vec::with_capacity(entries.length() as usize);
+    for i in 0..entries.length() {
+        let entry = js_sys::Array::from(&entries.get(i));
+        if let (Some(key), Some(value)) = (entry.get(0).as_string(), entry.get(1).as_string()) {
+            headers.push((key, value));
+        }
+    }
+    Ok(headers)
 }
 
 fn serialize_headers(headers: &[(String, String)]) -> Result<String, HttpError> {

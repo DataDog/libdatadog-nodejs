@@ -15,3 +15,8 @@ panic = "abort"
 strip = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[patch.crates-io]
+# Override the native capability implementations with wasm versions
+# backed by JS transports. Same package name + public API as the native crate.
+libdd-capabilities-impl = { path = "crates/capabilities" }
