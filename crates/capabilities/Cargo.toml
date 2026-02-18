@@ -1,7 +1,10 @@
 [package]
-name = "capabilities"
+name = "libdd-capabilities-impl"
 version = "0.1.0"
 edition = "2018"
+
+# Same package name and version as the native crate in libdatadog.
+# libdatadog-nodejs's [patch.crates-io] swaps this in when building for wasm.
 
 [lib]
 crate-type = ["cdylib", "rlib"]
