@@ -46,7 +46,15 @@ impl HttpClientTrait for DefaultHttpClient {
             let method = req.method_str();
             let url = req.url().to_owned();
             let headers_json = serialize_headers(req.headers())?;
+            let accepts_body = req.method().accepts_body();
             let body = req.into_body();
+            if body.is_some() && !accepts_body {
+                return Err(HttpError::InvalidRequest(format!(
+                    "method {} does not accept a request body",
+                    method
+                )));
+            }
+            let body = body.unwrap_or_default();
 
             let result = JsFuture::from(http_request(method, &url, &headers_json, &body))
                 .await
