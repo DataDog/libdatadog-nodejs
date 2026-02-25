@@ -10,8 +10,9 @@ function myFaultyFunction () {
 }
 
 crashtracker.beginProfilerSerializing()
-try {
-  myFaultyFunction()
-} catch (e) {
+
+process.on('uncaughtException', (e) => {
   crashtracker.reportUnhandledException(e)
-}
+})
+
+myFaultyFunction()
