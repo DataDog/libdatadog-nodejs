@@ -773,7 +773,7 @@ checksum = "bcc35a38544a891a5f7c865aca548a982ccb3b8650a5b06d0fd33a10283c56fc"
 [[package]]
 name = "libdd-common"
 version = "1.1.0"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v28.0.0#c8121f422d2c8d219f8d421ff3cdb1fcbe9e8b09"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v28.0.1#647c8ff924070d4e79494ec852d312ff0301fd8a"
 dependencies = [
  "anyhow",
  "bytes",
@@ -807,7 +807,7 @@ dependencies = [
 [[package]]
 name = "libdd-crashtracker"
 version = "1.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v28.0.0#c8121f422d2c8d219f8d421ff3cdb1fcbe9e8b09"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v28.0.1#647c8ff924070d4e79494ec852d312ff0301fd8a"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -839,7 +839,7 @@ dependencies = [
 [[package]]
 name = "libdd-ddsketch"
 version = "1.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v28.0.0#c8121f422d2c8d219f8d421ff3cdb1fcbe9e8b09"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v28.0.1#647c8ff924070d4e79494ec852d312ff0301fd8a"
 dependencies = [
  "prost",
 ]
@@ -847,7 +847,7 @@ dependencies = [
 [[package]]
 name = "libdd-telemetry"
 version = "2.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v28.0.0#c8121f422d2c8d219f8d421ff3cdb1fcbe9e8b09"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v28.0.1#647c8ff924070d4e79494ec852d312ff0301fd8a"
 dependencies = [
  "anyhow",
  "base64",
