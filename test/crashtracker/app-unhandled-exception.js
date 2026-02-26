@@ -11,7 +11,7 @@ function myFaultyFunction () {
 
 crashtracker.beginProfilerSerializing()
 
-process.on('uncaughtException', (e) => {
+process.on('uncaughtExceptionMonitor', (e) => {
   crashtracker.reportUnhandledException(e)
 })
 
