@@ -47,97 +47,92 @@ app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
   }
 })
 
-function runSegfaultTest (PORT) {
-  return new Promise((resolve, reject) => {
-    currentTest = (logPayload, tags) => {
-      currentTest = null
-      const stackTrace = JSON.parse(logPayload.message).error.stack.frames
+let PORT
 
-      const boomFrame = stackTrace.find(frame => frame.function?.toLowerCase().includes('segfaultify'))
-
-      if (existsSync('/etc/alpine-release')) {
-        // TODO: Remove this when supported.
-        console.log('Received crash report. Skipping stack trace test since it is currently unsupported for Alpine.')
-      } else if (boomFrame) {
-        console.log('Stack frame for crashing function successfully received by the mock agent.')
-      } else {
-        return reject(new Error('Could not find a stack frame for the crashing function.'))
-      }
-
-      if (tags.includes('profiler_serializing:1')) {
-        console.log('Stack trace was marked as happened during profile serialization.')
-      } else {
-        return reject(new Error('Stack trace was not marked as happening during profile serialization.'))
-      }
-
-      resolve()
-    }
-
-    exec('node app-seg-fault', {
-      ...opts,
-      env: { ...process.env, PORT }
-    }, e => {
-      if (e && e.signal !== 'SIGSEGV' && e.code !== 139 && e.status !== 139) {
-        reject(e)
-      }
-    })
-  })
-}
-
-function runUnhandledExceptionTest (PORT) {
-  return new Promise((resolve, reject) => {
-    rmSync(path.join(cwd, 'stdout.log'), { force: true })
-    rmSync(path.join(cwd, 'stderr.log'), { force: true })
-
-    currentTest = (logPayload) => {
-      currentTest = null
-      const crashReport = JSON.parse(logPayload.message)
-      const stackTrace = crashReport.error.stack.frames
-      const errorMessage = crashReport.error.message
-      const errorKind = crashReport.error.kind
-
-      if (errorKind === 'UnhandledException') {
-        console.log('Error kind correctly reported as UnhandledException.')
-      } else {
-        return reject(new Error(`Expected error kind "UnhandledException" but got "${errorKind}".`))
-      }
-
-      if (errorMessage.includes('TypeError') && errorMessage.includes('something went wrong')) {
-        console.log('Exception type and message correctly captured.')
-      } else {
-        return reject(new Error(`Error message did not contain expected content: "${errorMessage}".`))
-      }
-
-      const faultyFrame = stackTrace.find(frame =>
-        frame.function && frame.function.includes('myFaultyFunction')
-      )
-
-      if (faultyFrame) {
-        console.log('Stack frame for myFaultyFunction successfully received by the mock agent.')
-      } else {
-        return reject(new Error('Could not find a stack frame for myFaultyFunction.'))
-      }
-
-      resolve()
-    }
-
-    exec('node app-unhandled-exception', {
+function runApp (script, { expectSignal } = {}) {
+  return new Promise((resolve) => {
+    exec(`node ${script}`, {
       ...opts,
       env: { ...process.env, PORT }
     }, e => {
       if (e) {
-        // tolerate non-zero exit since reportUnhandledException disables the crash handler
+        if (expectSignal && (e.signal === expectSignal || e.code === 139 || e.status === 139)) {
+          return
+        }
       }
     })
+
+    currentTest = (logPayload, tags) => {
+      currentTest = null
+      resolve({ logPayload, tags })
+    }
   })
 }
 
+function assert (condition, label, message) {
+  if (!condition) {
+    throw new Error(`[${label}] ${message}`)
+  }
+  console.log(`[${label}] ${message}`)
+}
+
+async function testSegfault () {
+  const { logPayload, tags } = await runApp('app-seg-fault', { expectSignal: 'SIGSEGV' })
+  const stackTrace = JSON.parse(logPayload.message).error.stack.frames
+  const boomFrame = stackTrace.find(frame => frame.function?.toLowerCase().includes('segfaultify'))
+
+  if (existsSync('/etc/alpine-release')) {
+    console.log('[segfault] Received crash report. Skipping stack trace test since it is currently unsupported for Alpine.')
+  } else {
+    assert(boomFrame, 'segfault', 'Stack frame for crashing function successfully received.')
+  }
+
+  assert(tags.includes('profiler_serializing:1'), 'segfault', 'Stack trace was marked as happened during profile serialization.')
+}
+
+async function testUnhandledError (label, script, { expectedType, expectedMessage, expectedFrame }) {
+  const { logPayload } = await runApp(script)
+  const crashReport = JSON.parse(logPayload.message)
+
+  assert(crashReport.error.message.includes(expectedType), label, `Exception type "${expectedType}" captured in message.`)
+  assert(crashReport.error.message.includes(expectedMessage), label, `Exception message "${expectedMessage}" captured.`)
+
+  const frame = crashReport.error.stack.frames.find(f => f.function && f.function.includes(expectedFrame))
+  assert(frame, label, `Stack frame for ${expectedFrame} successfully received.`)
+}
+
+async function testUnhandledNonError (label, script, { expectedFallbackType, expectedValue }) {
+  const { logPayload } = await runApp(script)
+  const crashReport = JSON.parse(logPayload.message)
+
+  assert(crashReport.error.message.includes(expectedFallbackType), label, `Fallback type "${expectedFallbackType}" captured in message.`)
+  assert(crashReport.error.message.includes(expectedValue), label, `Stringified value "${expectedValue}" captured in message.`)
+  assert(crashReport.error.stack.frames.length === 0, label, 'Empty stack trace correctly reported.')
+}
+
 const server = app.listen(async () => {
-  const PORT = server.address().port
+  PORT = server.address().port
 
   try {
-    await runSegfaultTest(PORT)
-    await runUnhandledExceptionTest(PORT)
+    await testSegfault()
+    await testUnhandledError('uncaught-exception', 'app-uncaught-exception', {
+      expectedType: 'TypeError',
+      expectedMessage: 'something went wrong',
+      expectedFrame: 'myFaultyFunction'
+    })
+    await testUnhandledNonError('uncaught-exception-non-error', 'app-uncaught-exception-non-error', {
+      expectedFallbackType: 'uncaughtException',
+      expectedValue: 'a plain string error'
+    })
+    await testUnhandledError('unhandled-rejection', 'app-unhandled-rejection', {
+      expectedType: 'Error',
+      expectedMessage: 'async went wrong',
+      expectedFrame: 'myAsyncFaultyFunction'
+    })
+    await testUnhandledNonError('unhandled-rejection-non-error', 'app-unhandled-rejection-non-error', {
+      expectedFallbackType: 'unhandledRejection',
+      expectedValue: 'a plain string rejection'
+    })
   } catch (e) {
     clearTimeout(timeout)
     server.close(() => { throw e })
