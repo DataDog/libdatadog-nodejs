@@ -1,7 +1,7 @@
 name: 'Build/Test WASM'
 description: 'A simple composite GitHub Action sets-up WASM; then test & build relevant crates'
 inputs:
-  cate:
+  crate:
     description: 'The crate name. Must be in ./crates'
     required: true
 runs:
