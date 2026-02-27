@@ -7,8 +7,8 @@ const { initTestCrashtracker } = require('./test_utils')
 initTestCrashtracker()
 crashtracker.beginProfilerSerializing()
 
-process.on('unhandledRejection', (reason) => {
-  crashtracker.reportUnhandledRejection(reason)
+process.on('uncaughtExceptionMonitor', (e, origin) => {
+  crashtracker.reportUncaughtExceptionMonitor(e, origin)
 })
 
 async function myAsyncFaultyFunction () {

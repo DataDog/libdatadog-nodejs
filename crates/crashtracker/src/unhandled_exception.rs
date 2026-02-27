@@ -104,6 +104,8 @@ fn report_unhandled(env: &Env, error: JsUnknown, fallback_type: &str) -> napi::R
         };
         (name, message, stacktrace)
     } else {
+        // This only fires for synchronous `throw <non-Error>`; node already
+        // wraps non-Error unhandled rejections in an Error object
         let message = stringify_js_value(error).ok();
         (
             Some(fallback_type.to_string()),
@@ -124,13 +126,12 @@ fn report_unhandled(env: &Env, error: JsUnknown, fallback_type: &str) -> napi::R
 }
 
 #[napi]
-pub fn report_uncaught_exception(env: Env, error: JsUnknown) -> napi::Result<()> {
-    report_unhandled(&env, error, "uncaughtException")
-}
-
-#[napi]
-pub fn report_unhandled_rejection(env: Env, error: JsUnknown) -> napi::Result<()> {
-    report_unhandled(&env, error, "unhandledRejection")
+pub fn report_uncaught_exception_monitor(
+    env: Env,
+    error: JsUnknown,
+    origin: String,
+) -> napi::Result<()> {
+    report_unhandled(&env, error, &origin)
 }
 
 #[cfg(test)]

@@ -7,8 +7,8 @@ const { initTestCrashtracker } = require('./test_utils')
 initTestCrashtracker()
 crashtracker.beginProfilerSerializing()
 
-process.on('uncaughtExceptionMonitor', (e) => {
-  crashtracker.reportUncaughtException(e)
+process.on('uncaughtExceptionMonitor', (e, origin) => {
+  crashtracker.reportUncaughtExceptionMonitor(e, origin)
 })
 
 function myFaultyFunction () {

@@ -96,9 +96,10 @@ async function testUnhandledError (label, script, { expectedType, expectedMessag
 
   assert(crashReport.error.message.includes(expectedType), label, `Exception type "${expectedType}" captured in message.`)
   assert(crashReport.error.message.includes(expectedMessage), label, `Exception message "${expectedMessage}" captured.`)
-
-  const frame = crashReport.error.stack.frames.find(f => f.function && f.function.includes(expectedFrame))
-  assert(frame, label, `Stack frame for ${expectedFrame} successfully received.`)
+  if (expectedFrame) {
+    const frame = crashReport.error.stack.frames.find(f => f.function && f.function.includes(expectedFrame))
+    assert(frame, label, `Stack frame for ${expectedFrame} successfully received.`)
+  }
 }
 
 async function testUnhandledNonError (label, script, { expectedFallbackType, expectedValue }) {
@@ -129,9 +130,13 @@ const server = app.listen(async () => {
       expectedMessage: 'async went wrong',
       expectedFrame: 'myAsyncFaultyFunction'
     })
-    await testUnhandledNonError('unhandled-rejection-non-error', 'app-unhandled-rejection-non-error', {
-      expectedFallbackType: 'unhandledRejection',
-      expectedValue: 'a plain string rejection'
+    // Node wraps non-Error rejections in an Error with name 'UnhandledPromiseRejection'
+    // before passing to uncaughtExceptionMonitor, so this hits the Error path.
+    // However, this test case rejects with a plain string, so the wrapped Error object has useless
+    // stack trace
+    await testUnhandledError('unhandled-rejection-non-error', 'app-unhandled-rejection-non-error', {
+      expectedType: 'UnhandledPromiseRejection',
+      expectedMessage: 'a plain string rejection'
     })
   } catch (e) {
     clearTimeout(timeout)
