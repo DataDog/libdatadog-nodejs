@@ -1,7 +1,6 @@
 'use strict'
 
 const { execSync, exec } = require('child_process')
-const { inspect } = require('util')
 
 const cwd = __dirname
 const stdio = ['inherit', 'inherit', 'inherit']
@@ -26,7 +25,9 @@ let timeout = setTimeout(() => {
   execSync('cat stderr.log', opts)
 
   throw new Error('No crash report received before timing out.')
-}, 10000) // TODO: reduce this when the receiver no longer locks up
+}, 10000)
+
+let currentTest = null
 
 app.use(bodyParser.json())
 
@@ -41,42 +42,99 @@ app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
     return
   }
 
-  clearTimeout(timeout)
+  if (!currentTest) {
+    throw new Error('Received unexpected crash report with no active test.')
+  }
 
-  server.close(() => {
-    const stackTrace = JSON.parse(logPayload.message).error.stack.frames
-
-    const boomFrame = stackTrace.find(frame => frame.function?.toLowerCase().includes('segfaultify'))
-
-    if (existsSync('/etc/alpine-release')) {
-      // TODO: Remove this when supported.
-      console.log('Received crash report. Skipping stack trace test since it is currently unsupported for Alpine.')
-    } else if (boomFrame) {
-      console.log('Stack frame for crashing function successfully received by the mock agent.')
-    } else {
-      throw new Error('Could not find a stack frame for the crashing function.')
-    }
-
-    if (tags.includes('profiler_serializing:1')) {
-      console.log('Stack trace was marked as happened during profile serialization.')
-    } else {
-      throw new Error('Stack trace was not marked as happening during profile serialization.')
-    }
-  })
+  currentTest(logPayload, tags)
 })
 
-const server = app.listen(() => {
-  const PORT = server.address().port
+let PORT
 
-  exec('node app', {
-    ...opts,
-    env: {
-      ...process.env,
-      PORT
-    }
-  }, e => {
-    if (e.signal !== 'SIGSEGV' && e.code !== 139 && e.status !== 139) {
-      throw e
+function runApp (script) {
+  return new Promise((resolve) => {
+    exec(`node ${script}`, {
+      ...opts,
+      env: { ...process.env, PORT }
+    })
+
+    currentTest = (logPayload, tags) => {
+      currentTest = null
+      resolve({ logPayload, tags })
     }
   })
+}
+
+function assert (condition, label, message) {
+  if (!condition) {
+    throw new Error(`[${label}] ${message}`)
+  }
+  console.log(`[${label}] ${message}`)
+}
+
+async function testSegfault () {
+  const { logPayload, tags } = await runApp('app-seg-fault')
+  const stackTrace = JSON.parse(logPayload.message).error.stack.frames
+  const boomFrame = stackTrace.find(frame => frame.function?.toLowerCase().includes('segfaultify'))
+
+  if (existsSync('/etc/alpine-release')) {
+    console.log('[segfault] Received crash report. Skipping stack trace test since it is currently unsupported for Alpine.')
+  } else {
+    assert(boomFrame, 'segfault', 'Stack frame for crashing function successfully received.')
+  }
+
+  assert(tags.includes('profiler_serializing:1'), 'segfault', 'Stack trace was marked as happened during profile serialization.')
+}
+
+async function testUnhandledError (label, script, { expectedType, expectedMessage, expectedFrame }) {
+  const { logPayload } = await runApp(script)
+  const crashReport = JSON.parse(logPayload.message)
+
+  assert(crashReport.error.message.includes(expectedType), label, `Exception type "${expectedType}" captured in message.`)
+  assert(crashReport.error.message.includes(expectedMessage), label, `Exception message "${expectedMessage}" captured.`)
+  if (expectedFrame) {
+    const frame = crashReport.error.stack.frames.find(f => f.function && f.function.includes(expectedFrame))
+    assert(frame, label, `Stack frame for ${expectedFrame} successfully received.`)
+  }
+}
+
+async function testUnhandledNonError (label, script, { expectedFallbackType, expectedValue }) {
+  const { logPayload } = await runApp(script)
+  const crashReport = JSON.parse(logPayload.message)
+
+  assert(crashReport.error.message.includes(expectedFallbackType), label, `Fallback type "${expectedFallbackType}" captured in message.`)
+  assert(crashReport.error.message.includes(expectedValue), label, `Stringified value "${expectedValue}" captured in message.`)
+  assert(crashReport.error.stack.frames.length === 0, label, 'Empty stack trace correctly reported.')
+}
+
+const server = app.listen(async () => {
+  PORT = server.address().port
+
+
+  await testSegfault()
+  await testUnhandledError('uncaught-exception', 'app-uncaught-exception', {
+    expectedType: 'TypeError',
+    expectedMessage: 'something went wrong',
+    expectedFrame: 'myFaultyFunction'
+  })
+  await testUnhandledNonError('uncaught-exception-non-error', 'app-uncaught-exception-non-error', {
+    expectedFallbackType: 'uncaughtException',
+    expectedValue: 'a plain string error'
+  })
+  await testUnhandledError('unhandled-rejection', 'app-unhandled-rejection', {
+    expectedType: 'Error',
+    expectedMessage: 'async went wrong',
+    expectedFrame: 'myAsyncFaultyFunction'
+  })
+  // Node wraps non-Error rejections in an Error with name 'UnhandledPromiseRejection'
+  // before passing to uncaughtExceptionMonitor, so this hits the Error path.
+  // However, this test case rejects with a plain string, so the wrapped Error object has useless
+  // stack trace
+  await testUnhandledError('unhandled-rejection-non-error', 'app-unhandled-rejection-non-error', {
+    expectedType: 'UnhandledPromiseRejection',
+    expectedMessage: 'a plain string rejection'
+  })
+
+  clearTimeout(timeout)
+  server.close()
 })
