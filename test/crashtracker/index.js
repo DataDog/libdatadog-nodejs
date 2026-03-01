@@ -42,24 +42,20 @@ app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
     return
   }
 
-  if (currentTest) {
-    currentTest(logPayload, tags)
+  if (!currentTest) {
+    throw new Error('Received unexpected crash report with no active test.')
   }
+
+  currentTest(logPayload, tags)
 })
 
 let PORT
 
-function runApp (script, { expectSignal } = {}) {
+function runApp (script) {
   return new Promise((resolve) => {
     exec(`node ${script}`, {
       ...opts,
       env: { ...process.env, PORT }
-    }, e => {
-      if (e) {
-        if (expectSignal && (e.signal === expectSignal || e.code === 139 || e.status === 139)) {
-          return
-        }
-      }
     })
 
     currentTest = (logPayload, tags) => {
@@ -77,7 +73,7 @@ function assert (condition, label, message) {
 }
 
 async function testSegfault () {
-  const { logPayload, tags } = await runApp('app-seg-fault', { expectSignal: 'SIGSEGV' })
+  const { logPayload, tags } = await runApp('app-seg-fault')
   const stackTrace = JSON.parse(logPayload.message).error.stack.frames
   const boomFrame = stackTrace.find(frame => frame.function?.toLowerCase().includes('segfaultify'))
 
@@ -114,35 +110,30 @@ async function testUnhandledNonError (label, script, { expectedFallbackType, exp
 const server = app.listen(async () => {
   PORT = server.address().port
 
-  try {
-    await testSegfault()
-    await testUnhandledError('uncaught-exception', 'app-uncaught-exception', {
-      expectedType: 'TypeError',
-      expectedMessage: 'something went wrong',
-      expectedFrame: 'myFaultyFunction'
-    })
-    await testUnhandledNonError('uncaught-exception-non-error', 'app-uncaught-exception-non-error', {
-      expectedFallbackType: 'uncaughtException',
-      expectedValue: 'a plain string error'
-    })
-    await testUnhandledError('unhandled-rejection', 'app-unhandled-rejection', {
-      expectedType: 'Error',
-      expectedMessage: 'async went wrong',
-      expectedFrame: 'myAsyncFaultyFunction'
-    })
-    // Node wraps non-Error rejections in an Error with name 'UnhandledPromiseRejection'
-    // before passing to uncaughtExceptionMonitor, so this hits the Error path.
-    // However, this test case rejects with a plain string, so the wrapped Error object has useless
-    // stack trace
-    await testUnhandledError('unhandled-rejection-non-error', 'app-unhandled-rejection-non-error', {
-      expectedType: 'UnhandledPromiseRejection',
-      expectedMessage: 'a plain string rejection'
-    })
-  } catch (e) {
-    clearTimeout(timeout)
-    server.close(() => { throw e })
-    return
-  }
+
+  await testSegfault()
+  await testUnhandledError('uncaught-exception', 'app-uncaught-exception', {
+    expectedType: 'TypeError',
+    expectedMessage: 'something went wrong',
+    expectedFrame: 'myFaultyFunction'
+  })
+  await testUnhandledNonError('uncaught-exception-non-error', 'app-uncaught-exception-non-error', {
+    expectedFallbackType: 'uncaughtException',
+    expectedValue: 'a plain string error'
+  })
+  await testUnhandledError('unhandled-rejection', 'app-unhandled-rejection', {
+    expectedType: 'Error',
+    expectedMessage: 'async went wrong',
+    expectedFrame: 'myAsyncFaultyFunction'
+  })
+  // Node wraps non-Error rejections in an Error with name 'UnhandledPromiseRejection'
+  // before passing to uncaughtExceptionMonitor, so this hits the Error path.
+  // However, this test case rejects with a plain string, so the wrapped Error object has useless
+  // stack trace
+  await testUnhandledError('unhandled-rejection-non-error', 'app-unhandled-rejection-non-error', {
+    expectedType: 'UnhandledPromiseRejection',
+    expectedMessage: 'a plain string rejection'
+  })
 
   clearTimeout(timeout)
   server.close()
