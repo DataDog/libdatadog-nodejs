@@ -12,6 +12,7 @@ execSync('yarn install', opts)
 
 const express = require('express')
 const bodyParser = require('body-parser')
+const assert = require('assert')
 const { existsSync, rmSync } = require('fs')
 const path = require('path')
 
@@ -65,13 +66,6 @@ function runApp (script) {
   })
 }
 
-function assert (condition, label, message) {
-  if (!condition) {
-    throw new Error(`[${label}] ${message}`)
-  }
-  console.log(`[${label}] ${message}`)
-}
-
 async function testSegfault () {
   const { logPayload, tags } = await runApp('app-seg-fault')
   const stackTrace = JSON.parse(logPayload.message).error.stack.frames
@@ -80,21 +74,21 @@ async function testSegfault () {
   if (existsSync('/etc/alpine-release')) {
     console.log('[segfault] Received crash report. Skipping stack trace test since it is currently unsupported for Alpine.')
   } else {
-    assert(boomFrame, 'segfault', 'Stack frame for crashing function successfully received.')
+    assert(boomFrame, '[segfault] Expected stack frame for crashing function not found.')
   }
 
-  assert(tags.includes('profiler_serializing:1'), 'segfault', 'Stack trace was marked as happened during profile serialization.')
+  assert(tags.includes('profiler_serializing:1'), '[segfault] Expected profiler_serializing:1 tag not found.')
 }
 
 async function testUnhandledError (label, script, { expectedType, expectedMessage, expectedFrame }) {
   const { logPayload } = await runApp(script)
   const crashReport = JSON.parse(logPayload.message)
 
-  assert(crashReport.error.message.includes(expectedType), label, `Exception type "${expectedType}" captured in message.`)
-  assert(crashReport.error.message.includes(expectedMessage), label, `Exception message "${expectedMessage}" captured.`)
+  assert(crashReport.error.message.includes(expectedType), `[${label}] Expected exception type "${expectedType}" not found in message.`)
+  assert(crashReport.error.message.includes(expectedMessage), `[${label}] Expected exception message "${expectedMessage}" not found.`)
   if (expectedFrame) {
     const frame = crashReport.error.stack.frames.find(f => f.function && f.function.includes(expectedFrame))
-    assert(frame, label, `Stack frame for ${expectedFrame} successfully received.`)
+    assert(frame, `[${label}] Expected stack frame for ${expectedFrame} not found.`)
   }
 }
 
@@ -102,9 +96,9 @@ async function testUnhandledNonError (label, script, { expectedFallbackType, exp
   const { logPayload } = await runApp(script)
   const crashReport = JSON.parse(logPayload.message)
 
-  assert(crashReport.error.message.includes(expectedFallbackType), label, `Fallback type "${expectedFallbackType}" captured in message.`)
-  assert(crashReport.error.message.includes(expectedValue), label, `Stringified value "${expectedValue}" captured in message.`)
-  assert(crashReport.error.stack.frames.length === 0, label, 'Empty stack trace correctly reported.')
+  assert(crashReport.error.message.includes(expectedFallbackType), `[${label}] Expected fallback type "${expectedFallbackType}" not found in message.`)
+  assert(crashReport.error.message.includes(expectedValue), `[${label}] Expected stringified value "${expectedValue}" not found in message.`)
+  assert.strictEqual(crashReport.error.stack.frames.length, 0, `[${label}] Expected empty stack trace but got ${crashReport.error.stack.frames.length} frames.`)
 }
 
 const server = app.listen(async () => {
