@@ -37,6 +37,11 @@ if (isMacOS) {
     // Add LLVM to PATH if not already included
     env.PATH = `${llvmBinDir}:${env.PATH}`;
   }
+
+  // Force C/C++ code (e.g. zstd-sys) to use Homebrew's clang for wasm32. Otherwise a global
+  // CC (e.g. ccache cc) can point at Apple Clang, which does not support wasm32-unknown-unknown.
+  env.CC_wasm32_unknown_unknown = `${llvmBinDir}/clang`;
+  env.CXX_wasm32_unknown_unknown = `${llvmBinDir}/clang++`;
 }
 
 childProcess.execSync(
