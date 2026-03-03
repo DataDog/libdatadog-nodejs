@@ -28,7 +28,6 @@ module.exports = [
       '@stylistic/space-before-function-paren': ['error', 'always'],
       'n/no-process-exit': 'off', // Duplicate of unicorn/no-process-exit
       'unicorn/prefer-module': 'off', // We use CJS
-      'unicorn/prefer-top-level-await': 'off',
       'unicorn/prevent-abbreviations': 'off',
     },
   },

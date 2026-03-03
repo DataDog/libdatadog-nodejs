@@ -15,4 +15,4 @@ async function myAsyncFaultyFunction () {
   throw new Error('async went wrong')
 }
 
-myAsyncFaultyFunction()
+myAsyncFaultyFunction() // eslint-disable-line unicorn/prefer-top-level-await
