@@ -14,8 +14,6 @@ const uid = process.getuid()
 const gid = process.getgid()
 const opts = { cwd, stdio, uid, gid }
 
-execSync('yarn install', opts)
-
 const app = express()
 
 rmSync(path.join(cwd, 'stdout.log'), { force: true })
