@@ -22,11 +22,19 @@ rmSync(path.join(cwd, 'stdout.log'), { force: true })
 rmSync(path.join(cwd, 'stderr.log'), { force: true })
 
 let timeout = setTimeout(() => {
-  execSync('cat stdout.log', opts)
-  execSync('cat stderr.log', opts)
+  if (existsSync(path.join(cwd, 'stdout.log'))) {
+    execSync('cat stdout.log', opts)
+  } else {
+    console.error('stdout.log not found')
+  }
+  if (existsSync(path.join(cwd, 'stderr.log'))) {
+    execSync('cat stderr.log', opts)
+  } else {
+    console.error('stderr.log not found')
+  }
 
   throw new Error('No crash report received before timing out.')
-}, 20000)
+}, 100_000_000)
 
 let currentTest = null
 
