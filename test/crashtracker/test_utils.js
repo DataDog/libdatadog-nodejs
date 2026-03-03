@@ -12,15 +12,15 @@ function initTestCrashtracker () {
       url: {
         scheme: 'http',
         authority: `127.0.0.1:${process.env.PORT || 8126}`,
-        path_and_query: ''
+        path_and_query: '',
       },
-      timeout_ms: 3000
+      timeout_ms: 3000,
     },
     timeout: { secs: 3, nanos: 0 },
     resolve_frames: 'EnabledWithInprocessSymbols',
     wait_for_receiver: true,
     demangle_names: false,
-    signals: []
+    signals: [],
   }, {
     args: [],
     env: [],
@@ -37,8 +37,8 @@ function initTestCrashtracker () {
       'runtime-id:8a8fef6433a849b3bc3171198831d102',
       'library_version:6.0.0-pre',
       'is_crash:true',
-      'severity:crash'
-    ]
+      'severity:crash',
+    ],
   })
 }
 

@@ -56,7 +56,7 @@ function runApp (script) {
   return new Promise((resolve) => {
     exec(`node ${script}`, {
       ...opts,
-      env: { ...process.env, PORT }
+      env: { ...process.env, PORT },
     })
 
     currentTest = (logPayload, tags) => {
@@ -104,21 +104,20 @@ async function testUnhandledNonError (label, script, { expectedFallbackType, exp
 const server = app.listen(async () => {
   PORT = server.address().port
 
-
   await testSegfault()
   await testUnhandledError('uncaught-exception', 'app-uncaught-exception', {
     expectedType: 'TypeError',
     expectedMessage: 'something went wrong',
-    expectedFrame: 'myFaultyFunction'
+    expectedFrame: 'myFaultyFunction',
   })
   await testUnhandledNonError('uncaught-exception-non-error', 'app-uncaught-exception-non-error', {
     expectedFallbackType: 'uncaughtException',
-    expectedValue: 'a plain string error'
+    expectedValue: 'a plain string error',
   })
   await testUnhandledError('unhandled-rejection', 'app-unhandled-rejection', {
     expectedType: 'Error',
     expectedMessage: 'async went wrong',
-    expectedFrame: 'myAsyncFaultyFunction'
+    expectedFrame: 'myAsyncFaultyFunction',
   })
   // Node wraps non-Error rejections in an Error with name 'UnhandledPromiseRejection'
   // before passing to uncaughtExceptionMonitor, so this hits the Error path.
@@ -126,7 +125,7 @@ const server = app.listen(async () => {
   // stack trace
   await testUnhandledError('unhandled-rejection-non-error', 'app-unhandled-rejection-non-error', {
     expectedType: 'UnhandledPromiseRejection',
-    expectedMessage: 'a plain string rejection'
+    expectedMessage: 'a plain string rejection',
   })
 
   clearTimeout(timeout)
