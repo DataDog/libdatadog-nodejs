@@ -80,7 +80,6 @@ function runApp (script) {
       // Allow a grace period for the crash report HTTP request to arrive
       // after the child process exits (e.g. segfault sends report then dies).
       closeTimer = setTimeout(() => {
-        cleanup()
         const reason = signal ? `signal ${signal}` : `exit code ${code}`
         reject(new Error(`Child process for "${script}" exited with ${reason} before sending a crash report`))
       }, 5000)
