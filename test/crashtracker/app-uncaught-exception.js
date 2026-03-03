@@ -2,7 +2,7 @@
 
 const libdatadog = require('../..')
 const crashtracker = libdatadog.load('crashtracker')
-const { initTestCrashtracker } = require('./test_utils')
+const { initTestCrashtracker } = require('./test-utils')
 
 initTestCrashtracker()
 crashtracker.beginProfilerSerializing()
