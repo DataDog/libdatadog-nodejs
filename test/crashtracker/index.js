@@ -61,15 +61,40 @@ app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
 let PORT
 
 function runApp (script) {
-  return new Promise((resolve) => {
-    exec(`node ${script}`, {
+  return new Promise((resolve, reject) => {
+    let closeTimer
+    let done = false
+
+    const child = exec(`node ${script}`, {
       ...opts,
       env: { ...process.env, PORT },
     })
 
+    child.on('error', (err) => {
+      cleanup()
+      reject(new Error(`Child process for "${script}" failed to start`, { cause: err }))
+    })
+
+    child.on('close', (code, signal) => {
+      if (done) return
+      // Allow a grace period for the crash report HTTP request to arrive
+      // after the child process exits (e.g. segfault sends report then dies).
+      closeTimer = setTimeout(() => {
+        cleanup()
+        const reason = signal ? `signal ${signal}` : `exit code ${code}`
+        reject(new Error(`Child process for "${script}" exited with ${reason} before sending a crash report`))
+      }, 5000)
+    })
+
     currentTest = (logPayload, tags) => {
+      cleanup()
       currentTest = undefined
       resolve({ logPayload, tags })
+    }
+
+    function cleanup () {
+      clearTimeout(closeTimer)
+      done = true
     }
   })
 }
