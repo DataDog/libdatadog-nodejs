@@ -1,7 +1,8 @@
-const path = require('node:path')
-const fs = require('node:fs')
-const loader = require('../../../load.js')
 const assert = require('node:assert')
+const fs = require('node:fs')
+const path = require('node:path')
+
+const loader = require('../../../load')
 
 const libconfig = loader.load('library_config')
 assert(libconfig !== undefined)

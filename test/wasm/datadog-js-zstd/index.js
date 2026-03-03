@@ -1,5 +1,6 @@
-const loader = require('../../../load.js')
 const assert = require('node:assert')
+
+const loader = require('../../../load')
 
 const zstd = loader.load('datadog-js-zstd')
 assert(zstd !== undefined)

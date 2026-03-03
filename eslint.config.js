@@ -1,5 +1,6 @@
 'use strict'
 
+const eslintPluginImportX = require('eslint-plugin-import-x')
 const eslintPluginJs = require('@eslint/js')
 const eslintPluginN = require('eslint-plugin-n')
 const eslintPluginStylistic = require('@stylistic/eslint-plugin')
@@ -8,12 +9,16 @@ const globals = require('globals')
 
 module.exports = [
   eslintPluginJs.configs.recommended,
+  eslintPluginImportX.flatConfigs.recommended,
   eslintPluginN.configs['flat/recommended-script'],
   eslintPluginStylistic.configs.recommended,
   eslintPluginUnicorn.configs.recommended,
   {
     languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'commonjs',
       globals: {
+        ...globals.es2022,
         ...globals.node,
       },
     },
@@ -26,6 +31,12 @@ module.exports = [
     rules: {
       '@stylistic/brace-style': ['error', '1tbs'],
       '@stylistic/space-before-function-paren': ['error', 'always'],
+      'import-x/extensions': ['error', 'never', { json: 'always' }],
+      'import-x/no-absolute-path': 'error',
+      'import-x/no-webpack-loader-syntax': 'error',
+      'import-x/order': ['error', {
+        'newlines-between': 'always',
+      }],
       'n/no-process-exit': 'off', // Duplicate of unicorn/no-process-exit
       'unicorn/prefer-module': 'off', // We use CJS
       'unicorn/prevent-abbreviations': 'off',

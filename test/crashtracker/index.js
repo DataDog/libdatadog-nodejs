@@ -1,6 +1,12 @@
 'use strict'
 
+const assert = require('node:assert')
+const { existsSync, rmSync } = require('node:fs')
+const path = require('node:path')
 const { execSync, exec } = require('node:child_process')
+
+const bodyParser = require('body-parser')
+const express = require('express')
 
 const cwd = __dirname
 const stdio = ['inherit', 'inherit', 'inherit']
@@ -9,12 +15,6 @@ const gid = process.getgid()
 const opts = { cwd, stdio, uid, gid }
 
 execSync('yarn install', opts)
-
-const express = require('express')
-const bodyParser = require('body-parser')
-const assert = require('node:assert')
-const { existsSync, rmSync } = require('node:fs')
-const path = require('node:path')
 
 const app = express()
 
