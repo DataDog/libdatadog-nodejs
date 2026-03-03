@@ -10,7 +10,7 @@ const outPath = path.join(rootPath, 'target', 'out.ndjson')
 const buildPath = path.join(rootPath, 'build', 'Release')
 
 const lineReader = readline.createInterface({
-  input: fs.createReadStream(outPath)
+  input: fs.createReadStream(outPath),
 })
 
 lineReader.on('line', function (line) {
