@@ -34,7 +34,7 @@ function test_service_selector() {
   configurator.set_envp(Object.entries(process.env).map(([key, value]) => `${key}=${value}`))
   configurator.set_args(process.argv)
 
-  values = configurator.get_configuration(rawConfigLocal.toString(), rawConfigManaged.toString())
+  const values = configurator.get_configuration(rawConfigLocal.toString(), rawConfigManaged.toString())
   values.forEach((value, key, map) => {
     console.log(`(phase 2) name: ${value.name}, value: ${value.value}, source: ${value.source}, config_id: ${value.config_id}`)
   });
