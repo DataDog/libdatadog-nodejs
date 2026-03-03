@@ -2,13 +2,13 @@
 
 // TODO: Extract this file to an external library.
 
-const { existsSync, readdirSync } = require('fs')
-const os = require('os')
-const path = require('path')
+const { existsSync, readdirSync } = require('node:fs')
+const os = require('node:os')
+const path = require('node:path')
 
 const PLATFORM = os.platform()
 const ARCH = process.arch
-const LIBC = PLATFORM === 'linux' ? existsSync('/etc/alpine-release') ? 'musl' : 'glibc' : ''
+const LIBC = PLATFORM === 'linux' ? (existsSync('/etc/alpine-release') ? 'musl' : 'glibc') : ''
 const ABI = process.versions.modules
 
 const inWebpack = typeof __webpack_require__ === 'function'
@@ -17,7 +17,7 @@ const runtimeRequire = inWebpack ? __non_webpack_require__ : require
 function maybeLoad (name) {
   try {
     return load(name)
-  } catch (e) {
+  } catch {
     // Not found, skip.
   }
 }
@@ -40,7 +40,7 @@ function findWASM (name) {
   const root = __dirname
   const prebuilds = path.join(root, 'prebuilds')
   const folders = readdirSync(prebuilds)
-  if (folders.find(f => f === name)) {
+  if (folders.includes(name)) {
     return path.join(prebuilds, name, `${name.replaceAll('-', '_')}.js`)
   }
 }
@@ -76,8 +76,8 @@ function findFolder (root) {
 
     return folders.find(f => f === `${PLATFORM}${LIBC}-${ARCH}`)
       || folders.find(f => f === `${PLATFORM}-${ARCH}`)
-  } catch (e) {
-    return null
+  } catch {
+    // Ignore
   }
 }
 
