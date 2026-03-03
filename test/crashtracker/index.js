@@ -20,11 +20,21 @@ rmSync(path.join(cwd, 'stdout.log'), { force: true })
 rmSync(path.join(cwd, 'stderr.log'), { force: true })
 
 const timeout = setTimeout(() => {
-  execSync('cat stdout.log', opts)
-  execSync('cat stderr.log', opts)
+  const stdoutLog = path.join(cwd, 'stdout.log')
+  const stderrLog = path.join(cwd, 'stderr.log')
+  if (existsSync(stdoutLog)) {
+    execSync(`cat ${stdoutLog}`, opts)
+  } else {
+    console.error('stdout.log not found (crashtracker-receiver may not have started)')
+  }
+  if (existsSync(stderrLog)) {
+    execSync(`cat ${stderrLog}`, opts)
+  } else {
+    console.error('stderr.log not found (crashtracker-receiver may not have started)')
+  }
 
   throw new Error('No crash report received before timing out.')
-}, 10_000)
+}, 20_000)
 
 let currentTest
 
@@ -51,20 +61,46 @@ app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
 let PORT
 
 function runApp (script) {
-  return new Promise((resolve) => {
-    exec(`node ${script}`, {
+  return new Promise((resolve, reject) => {
+    let closeTimer
+    let done = false
+
+    const child = exec(`node ${script}`, {
       ...opts,
       env: { ...process.env, PORT },
     })
 
+    child.on('error', (err) => {
+      cleanup()
+      reject(new Error(`Child process for "${script}" failed to start`, { cause: err }))
+    })
+
+    child.on('close', (code, signal) => {
+      if (done) return
+      // Allow a grace period for the crash report HTTP request to arrive
+      // after the child process exits (e.g. segfault sends report then dies).
+      closeTimer = setTimeout(() => {
+        const reason = signal ? `signal ${signal}` : `exit code ${code}`
+        reject(new Error(`Child process for "${script}" exited with ${reason} before sending a crash report`))
+      }, 5000)
+    })
+
     currentTest = (logPayload, tags) => {
+      cleanup()
       currentTest = undefined
       resolve({ logPayload, tags })
+    }
+
+    function cleanup () {
+      clearTimeout(closeTimer)
+      done = true
     }
   })
 }
 
 async function testSegfault () {
+  console.log('Running test: testSegfault')
+
   const { logPayload, tags } = await runApp('app-seg-fault')
   const stackTrace = JSON.parse(logPayload.message).error.stack.frames
   const boomFrame = stackTrace.find(frame => frame.function?.toLowerCase().includes('segfaultify'))
@@ -79,6 +115,8 @@ async function testSegfault () {
 }
 
 async function testUnhandledError (label, script, { expectedType, expectedMessage, expectedFrame }) {
+  console.log('Running test: testUnhandledError', label)
+
   const { logPayload } = await runApp(script)
   const crashReport = JSON.parse(logPayload.message)
 
@@ -91,6 +129,8 @@ async function testUnhandledError (label, script, { expectedType, expectedMessag
 }
 
 async function testUnhandledNonError (label, script, { expectedFallbackType, expectedValue }) {
+  console.log('Running test: testUnhandledNonError', label)
+
   const { logPayload } = await runApp(script)
   const crashReport = JSON.parse(logPayload.message)
 
