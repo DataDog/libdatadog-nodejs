@@ -30,7 +30,7 @@ if (isMacOS) {
     childProcess.execSync(`${llvmBinDir}/llvm-config --version`)
   } catch (error) {
     console.error(`‼️ LLVM not found in ${llvmDir}.\n‼️ Please install LLVM using Homebrew:\n📝   brew install llvm`)
-    process.exit(1)
+    process.exit(1) // eslint-disable-line n/no-process-exit
   }
 
   if (!env.PATH.includes(llvmBinDir)) {
