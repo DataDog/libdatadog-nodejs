@@ -1,8 +1,8 @@
 'use strict'
 
-const fs = require('node:fs')
-const path = require('node:path')
-const readline = require('node:readline')
+const fs = require('fs')
+const path = require('path')
+const readline = require('readline')
 
 const rootPath = path.resolve(path.join(__dirname, '..'))
 const cratesPath = path.join(rootPath, 'crates')

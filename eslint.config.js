@@ -53,6 +53,20 @@ module.exports = [
     },
   },
   {
+    // This script runs inside the prebuildify Docker container which uses Node.js 12
+    files: ['scripts/copy-artifacts.js'],
+    languageOptions: {
+      ecmaVersion: 2019,
+    },
+    settings: {
+      // Used by `eslint-plugin-n` to determine the minimum version of Node.js to support.
+      node: { version: '>=12.0.0' },
+    },
+    rules: {
+      'unicorn/prefer-node-protocol': 'off',
+    },
+  },
+  {
     ignores: ['build/', 'target/', 'prebuilds/'],
   },
 ]
