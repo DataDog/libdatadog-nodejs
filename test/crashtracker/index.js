@@ -20,8 +20,18 @@ rmSync(path.join(cwd, 'stdout.log'), { force: true })
 rmSync(path.join(cwd, 'stderr.log'), { force: true })
 
 const timeout = setTimeout(() => {
-  execSync('cat stdout.log', opts)
-  execSync('cat stderr.log', opts)
+  const stdoutLog = path.join(cwd, 'stdout.log')
+  const stderrLog = path.join(cwd, 'stderr.log')
+  if (existsSync(stdoutLog)) {
+    execSync(`cat ${stdoutLog}`, opts)
+  } else {
+    console.error('stdout.log not found (crashtracker-receiver may not have started)')
+  }
+  if (existsSync(stderrLog)) {
+    execSync(`cat ${stderrLog}`, opts)
+  } else {
+    console.error('stderr.log not found (crashtracker-receiver may not have started)')
+  }
 
   throw new Error('No crash report received before timing out.')
 }, 120_000)
