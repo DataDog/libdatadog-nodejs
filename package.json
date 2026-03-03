@@ -13,6 +13,7 @@
     "cargo-build-release": "yarn -s cargo-build -- --release",
     "cargo-build": "cargo build --message-format=json-render-diagnostics",
     "copy-artifacts": "node ./scripts/copy-artifacts",
+    "lint": "eslint .",
     "test": "bash scripts/test.sh"
   },
   "author": "Datadog Inc. <info@datadoghq.com>",
@@ -27,5 +28,14 @@
   "homepage": "https://github.com/DataDog/libdatadog-nodejs#readme",
   "publishConfig": {
     "access": "public"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.9.0",
+    "eslint": "^10.0.2",
+    "eslint-plugin-import-x": "^4.12.2",
+    "eslint-plugin-n": "^17.24.0",
+    "eslint-plugin-unicorn": "^63.0.0",
+    "globals": "^17.4.0"
   }
 }

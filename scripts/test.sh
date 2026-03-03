@@ -2,6 +2,12 @@
 set -e
 
 run_test() {
+  local dir
+  dir=$(dirname "$1")
+  if [ -f "${dir}/package.json" ]; then
+    echo "Installing dependencies for $1"
+    yarn --cwd "$dir" install
+  fi
   echo "Running $1"
   node "$1"
 }

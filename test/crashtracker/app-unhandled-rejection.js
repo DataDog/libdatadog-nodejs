@@ -1,8 +1,10 @@
 'use strict'
 
 const libdatadog = require('../..')
+
+const { initTestCrashtracker } = require('./test-utils')
+
 const crashtracker = libdatadog.load('crashtracker')
-const { initTestCrashtracker } = require('./test_utils')
 
 initTestCrashtracker()
 crashtracker.beginProfilerSerializing()
@@ -15,4 +17,4 @@ async function myAsyncFaultyFunction () {
   throw new Error('async went wrong')
 }
 
-myAsyncFaultyFunction()
+myAsyncFaultyFunction() // eslint-disable-line unicorn/prefer-top-level-await

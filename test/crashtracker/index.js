@@ -1,6 +1,12 @@
 'use strict'
 
-const { execSync, exec } = require('child_process')
+const assert = require('node:assert')
+const { existsSync, rmSync } = require('node:fs')
+const path = require('node:path')
+const { execSync, exec } = require('node:child_process')
+
+const bodyParser = require('body-parser')
+const express = require('express')
 
 const cwd = __dirname
 const stdio = ['inherit', 'inherit', 'inherit']
@@ -8,27 +14,19 @@ const uid = process.getuid()
 const gid = process.getgid()
 const opts = { cwd, stdio, uid, gid }
 
-execSync('yarn install', opts)
-
-const express = require('express')
-const bodyParser = require('body-parser')
-const assert = require('assert')
-const { existsSync, rmSync } = require('fs')
-const path = require('path')
-
 const app = express()
 
 rmSync(path.join(cwd, 'stdout.log'), { force: true })
 rmSync(path.join(cwd, 'stderr.log'), { force: true })
 
-let timeout = setTimeout(() => {
+const timeout = setTimeout(() => {
   execSync('cat stdout.log', opts)
   execSync('cat stderr.log', opts)
 
   throw new Error('No crash report received before timing out.')
-}, 10000)
+}, 10_000)
 
-let currentTest = null
+let currentTest
 
 app.use(bodyParser.json())
 
@@ -56,11 +54,11 @@ function runApp (script) {
   return new Promise((resolve) => {
     exec(`node ${script}`, {
       ...opts,
-      env: { ...process.env, PORT }
+      env: { ...process.env, PORT },
     })
 
     currentTest = (logPayload, tags) => {
-      currentTest = null
+      currentTest = undefined
       resolve({ logPayload, tags })
     }
   })
@@ -104,21 +102,20 @@ async function testUnhandledNonError (label, script, { expectedFallbackType, exp
 const server = app.listen(async () => {
   PORT = server.address().port
 
-
   await testSegfault()
   await testUnhandledError('uncaught-exception', 'app-uncaught-exception', {
     expectedType: 'TypeError',
     expectedMessage: 'something went wrong',
-    expectedFrame: 'myFaultyFunction'
+    expectedFrame: 'myFaultyFunction',
   })
   await testUnhandledNonError('uncaught-exception-non-error', 'app-uncaught-exception-non-error', {
     expectedFallbackType: 'uncaughtException',
-    expectedValue: 'a plain string error'
+    expectedValue: 'a plain string error',
   })
   await testUnhandledError('unhandled-rejection', 'app-unhandled-rejection', {
     expectedType: 'Error',
     expectedMessage: 'async went wrong',
-    expectedFrame: 'myAsyncFaultyFunction'
+    expectedFrame: 'myAsyncFaultyFunction',
   })
   // Node wraps non-Error rejections in an Error with name 'UnhandledPromiseRejection'
   // before passing to uncaughtExceptionMonitor, so this hits the Error path.
@@ -126,7 +123,7 @@ const server = app.listen(async () => {
   // stack trace
   await testUnhandledError('unhandled-rejection-non-error', 'app-unhandled-rejection-non-error', {
     expectedType: 'UnhandledPromiseRejection',
-    expectedMessage: 'a plain string rejection'
+    expectedMessage: 'a plain string rejection',
   })
 
   clearTimeout(timeout)
