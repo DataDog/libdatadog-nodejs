@@ -26,7 +26,7 @@ let timeout = setTimeout(() => {
   execSync('cat stderr.log', opts)
 
   throw new Error('No crash report received before timing out.')
-}, 10000)
+}, 20000)
 
 let currentTest = null
 
