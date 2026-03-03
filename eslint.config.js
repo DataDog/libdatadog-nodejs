@@ -38,6 +38,7 @@ module.exports = [
         'newlines-between': 'always',
       }],
       'n/no-process-exit': 'off', // Duplicate of unicorn/no-process-exit
+      'prefer-const': 'error',
       'unicorn/prefer-module': 'off', // We use CJS
       'unicorn/prevent-abbreviations': 'off',
     },

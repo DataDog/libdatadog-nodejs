@@ -10,12 +10,12 @@ assert(libconfig !== undefined)
 // Test 1: phase 1 (host selection)
 function test_host_wide () {
   const rawConfigLocal = fs.readFileSync(path.join(__dirname, 'config_local_phase1.yaml'))
-  let configurator = new libconfig.JsConfigurator()
+  const configurator = new libconfig.JsConfigurator()
 
   configurator.set_envp(Object.entries(process.env).map(([key, value]) => `${key}=${value}`))
   configurator.set_args(process.argv)
 
-  let values = configurator.get_configuration(rawConfigLocal.toString(), '')
+  const values = configurator.get_configuration(rawConfigLocal.toString(), '')
   for (const value of values) {
     console.log(`(phase 1) name: ${value.name}, value: ${value.value}, source: ${value.source}, config_id: ${value.config_id}`)
   }
@@ -30,7 +30,7 @@ function test_host_wide () {
 function test_service_selector () {
   const rawConfigLocal = fs.readFileSync(path.join(__dirname, 'config_local_phase2.yaml'))
   const rawConfigManaged = fs.readFileSync(path.join(__dirname, 'config_managed_phase2.yaml'))
-  let configurator = new libconfig.JsConfigurator()
+  const configurator = new libconfig.JsConfigurator()
 
   configurator.set_envp(Object.entries(process.env).map(([key, value]) => `${key}=${value}`))
   configurator.set_args(process.argv)

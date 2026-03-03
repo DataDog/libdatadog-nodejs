@@ -21,7 +21,7 @@ const app = express()
 rmSync(path.join(cwd, 'stdout.log'), { force: true })
 rmSync(path.join(cwd, 'stderr.log'), { force: true })
 
-let timeout = setTimeout(() => {
+const timeout = setTimeout(() => {
   execSync('cat stdout.log', opts)
   execSync('cat stderr.log', opts)
 
