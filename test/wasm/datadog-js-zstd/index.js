@@ -1,5 +1,5 @@
 const loader = require('../../../load.js')
-const assert = require('assert')
+const assert = require('node:assert')
 
 const zstd = loader.load('datadog-js-zstd')
 assert(zstd !== undefined)
@@ -11,19 +11,19 @@ const DATA_SIZE = SAMPLE_COUNT * 4 * SAMPLE_SIZE
 
 const samples = []
 for (let i = 0; i < SAMPLE_COUNT; i++) {
-  const sample = new Array(SAMPLE_SIZE)
+  const sample = Array.from({ length: SAMPLE_SIZE })
   for (let j = 0; j < SAMPLE_SIZE; j++) {
-    sample[j] = (Math.random() * 256) | 0
+    sample[j] = Math.trunc(Math.random() * 256)
   }
   samples.push(sample)
 }
-const data = new Array(DATA_SIZE)
+const data = Array.from({ length: DATA_SIZE })
 for (let i = 0; i < DATA_SIZE; i += SAMPLE_SIZE) {
-  data.push(...samples[Math.random() * SAMPLE_COUNT | 0])
+  data.push(...samples[Math.trunc(Math.random() * SAMPLE_COUNT)])
 }
 // Introduce some irregularities
 for (let i = 0; i < SAMPLE_COUNT; i++) {
-  data[Math.random() * DATA_SIZE | 0] = 0
+  data[Math.trunc(Math.random() * DATA_SIZE)] = 0
 }
 const dataArr = new Uint8Array(data)
 const compressed3 = zstd.zstd_compress(dataArr, 3)
@@ -44,7 +44,7 @@ assert(compressed18.length < compressed3.length)
 function ensureCompressed (compressed) {
   assert(compressed.length > 4)
   assert.equal(compressed[0], 0x28)
-  assert.equal(compressed[1], 0xb5)
-  assert.equal(compressed[2], 0x2f)
-  assert.equal(compressed[3], 0xfd)
+  assert.equal(compressed[1], 0xB5)
+  assert.equal(compressed[2], 0x2F)
+  assert.equal(compressed[3], 0xFD)
 }

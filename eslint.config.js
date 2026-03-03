@@ -3,12 +3,14 @@
 const eslintPluginJs = require('@eslint/js')
 const eslintPluginN = require('eslint-plugin-n')
 const eslintPluginStylistic = require('@stylistic/eslint-plugin')
+const eslintPluginUnicorn = require('eslint-plugin-unicorn').default
 const globals = require('globals')
 
 module.exports = [
   eslintPluginJs.configs.recommended,
   eslintPluginN.configs['flat/recommended-script'],
   eslintPluginStylistic.configs.recommended,
+  eslintPluginUnicorn.configs.recommended,
   {
     languageOptions: {
       globals: {
@@ -24,10 +26,12 @@ module.exports = [
     rules: {
       '@stylistic/brace-style': ['error', '1tbs'],
       '@stylistic/space-before-function-paren': ['error', 'always'],
-      'no-unused-vars': ['error', {
-        args: 'none',
-        caughtErrors: 'none',
-      }],
+      'n/no-process-exit': 'off', // Duplicate of unicorn/no-process-exit
+      'unicorn/filename-case': 'off',
+      'unicorn/no-null': 'off',
+      'unicorn/prefer-module': 'off', // We use CJS
+      'unicorn/prefer-top-level-await': 'off',
+      'unicorn/prevent-abbreviations': 'off',
     },
   },
   {

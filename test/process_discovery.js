@@ -1,8 +1,8 @@
 'use strict'
 
-const assert = require('assert')
-const fs = require('fs')
-const process = require('process')
+const assert = require('node:assert')
+const fs = require('node:fs')
+const process = require('node:process')
 
 const libdatadog = require('..')
 const process_discovery = libdatadog.load('process-discovery')
@@ -25,7 +25,7 @@ if (process.platform === 'linux') {
     for (const fd in fds) {
       try {
         const fd_name = fs.readlinkSync(`/proc/${process.pid}/fd/${fd}`)
-        if (fd_name.indexOf('datadog-tracer-info-') !== -1) {
+        if (fd_name.includes('datadog-tracer-info-')) {
           return true
         }
       } catch {

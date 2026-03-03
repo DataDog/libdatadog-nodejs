@@ -1,7 +1,7 @@
-const path = require('path')
-const fs = require('fs')
+const path = require('node:path')
+const fs = require('node:fs')
 const loader = require('../../../load.js')
-const assert = require('assert')
+const assert = require('node:assert')
 
 const libconfig = loader.load('library_config')
 assert(libconfig !== undefined)
@@ -15,9 +15,9 @@ function test_host_wide () {
   configurator.set_args(process.argv)
 
   let values = configurator.get_configuration(rawConfigLocal.toString(), '')
-  values.forEach((value, key, map) => {
+  for (const value of values) {
     console.log(`(phase 1) name: ${value.name}, value: ${value.value}, source: ${value.source}, config_id: ${value.config_id}`)
-  })
+  }
 
   assert.strictEqual(values.length, 1)
   assert.strictEqual(values[0].name, 'DD_RUNTIME_METRICS_ENABLED')
@@ -35,9 +35,9 @@ function test_service_selector () {
   configurator.set_args(process.argv)
 
   const values = configurator.get_configuration(rawConfigLocal.toString(), rawConfigManaged.toString())
-  values.forEach((value, key, map) => {
+  for (const value of values) {
     console.log(`(phase 2) name: ${value.name}, value: ${value.value}, source: ${value.source}, config_id: ${value.config_id}`)
-  })
+  }
 
   assert.strictEqual(values.length, 2)
   // We can't rely on ordering, so sort it by name to make it deterministic
@@ -54,7 +54,7 @@ function test_service_selector () {
   } else if (process.platform == 'darwin') {
     assert.strictEqual(configurator.get_config_local_path(process.platform), '/opt/datadog-agent/etc/application_monitoring.yaml')
   } else if (process.platform == 'win32') {
-    assert.strictEqual(configurator.get_config_local_path(process.platform), 'C:\\ProgramData\\Datadog\\application_monitoring.yaml')
+    assert.strictEqual(configurator.get_config_local_path(process.platform), String.raw`C:\ProgramData\Datadog\application_monitoring.yaml`)
   }
 }
 

@@ -1,6 +1,6 @@
 'use strict'
 
-const { execSync, exec } = require('child_process')
+const { execSync, exec } = require('node:child_process')
 
 const cwd = __dirname
 const stdio = ['inherit', 'inherit', 'inherit']
@@ -12,9 +12,9 @@ execSync('yarn install', opts)
 
 const express = require('express')
 const bodyParser = require('body-parser')
-const assert = require('assert')
-const { existsSync, rmSync } = require('fs')
-const path = require('path')
+const assert = require('node:assert')
+const { existsSync, rmSync } = require('node:fs')
+const path = require('node:path')
 
 const app = express()
 
@@ -26,7 +26,7 @@ let timeout = setTimeout(() => {
   execSync('cat stderr.log', opts)
 
   throw new Error('No crash report received before timing out.')
-}, 10000)
+}, 10_000)
 
 let currentTest = null
 

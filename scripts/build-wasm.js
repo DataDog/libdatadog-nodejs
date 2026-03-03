@@ -10,8 +10,8 @@
 // Our releases are built on Linux, and fortunately no special handling is required there. This
 // script only allows development to happen on macOS.
 
-const os = require('os')
-const childProcess = require('child_process')
+const os = require('node:os')
+const childProcess = require('node:child_process')
 
 const isMacOS = os.platform() === 'darwin'
 const noWasmOpt = isMacOS ? '--no-opt' : ''
@@ -28,9 +28,9 @@ if (isMacOS) {
 
   try {
     childProcess.execSync(`${llvmBinDir}/llvm-config --version`)
-  } catch (error) {
+  } catch {
     console.error(`‼️ LLVM not found in ${llvmDir}.\n‼️ Please install LLVM using Homebrew:\n📝   brew install llvm`)
-    process.exit(1) // eslint-disable-line n/no-process-exit
+    process.exit(1) // eslint-disable-line unicorn/no-process-exit
   }
 
   if (!env.PATH.includes(llvmBinDir)) {
