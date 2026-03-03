@@ -27,7 +27,6 @@ module.exports = [
       '@stylistic/brace-style': ['error', '1tbs'],
       '@stylistic/space-before-function-paren': ['error', 'always'],
       'n/no-process-exit': 'off', // Duplicate of unicorn/no-process-exit
-      'unicorn/no-null': 'off',
       'unicorn/prefer-module': 'off', // We use CJS
       'unicorn/prefer-top-level-await': 'off',
       'unicorn/prevent-abbreviations': 'off',

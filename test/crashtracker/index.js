@@ -28,7 +28,7 @@ let timeout = setTimeout(() => {
   throw new Error('No crash report received before timing out.')
 }, 10_000)
 
-let currentTest = null
+let currentTest
 
 app.use(bodyParser.json())
 
@@ -60,7 +60,7 @@ function runApp (script) {
     })
 
     currentTest = (logPayload, tags) => {
-      currentTest = null
+      currentTest = undefined
       resolve({ logPayload, tags })
     }
   })

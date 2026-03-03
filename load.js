@@ -77,7 +77,7 @@ function findFolder (root) {
     return folders.find(f => f === `${PLATFORM}${LIBC}-${ARCH}`)
       || folders.find(f => f === `${PLATFORM}-${ARCH}`)
   } catch {
-    return null
+    // Ignore
   }
 }
 
