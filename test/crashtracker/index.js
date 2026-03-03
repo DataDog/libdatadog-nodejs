@@ -34,7 +34,7 @@ const timeout = setTimeout(() => {
   }
 
   throw new Error('No crash report received before timing out.')
-}, 120_000)
+}, 10_000)
 
 let currentTest
 
