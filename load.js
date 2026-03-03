@@ -24,13 +24,15 @@ function maybeLoad (name) {
 
 function load (name) {
   const filename = find(name)
-  const filenameWASM = findWASM(name)
-
   if (filename) {
     return runtimeRequire(filename)
-  } else if (filenameWASM) {
+  }
+
+  const filenameWASM = findWASM(name)
+  if (filenameWASM) {
     return runtimeRequire(filenameWASM)
   }
+
   throw new Error(`Could not find a ${name} binary for ${PLATFORM}${LIBC}-${ARCH} nor a ${name} WASM module.`)
 }
 
