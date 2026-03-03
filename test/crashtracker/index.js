@@ -99,6 +99,8 @@ function runApp (script) {
 }
 
 async function testSegfault () {
+  console.log('Running test: testSegfault')
+
   const { logPayload, tags } = await runApp('app-seg-fault')
   const stackTrace = JSON.parse(logPayload.message).error.stack.frames
   const boomFrame = stackTrace.find(frame => frame.function?.toLowerCase().includes('segfaultify'))
@@ -113,6 +115,8 @@ async function testSegfault () {
 }
 
 async function testUnhandledError (label, script, { expectedType, expectedMessage, expectedFrame }) {
+  console.log('Running test: testUnhandledError', label)
+
   const { logPayload } = await runApp(script)
   const crashReport = JSON.parse(logPayload.message)
 
@@ -125,6 +129,8 @@ async function testUnhandledError (label, script, { expectedType, expectedMessag
 }
 
 async function testUnhandledNonError (label, script, { expectedFallbackType, expectedValue }) {
+  console.log('Running test: testUnhandledNonError', label)
+
   const { logPayload } = await runApp(script)
   const crashReport = JSON.parse(logPayload.message)
 
