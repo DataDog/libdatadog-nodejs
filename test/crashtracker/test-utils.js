@@ -17,7 +17,7 @@ function initTestCrashtracker () {
       timeout_ms: 3000,
     },
     timeout: { secs: 15, nanos: 0 },
-    resolve_frames: 'EnabledWithInprocessSymbols',
+    resolve_frames: 'EnabledWithSymbolsInReceiver',
     wait_for_receiver: true,
     demangle_names: false,
     signals: [],
