@@ -309,7 +309,6 @@ dependencies = [
  "libdd-crashtracker",
  "napi",
  "napi-derive",
- "rustls",
 ]
 
 [[package]]
