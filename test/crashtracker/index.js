@@ -1,40 +1,24 @@
 'use strict'
 
 const assert = require('node:assert')
-const { existsSync, rmSync } = require('node:fs')
+const { existsSync } = require('node:fs')
 const path = require('node:path')
-const { execSync, exec } = require('node:child_process')
+const { exec } = require('node:child_process')
 
 const bodyParser = require('body-parser')
 const express = require('express')
 
 const cwd = __dirname
-const stdio = ['inherit', 'inherit', 'inherit']
 const uid = process.getuid()
 const gid = process.getgid()
-const opts = { cwd, stdio, uid, gid }
+const opts = { cwd, stdio: 'inherit', uid, gid }
 
 const app = express()
 
-rmSync(path.join(cwd, 'stdout.log'), { force: true })
-rmSync(path.join(cwd, 'stderr.log'), { force: true })
-
 const timeout = setTimeout(() => {
-  const stdoutLog = path.join(cwd, 'stdout.log')
-  const stderrLog = path.join(cwd, 'stderr.log')
-  if (existsSync(stdoutLog)) {
-    execSync(`cat ${stdoutLog}`, opts)
-  } else {
-    console.error('stdout.log not found (crashtracker-receiver may not have started)')
-  }
-  if (existsSync(stderrLog)) {
-    execSync(`cat ${stderrLog}`, opts)
-  } else {
-    console.error('stderr.log not found (crashtracker-receiver may not have started)')
-  }
-
-  throw new Error('No crash report received before timing out.')
-}, 20_000)
+  console.error('Test suite timed out after 60s. Check receiver output above (if any).')
+  process.exit(1)
+}, 60_000)
 
 let currentTest
 
@@ -142,29 +126,36 @@ async function testUnhandledNonError (label, script, { expectedFallbackType, exp
 const server = app.listen(async () => {
   PORT = server.address().port
 
-  await testSegfault()
-  await testUnhandledError('uncaught-exception', 'app-uncaught-exception', {
-    expectedType: 'TypeError',
-    expectedMessage: 'something went wrong',
-    expectedFrame: 'myFaultyFunction',
-  })
-  await testUnhandledNonError('uncaught-exception-non-error', 'app-uncaught-exception-non-error', {
-    expectedFallbackType: 'uncaughtException',
-    expectedValue: 'a plain string error',
-  })
-  await testUnhandledError('unhandled-rejection', 'app-unhandled-rejection', {
-    expectedType: 'Error',
-    expectedMessage: 'async went wrong',
-    expectedFrame: 'myAsyncFaultyFunction',
-  })
-  // Node wraps non-Error rejections in an Error with name 'UnhandledPromiseRejection'
-  // before passing to uncaughtExceptionMonitor, so this hits the Error path.
-  // However, this test case rejects with a plain string, so the wrapped Error object has useless
-  // stack trace
-  await testUnhandledError('unhandled-rejection-non-error', 'app-unhandled-rejection-non-error', {
-    expectedType: 'UnhandledPromiseRejection',
-    expectedMessage: 'a plain string rejection',
-  })
+  try {
+    await testSegfault()
+    await testUnhandledError('uncaught-exception', 'app-uncaught-exception', {
+      expectedType: 'TypeError',
+      expectedMessage: 'something went wrong',
+      expectedFrame: 'myFaultyFunction',
+    })
+    await testUnhandledNonError('uncaught-exception-non-error', 'app-uncaught-exception-non-error', {
+      expectedFallbackType: 'uncaughtException',
+      expectedValue: 'a plain string error',
+    })
+    await testUnhandledError('unhandled-rejection', 'app-unhandled-rejection', {
+      expectedType: 'Error',
+      expectedMessage: 'async went wrong',
+      expectedFrame: 'myAsyncFaultyFunction',
+    })
+    // Node wraps non-Error rejections in an Error with name 'UnhandledPromiseRejection'
+    // before passing to uncaughtExceptionMonitor, so this hits the Error path.
+    // However, this test case rejects with a plain string, so the wrapped Error object has useless
+    // stack trace
+    await testUnhandledError('unhandled-rejection-non-error', 'app-unhandled-rejection-non-error', {
+      expectedType: 'UnhandledPromiseRejection',
+      expectedMessage: 'a plain string rejection',
+    })
+  } catch (err) {
+    clearTimeout(timeout)
+    server.close()
+    console.error(err)
+    process.exit(1)
+  }
 
   clearTimeout(timeout)
   server.close()
