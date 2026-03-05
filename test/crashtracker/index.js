@@ -1,22 +1,50 @@
 'use strict'
 
 const assert = require('node:assert')
-const { existsSync } = require('node:fs')
+const { existsSync, readFileSync, rmSync } = require('node:fs')
 const path = require('node:path')
-const { exec } = require('node:child_process')
+const { execSync, exec } = require('node:child_process')
 
 const bodyParser = require('body-parser')
 const express = require('express')
 
 const cwd = __dirname
+const stdio = ['inherit', 'inherit', 'inherit']
 const uid = process.getuid()
 const gid = process.getgid()
-const opts = { cwd, stdio: 'inherit', uid, gid }
+const opts = { cwd, stdio, uid, gid }
 
 const app = express()
 
+const stdoutLog = path.join(cwd, 'stdout.log')
+const stderrLog = path.join(cwd, 'stderr.log')
+
+rmSync(stdoutLog, { force: true })
+rmSync(stderrLog, { force: true })
+
+function dumpDiagnostics (label) {
+  console.error(`\n--- diagnostics (${label}) ---`)
+  try {
+    const ps = execSync('ps aux 2>/dev/null || ps -ef 2>/dev/null || true', { encoding: 'utf8' })
+    const receiverLines = ps.split('\n').filter(l => l.includes('crashtracker'))
+    console.error('crashtracker processes:', receiverLines.length ? receiverLines.join('\n') : 'none found')
+  } catch {
+    console.error('could not list processes')
+  }
+  for (const f of [stdoutLog, stderrLog]) {
+    if (existsSync(f)) {
+      const content = readFileSync(f, 'utf8')
+      console.error(`${path.basename(f)}: ${content || '(empty)'}`)
+    } else {
+      console.error(`${path.basename(f)}: not found`)
+    }
+  }
+  console.error('--- end diagnostics ---\n')
+}
+
 const timeout = setTimeout(() => {
-  console.error('Test suite timed out after 60s. Check receiver output above (if any).')
+  dumpDiagnostics('global timeout')
+  console.error('Test suite timed out after 60s.')
   process.exit(1)
 }, 60_000)
 
@@ -65,6 +93,7 @@ function runApp (script) {
       // after the child process exits (e.g. segfault sends report then dies).
       closeTimer = setTimeout(() => {
         const reason = signal ? `signal ${signal}` : `exit code ${code}`
+        dumpDiagnostics(script)
         reject(new Error(`Child process for "${script}" exited with ${reason} before sending a crash report`))
       }, 5000)
     })
@@ -151,6 +180,7 @@ const server = app.listen(async () => {
       expectedMessage: 'a plain string rejection',
     })
   } catch (err) {
+    dumpDiagnostics('test suite failure')
     clearTimeout(timeout)
     server.close()
     console.error(err)

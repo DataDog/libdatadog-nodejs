@@ -25,8 +25,8 @@ function initTestCrashtracker () {
     args: [],
     env: [],
     path_to_receiver_binary: libdatadog.find('crashtracker-receiver', true),
-    stderr_filename: '/dev/stderr',
-    stdout_filename: '/dev/stderr',
+    stderr_filename: 'stderr.log',
+    stdout_filename: 'stdout.log',
   }, {
     library_name: 'dd-trace-js',
     library_version: '6.0.0-pre',
