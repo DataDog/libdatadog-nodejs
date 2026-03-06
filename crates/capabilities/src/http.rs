@@ -9,11 +9,12 @@
 use std::collections::HashMap;
 use std::future::Future;
 
+use bytes::Bytes;
 use js_sys;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 
-use libdd_capabilities::http::{HttpClientTrait, HttpError, HttpRequest, HttpResponse};
+use libdd_capabilities::http::{HttpClientTrait, HttpError};
 use libdd_capabilities::maybe_send::MaybeSend;
 
 #[wasm_bindgen(module = "/src/http_transport.js")]
@@ -40,46 +41,45 @@ impl HttpClientTrait for DefaultHttpClient {
     #[allow(clippy::manual_async_fn)]
     fn request(
         &self,
-        req: HttpRequest,
-    ) -> impl Future<Output = Result<HttpResponse, HttpError>> + MaybeSend {
+        req: http::Request<Bytes>,
+    ) -> impl Future<Output = Result<http::Response<Bytes>, HttpError>> + MaybeSend {
         async move {
-            let method = req.method_str();
-            let url = req.url().to_owned();
+            let method = req.method().as_str().to_owned();
+            let url = req.uri().to_string();
             let headers_json = serialize_headers(req.headers())?;
-            let accepts_body = req.method().accepts_body();
             let body = req.into_body();
-            if body.is_some() && !accepts_body {
-                return Err(HttpError::InvalidRequest(format!(
-                    "method {} does not accept a request body",
-                    method
-                )));
-            }
-            let body = body.unwrap_or_default();
 
-            let result = JsFuture::from(http_request(method, &url, &headers_json, &body))
+            let result = JsFuture::from(http_request(&method, &url, &headers_json, &body))
                 .await
-                .map_err(|e| HttpError::Network(format!("{:?}", e)))?;
+                .map_err(|e| HttpError::Network(anyhow::anyhow!("{:?}", e)))?;
 
             let status = js_sys::Reflect::get(&result, &JsValue::from_str("status"))
-                .map_err(|_| HttpError::Other("missing status in response".into()))?
+                .map_err(|_| HttpError::Other(anyhow::anyhow!("missing status in response")))?
                 .as_f64()
-                .ok_or_else(|| HttpError::Other("status is not a number".into()))?
+                .ok_or_else(|| HttpError::Other(anyhow::anyhow!("status is not a number")))?
                 as u16;
 
             let headers = parse_response_headers(&result)?;
 
             let body_js = js_sys::Reflect::get(&result, &JsValue::from_str("body"))
-                .map_err(|_| HttpError::Other("missing body in response".into()))?;
+                .map_err(|_| HttpError::Other(anyhow::anyhow!("missing body in response")))?;
 
             let body = if body_js.is_undefined() || body_js.is_null() {
-                Vec::new()
+                Bytes::new()
             } else {
-                js_sys::Uint8Array::new(&body_js).to_vec()
+                Bytes::from(js_sys::Uint8Array::new(&body_js).to_vec())
             };
 
-            Ok(HttpResponse { status, headers, body })
+            let mut builder = http::Response::builder().status(status);
+            for (name, value) in &headers {
+                builder = builder.header(name.as_str(), value.as_str());
+            }
+            builder
+                .body(body)
+                .map_err(|e| HttpError::Other(e.into()))
         }
     }
+
 }
 
 /// Parse response headers from a JS object `{ "header-name": "value", ... }`.
@@ -87,7 +87,7 @@ impl HttpClientTrait for DefaultHttpClient {
 /// Node.js `res.headers` returns lowercased header names with string values.
 fn parse_response_headers(result: &JsValue) -> Result<Vec<(String, String)>, HttpError> {
     let headers_js = js_sys::Reflect::get(result, &JsValue::from_str("headers"))
-        .map_err(|_| HttpError::Other("missing headers in response".into()))?;
+        .map_err(|_| HttpError::Other(anyhow::anyhow!("missing headers in response")))?;
 
     if headers_js.is_undefined() || headers_js.is_null() {
         return Ok(Vec::new());
@@ -104,11 +104,17 @@ fn parse_response_headers(result: &JsValue) -> Result<Vec<(String, String)>, Htt
     Ok(headers)
 }
 
-fn serialize_headers(headers: &[(String, String)]) -> Result<String, HttpError> {
-    let map: HashMap<&str, &str> = headers
-        .iter()
-        .map(|(k, v)| (k.as_str(), v.as_str()))
+fn serialize_headers(headers: &http::HeaderMap) -> Result<String, HttpError> {
+    let mut map: HashMap<&str, Vec<&str>> = HashMap::new();
+    for (name, value) in headers.iter() {
+        map.entry(name.as_str())
+            .or_default()
+            .push(value.to_str().unwrap_or(""));
+    }
+    let flat: HashMap<&str, String> = map
+        .into_iter()
+        .map(|(k, v)| (k, v.join(", ")))
         .collect();
-    serde_json::to_string(&map)
-        .map_err(|e| HttpError::InvalidRequest(format!("failed to serialize headers: {}", e)))
+    serde_json::to_string(&flat)
+        .map_err(|e| HttpError::InvalidRequest(e.into()))
 }

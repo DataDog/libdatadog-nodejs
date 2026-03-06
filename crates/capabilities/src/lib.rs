@@ -1,12 +1,18 @@
 // Copyright 2026-Present Datadog, Inc. https://www.datadoghq.com/
 // SPDX-License-Identifier: Apache-2.0
 
-//! Wasm capability implementations.
+//! Wasm capability implementations for libdatadog-nodejs.
 //!
-//! This crate has the same package name (`libdd-capabilities-impl`) and
-//! public API as the native version in libdatadog. Cargo `[patch]` in
-//! `libdatadog-nodejs/Cargo.toml` swaps this in when building for wasm.
+//! `WasmCapabilities` is the bundle struct that implements all capability
+//! traits using wasm_bindgen + JS transports. The wasm binding crate pins
+//! this type as the generic parameter for libdatadog structs.
 
 pub mod http;
 
 pub use http::DefaultHttpClient;
+
+/// Bundle struct for wasm platform capabilities.
+///
+/// Currently delegates to `DefaultHttpClient` for HTTP. As more capability
+/// traits are added (spawn, sleep, etc.), this type will implement all of them.
+pub type WasmCapabilities = DefaultHttpClient;
