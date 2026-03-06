@@ -10,5 +10,5 @@ crate-type = ["cdylib", "rlib"]
 anyhow = "1"
 datadog-library-config = { git = "https://github.com/DataDog/libdatadog.git", tag = "v18.1.0" }
 
-napi = { version = "2" }
+napi = { version = "3" }
 napi-derive = { version = "2", default-features = false }
