@@ -1,0 +1,24 @@
+[package]
+name = "trace-exporter"
+version = "0.1.0"
+edition = "2021"
+description = "Wasm binding for libdd-data-pipeline TraceExporter"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+libdatadog-nodejs-capabilities = { path = "../capabilities" }
+libdd-capabilities = { path = "../../../libdatadog/libdd-capabilities" }
+libdd-data-pipeline = { path = "../../../libdatadog/libdd-data-pipeline", default-features = false }
+console_error_panic_hook = "0.1"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
+uuid = { version = "1", features = ["js"] }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
