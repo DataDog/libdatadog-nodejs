@@ -771,6 +771,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bcc35a38544a891a5f7c865aca548a982ccb3b8650a5b06d0fd33a10283c56fc"
 
 [[package]]
+name = "libdd-capabilities"
+version = "0.1.0"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture#449306a7f01e4e0a75bc35f120bb54fb462e09f1"
+
+[[package]]
+name = "libdd-capabilities-impl"
+version = "0.1.0"
+dependencies = [
+ "js-sys",
+ "libdd-capabilities",
+ "serde_json",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-bindgen-test",
+]
+
+[[package]]
 name = "libdd-common"
 version = "1.1.0"
 source = "git+https://github.com/DataDog/libdatadog.git?tag=v28.0.1#647c8ff924070d4e79494ec852d312ff0301fd8a"
