@@ -858,41 +858,12 @@ dependencies = [
 [[package]]
 name = "libdd-capabilities"
 version = "0.1.0"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture#b03ced3af42c153de53ec3d0a276ade87d47ad98"
 dependencies = [
  "anyhow",
  "bytes",
  "http",
  "thiserror",
-]
-
-[[package]]
-name = "libdd-common"
-version = "1.1.0"
-dependencies = [
- "anyhow",
- "bytes",
- "cc",
- "const_format",
- "futures",
- "futures-core",
- "futures-util",
- "hex",
- "http",
- "http-body",
- "http-body-util",
- "hyper",
- "hyper-util",
- "libc",
- "libdd-capabilities",
- "nix 0.29.0",
- "pin-project",
- "regex",
- "serde",
- "static_assertions",
- "thiserror",
- "tokio",
- "tower-service",
- "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -924,6 +895,37 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-rustls",
+ "tower-service",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "libdd-common"
+version = "1.1.0"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture#b03ced3af42c153de53ec3d0a276ade87d47ad98"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "cc",
+ "const_format",
+ "futures",
+ "futures-core",
+ "futures-util",
+ "hex",
+ "http",
+ "http-body",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "libc",
+ "libdd-capabilities",
+ "nix 0.29.0",
+ "pin-project",
+ "regex",
+ "serde",
+ "static_assertions",
+ "thiserror",
+ "tokio",
  "tower-service",
  "windows-sys 0.52.0",
 ]
@@ -963,6 +965,7 @@ dependencies = [
 [[package]]
 name = "libdd-data-pipeline"
 version = "1.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture#b03ced3af42c153de53ec3d0a276ade87d47ad98"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -971,8 +974,8 @@ dependencies = [
  "http",
  "http-body-util",
  "libdd-capabilities",
- "libdd-common 1.1.0",
- "libdd-ddsketch 1.0.0",
+ "libdd-common 1.1.0 (git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture)",
+ "libdd-ddsketch 1.0.0 (git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture)",
  "libdd-dogstatsd-client",
  "libdd-tinybytes",
  "libdd-trace-protobuf",
@@ -991,6 +994,7 @@ dependencies = [
 [[package]]
 name = "libdd-ddsketch"
 version = "1.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v26.0.0#9aa79d219d0fa74ce667c4013005008f69052786"
 dependencies = [
  "prost",
 ]
@@ -998,7 +1002,7 @@ dependencies = [
 [[package]]
 name = "libdd-ddsketch"
 version = "1.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v26.0.0#9aa79d219d0fa74ce667c4013005008f69052786"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture#b03ced3af42c153de53ec3d0a276ade87d47ad98"
 dependencies = [
  "prost",
 ]
@@ -1006,11 +1010,12 @@ dependencies = [
 [[package]]
 name = "libdd-dogstatsd-client"
 version = "1.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture#b03ced3af42c153de53ec3d0a276ade87d47ad98"
 dependencies = [
  "anyhow",
  "cadence",
  "http",
- "libdd-common 1.1.0",
+ "libdd-common 1.1.0 (git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture)",
  "serde",
  "tracing",
 ]
@@ -1044,6 +1049,7 @@ dependencies = [
 [[package]]
 name = "libdd-tinybytes"
 version = "1.1.0"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture#b03ced3af42c153de53ec3d0a276ade87d47ad98"
 dependencies = [
  "serde",
 ]
@@ -1051,6 +1057,7 @@ dependencies = [
 [[package]]
 name = "libdd-trace-normalization"
 version = "1.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture#b03ced3af42c153de53ec3d0a276ade87d47ad98"
 dependencies = [
  "anyhow",
  "libdd-trace-protobuf",
@@ -1059,6 +1066,7 @@ dependencies = [
 [[package]]
 name = "libdd-trace-protobuf"
 version = "1.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture#b03ced3af42c153de53ec3d0a276ade87d47ad98"
 dependencies = [
  "prost",
  "serde",
@@ -1068,9 +1076,10 @@ dependencies = [
 [[package]]
 name = "libdd-trace-stats"
 version = "1.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture#b03ced3af42c153de53ec3d0a276ade87d47ad98"
 dependencies = [
  "hashbrown 0.15.5",
- "libdd-ddsketch 1.0.0",
+ "libdd-ddsketch 1.0.0 (git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture)",
  "libdd-trace-protobuf",
  "libdd-trace-utils",
 ]
@@ -1078,6 +1087,7 @@ dependencies = [
 [[package]]
 name = "libdd-trace-utils"
 version = "1.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture#b03ced3af42c153de53ec3d0a276ade87d47ad98"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1087,7 +1097,7 @@ dependencies = [
  "http-body-util",
  "indexmap",
  "libdd-capabilities",
- "libdd-common 1.1.0",
+ "libdd-common 1.1.0 (git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture)",
  "libdd-tinybytes",
  "libdd-trace-normalization",
  "libdd-trace-protobuf",

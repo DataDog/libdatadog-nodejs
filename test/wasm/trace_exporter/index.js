@@ -1,20 +1,11 @@
 'use strict'
 
-// North-star integration test for the wasm trace exporter.
-//
 // This test exercises the full call flow:
 //   JS -> wasm (TraceExporter logic) -> JS (http_transport.js for I/O) -> wasm -> JS
 //
 // To run:
 //   1. Build: wasm-pack build --target nodejs ./crates/trace_exporter --out-dir ../../prebuilds/trace_exporter
 //   2. Run:   node test_wasm.js trace_exporter
-//
-// Currently FAILS TO COMPILE because libdd-data-pipeline pulls in
-// wasm-incompatible transitive dependencies (hyper, mio, tokio net/fs).
-// These must be feature-gated behind cfg(not(wasm32)) in libdd-common.
-//
-// Once it compiles, the test itself may still fail (runtime errors, missing
-// SpawnTrait, etc.) — each failure points to the next thing to fix.
 
 const http = require('http')
 const loader = require('../../../load.js')
