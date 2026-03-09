@@ -16,7 +16,7 @@ http = "1"
 bytes = "1.4"
 futures-core = "0.3"
 anyhow = "1"
-libdd-capabilities = { path = "../../../libdatadog/libdd-capabilities" }
+libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", branch = "jwiriath/capability-traits-architecture" }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
