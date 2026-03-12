@@ -17,7 +17,7 @@ function initTestCrashtracker () {
       timeout_ms: 3000,
     },
     timeout: { secs: 15, nanos: 0 },
-    // In process symbols can crash the CT process itself
+    // In process symbol resolution can crash the CT process itself.
     resolve_frames: 'EnabledWithSymbolsInReceiver',
     wait_for_receiver: true,
     demangle_names: false,

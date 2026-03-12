@@ -41,6 +41,7 @@ jobs:
       min-node-version: 18
       rust: true
       only: darwin-arm64,darwin-x64,linux-arm64,linux-x64
+      # Need this, now that libdatadog packages libunwind as a submodule
       prebuild: '(command -v apk >/dev/null && apk add autoconf automake libtool) || (command -v apt-get >/dev/null && apt-get update && apt-get install -y autoconf automake libtool) || true'
 
   package-size:
