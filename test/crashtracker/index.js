@@ -103,7 +103,6 @@ async function testSegfault () {
 
   const { logPayload, tags } = await runApp('app-seg-fault')
   const stackTrace = JSON.parse(logPayload.message).error.stack.frames
-  console.log(stackTrace)
   const boomFrame = stackTrace.find(frame => frame.function?.toLowerCase().includes('segfaultify'))
 
   if (existsSync('/etc/alpine-release')) {
