@@ -19,7 +19,7 @@ function initTestCrashtracker () {
     timeout: { secs: 15, nanos: 0 },
     resolve_frames: 'EnabledWithInprocessSymbols',
     wait_for_receiver: true,
-    demangle_names: false,
+    demangle_names: true,
     signals: [],
   }, {
     args: [],
