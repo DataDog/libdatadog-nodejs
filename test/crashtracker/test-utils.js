@@ -20,7 +20,7 @@ function initTestCrashtracker () {
     // In process symbol resolution can crash the CT process itself.
     resolve_frames: 'EnabledWithSymbolsInReceiver',
     wait_for_receiver: true,
-    demangle_names: false,
+    demangle_names: true,
     signals: [],
   }, {
     args: [],
