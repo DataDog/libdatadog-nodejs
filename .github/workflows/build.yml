@@ -33,7 +33,7 @@ jobs:
           crate: '${{ matrix.crate }}'
 
   build:
-    uses: Datadog/action-prebuildify/.github/workflows/build.yml@main
+    uses: Datadog/action-prebuildify/.github/workflows/build.yml@d4e89247e6dd34f485c0f92c12f0cc739c2f8c92 # main
     needs: build-test-wasm
     with:
       package-manager: 'yarn'
@@ -57,6 +57,6 @@ jobs:
         uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
       - run: yarn install
       - name: Compute module size tree and report
-        uses: qard/heaviest-objects-in-the-universe@v1
+        uses: qard/heaviest-objects-in-the-universe@1e02edbdda803a45537a808ede97866db47756d3 # v1.0.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
