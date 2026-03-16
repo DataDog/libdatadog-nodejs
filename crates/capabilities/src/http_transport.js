@@ -29,7 +29,7 @@ module.exports.httpRequest = function (method, url, headersJson, body) {
       }
     );
     req.on('error', reject);
-    req.write(Buffer.from(body));
+    req.write(body);
     req.end();
   });
 };
