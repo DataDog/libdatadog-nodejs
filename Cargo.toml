@@ -3,7 +3,6 @@ resolver = "2"
 default-members = [
   "crates/crashtracker",
   "crates/process_discovery",
-  "crates/pipeline",
 ]
 members = [
   "crates/*",

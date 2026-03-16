@@ -1,84 +1,116 @@
+use libdatadog_nodejs_capabilities::WasmCapabilities;
 use libdd_data_pipeline::trace_exporter::agent_response::AgentResponse;
 use libdd_data_pipeline::trace_exporter::TraceExporter;
-use libdd_data_pipeline::trace_exporter::TraceExporterBuilder;
 use std::ffi::CStr;
 
-use napi::bindgen_prelude::BigInt;
-use napi::bindgen_prelude::*;
-use napi_derive::napi;
+use wasm_bindgen::prelude::*;
 
 mod span_string;
 use span_string::*;
 
+mod span_bytes;
+
+mod trace_data;
+use trace_data::*;
+
 use libdd_trace_utils::change_buffer::{ChangeBuffer, ChangeBufferState};
-use libdd_trace_utils::span::Span;
 
 mod utils;
 use utils::*;
 
-#[napi]
-pub struct NativeSpanState {
-    // (Length is u64 number of BufOps)
-    string_table_input: Vec<u8>,
-    exporter: TraceExporter,
-    // sampling_buffer: SendPtr,
-    change_buffer_state: ChangeBufferState<SpanString>,
+#[wasm_bindgen(start)]
+fn init() {
+    console_error_panic_hook::set_once();
 }
-unsafe impl Send for NativeSpanState {}
 
-#[napi]
-impl NativeSpanState {
-    #[napi(constructor)]
+#[wasm_bindgen]
+pub struct WasmSpanState {
+    change_queue: Vec<u8>,
+    string_table_input: Vec<u8>,
+    exporter: TraceExporter<WasmCapabilities>,
+    change_buffer_state: ChangeBufferState<WasmTraceData>,
+}
+
+#[wasm_bindgen]
+impl WasmSpanState {
+    #[wasm_bindgen(constructor)]
     pub fn new(
-        url: String,
-        tracer_version: String,
-        lang: String,
-        lang_version: String,
-        lang_interpreter: String,
-        change_queue_buffer: Buffer,
-        string_table_input_buffer: Buffer,
-        pid: f64,
-        tracer_service: String,
-        // sampling_buffer: Buffer,
-    ) -> Result<Self> {
-        let mut builder = TraceExporterBuilder::default();
+        url: &str,
+        tracer_version: &str,
+        lang: &str,
+        lang_version: &str,
+        lang_interpreter: &str,
+        change_queue_size: u32,
+        string_table_input_size: u32,
+        pid: u32,
+        tracer_service: &str,
+    ) -> Result<WasmSpanState, JsValue> {
+        let mut builder = TraceExporter::<WasmCapabilities>::builder();
         builder
-            .set_url(&url)
-            .set_tracer_version(&tracer_version)
-            .set_language(&lang)
-            .set_language_version(&lang_version)
-            .set_language_interpreter(&lang_interpreter);
+            .set_url(url)
+            .set_tracer_version(tracer_version)
+            .set_language(lang)
+            .set_language_version(lang_version)
+            .set_language_interpreter(lang_interpreter);
 
-        let buf = change_queue_buffer.as_ref();
-        let change_buffer = unsafe { ChangeBuffer::from_raw_parts(buf.as_ref().as_ptr(), buf.len()) };
-        let change_buffer_state =
-            ChangeBufferState::new(change_buffer, tracer_service.into(), lang.into(), pid);
-        Ok(NativeSpanState {
+        let mut change_queue = vec![0u8; change_queue_size as usize];
+        let change_buffer =
+            unsafe { ChangeBuffer::from_raw_parts(change_queue.as_mut_ptr(), change_queue.len()) };
+        let change_buffer_state = ChangeBufferState::new(
+            change_buffer,
+            tracer_service.into(),
+            lang.into(),
+            pid,
+        );
+
+        let exporter = builder
+            .build()
+            .map_err(|e| JsValue::from_str(&format!("{:?}", e)))?;
+
+        Ok(WasmSpanState {
+            change_queue,
+            string_table_input: vec![0u8; string_table_input_size as usize],
+            exporter,
             change_buffer_state,
-            string_table_input: string_table_input_buffer.into(),
-            exporter: builder
-                .build()
-                .map_err(|e| Error::new(Status::GenericFailure, format!("{}", e)))?,
-            // sampling_buffer: SendPtr(sampling_buffer.as_ref().as_ptr()),
         })
     }
 
-    #[napi]
-    pub async unsafe fn flush_chunk(
+    #[wasm_bindgen]
+    pub fn change_queue_ptr(&self) -> *const u8 {
+        self.change_queue.as_ptr()
+    }
+
+    #[wasm_bindgen]
+    pub fn change_queue_len(&self) -> u32 {
+        self.change_queue.len() as u32
+    }
+
+    #[wasm_bindgen]
+    pub fn string_table_input_ptr(&self) -> *const u8 {
+        self.string_table_input.as_ptr()
+    }
+
+    #[wasm_bindgen]
+    pub fn string_table_input_len(&self) -> u32 {
+        self.string_table_input.len() as u32
+    }
+
+    #[wasm_bindgen(js_name = "flushChunk")]
+    pub async fn flush_chunk(
         &mut self,
         len: u32,
         first_is_local_root: bool,
-        chunk: Buffer,
-    ) -> Result<String> {
+        chunk: &[u8],
+    ) -> Result<JsValue, JsValue> {
         self.change_buffer_state
             .flush_change_buffer()
-            .map_err(|e| Error::from_reason(e.to_string()))?;
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+
         let mut count = len;
         let mut index = 0;
-        let chunk_vec: Vec<u8> = chunk.into();
         let mut span_ids = Vec::with_capacity(count as usize);
         while count > 0 {
-            let span_id: u64 = get_num(&chunk_vec, &mut index);
+            let span_id: u64 = get_num(chunk, &mut index);
             span_ids.push(span_id);
             count -= 1;
         }
@@ -86,57 +118,38 @@ impl NativeSpanState {
         let spans_vec = self
             .change_buffer_state
             .flush_chunk(span_ids, first_is_local_root)
-            .map_err(|e| Error::from_reason(e.to_string()))?;
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
-        let resp = self.exporter.send_trace_chunks_async(vec![spans_vec]).await;
+        let resp = self
+            .exporter
+            .send_trace_chunks_async(vec![spans_vec])
+            .await;
         let response_str = resp.map(|resp| match resp {
             AgentResponse::Unchanged => "unchanged".to_string(),
             AgentResponse::Changed { body } => body,
         });
 
-        response_str.map_err(|e| Error::new(Status::GenericFailure, format!("{}", e)))
+        response_str
+            .map(|s| JsValue::from_str(&s))
+            .map_err(|e| JsValue::from_str(&format!("{:?}", e)))
     }
 
-    #[napi]
-    pub fn flush_change_queue(&mut self) -> Result<bool> {
+    #[wasm_bindgen(js_name = "flushChangeQueue")]
+    pub fn flush_change_queue(&mut self) -> Result<bool, JsValue> {
         self.change_buffer_state
             .flush_change_buffer()
-            .map_err(|e| Error::from_reason(e.to_string()))?;
-
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
         Ok(true)
     }
 
-    #[napi]
-    pub fn sample(&mut self) -> Result<bool> {
-        // self.flush_change_queue()?;
-        // let span_id: u64 = get_num_raw(*self.sampling_buffer, &mut 0);
-        // let span = self.get_mut_span(&span_id);
-        // let result = span?.sample();
-        // if let Some(result) = result {
-        //     let buf_mut = *self.sampling_buffer as *mut u8;
-        //     unsafe {
-        //         std::ptr::copy_nonoverlapping(result.as_ptr(), buf_mut, result.len());
-        //     }
-        // }
-        // Ok(result.is_some())
-
-        Ok(true)
-    }
-
-    fn get_span_bigint(&self, id: BigInt) -> Result<&Span<SpanString>> {
-        self.change_buffer_state
-            .get_span(&id.get_u64().1)
-            .map_err(|x| Error::from_reason(x.to_string()))
-    }
-
-    #[napi]
-    pub fn string_table_insert_one(&mut self, key: u32, val: String) {
+    #[wasm_bindgen(js_name = "stringTableInsertOne")]
+    pub fn string_table_insert_one(&mut self, key: u32, val: &str) {
         self.change_buffer_state
             .string_table_insert_one(key, val.into());
     }
 
-    #[napi]
-    pub fn string_table_insert_many(&mut self, count: u32) -> Result<()> {
+    #[wasm_bindgen(js_name = "stringTableInsertMany")]
+    pub fn string_table_insert_many(&mut self, count: u32) -> Result<(), JsValue> {
         let mut index: usize = 0;
         let mut remaining = count as usize;
         while remaining > 0 {
@@ -145,7 +158,7 @@ impl NativeSpanState {
             let val = unsafe {
                 CStr::from_ptr(str_slice.as_ptr() as *const _)
                     .to_str()
-                    .map_err(|e| Error::new(Status::GenericFailure, format!("{}", e)))?
+                    .map_err(|e| JsValue::from_str(&format!("{}", e)))?
             }
             .to_owned();
             index += val.len();
@@ -153,107 +166,155 @@ impl NativeSpanState {
                 .string_table_insert_one(key, val.into());
             remaining -= 1;
         }
-
         Ok(())
     }
 
-    #[napi]
+    #[wasm_bindgen(js_name = "stringTableEvict")]
     pub fn string_table_evict(&mut self, key: u32) {
         self.change_buffer_state.string_table_evict_one(key);
     }
 
-    #[napi]
-    pub fn get_service_name(&mut self, id: BigInt) -> Result<String> {
-        self.flush_change_queue()?;
-        Ok(self.get_span_bigint(id)?.service.to_string())
+    fn get_span_f64(&self, id: f64) -> Result<&libdd_trace_utils::span::v04::Span<WasmTraceData>, JsValue> {
+        let span_id = id as u64;
+        self.change_buffer_state
+            .get_span(&span_id)
+            .map_err(|e| JsValue::from_str(&e.to_string()))
     }
 
-    #[napi]
-    pub fn get_resource_name(&mut self, id: BigInt) -> Result<String> {
+    #[wasm_bindgen(js_name = "getServiceName")]
+    pub fn get_service_name(&mut self, id: f64) -> Result<String, JsValue> {
         self.flush_change_queue()?;
-        Ok(self.get_span_bigint(id)?.resource.to_string())
+        Ok(self.get_span_f64(id)?.service.to_string())
     }
 
-    #[napi]
-    pub fn get_meta_attr(&mut self, id: BigInt, name: String) -> Result<Option<String>> {
+    #[wasm_bindgen(js_name = "getResourceName")]
+    pub fn get_resource_name(&mut self, id: f64) -> Result<String, JsValue> {
+        self.flush_change_queue()?;
+        Ok(self.get_span_f64(id)?.resource.to_string())
+    }
+
+    #[wasm_bindgen(js_name = "getMetaAttr")]
+    pub fn get_meta_attr(&mut self, id: f64, name: &str) -> Result<JsValue, JsValue> {
         self.flush_change_queue()?;
         let name: SpanString = name.into();
         Ok(self
-            .get_span_bigint(id)?
+            .get_span_f64(id)?
             .meta
             .get(&name)
-            .map(|v| v.to_string()))
+            .map(|v| JsValue::from_str(&v.to_string()))
+            .unwrap_or(JsValue::NULL))
     }
 
-    #[napi]
-    pub fn get_metric_attr(&mut self, id: BigInt, name: String) -> Result<Option<f64>> {
+    #[wasm_bindgen(js_name = "getMetricAttr")]
+    pub fn get_metric_attr(&mut self, id: f64, name: &str) -> Result<JsValue, JsValue> {
         self.flush_change_queue()?;
         let name: SpanString = name.into();
-        Ok(self.get_span_bigint(id)?.metrics.get(&name).copied())
+        Ok(self
+            .get_span_f64(id)?
+            .metrics
+            .get(&name)
+            .map(|v| JsValue::from_f64(*v))
+            .unwrap_or(JsValue::NULL))
     }
 
-    #[napi]
-    pub fn get_error(&mut self, id: BigInt) -> Result<i32> {
+    #[wasm_bindgen(js_name = "getError")]
+    pub fn get_error(&mut self, id: f64) -> Result<i32, JsValue> {
         self.flush_change_queue()?;
-        Ok(self.get_span_bigint(id)?.error)
+        Ok(self.get_span_f64(id)?.error)
     }
 
-    #[napi]
-    pub fn get_start(&mut self, id: BigInt) -> Result<i64> {
+    #[wasm_bindgen(js_name = "getStart")]
+    pub fn get_start(&mut self, id: f64) -> Result<f64, JsValue> {
         self.flush_change_queue()?;
-        Ok(self.get_span_bigint(id)?.start)
+        Ok(self.get_span_f64(id)?.start as f64)
     }
 
-    #[napi]
-    pub fn get_duration(&mut self, id: BigInt) -> Result<i64> {
+    #[wasm_bindgen(js_name = "getDuration")]
+    pub fn get_duration(&mut self, id: f64) -> Result<f64, JsValue> {
         self.flush_change_queue()?;
-        Ok(self.get_span_bigint(id)?.duration)
+        Ok(self.get_span_f64(id)?.duration as f64)
     }
 
-    #[napi]
-    pub fn get_type(&mut self, id: BigInt) -> Result<String> {
+    #[wasm_bindgen(js_name = "getType")]
+    pub fn get_type(&mut self, id: f64) -> Result<String, JsValue> {
         self.flush_change_queue()?;
-        Ok(self.get_span_bigint(id)?.r#type.to_string())
+        Ok(self.get_span_f64(id)?.r#type.to_string())
     }
 
-    #[napi]
-    pub fn get_name(&mut self, id: BigInt) -> Result<String> {
+    #[wasm_bindgen(js_name = "getName")]
+    pub fn get_name(&mut self, id: f64) -> Result<String, JsValue> {
         self.flush_change_queue()?;
-        Ok(self.get_span_bigint(id)?.name.to_string())
+        Ok(self.get_span_f64(id)?.name.to_string())
     }
 
-    #[napi]
-    pub fn get_trace_meta_attr(&mut self, id: BigInt, name: String) -> Result<Option<String>> {
+    #[wasm_bindgen(js_name = "getTraceMetaAttr")]
+    pub fn get_trace_meta_attr(&mut self, id: f64, name: &str) -> Result<JsValue, JsValue> {
         self.flush_change_queue()?;
-        let trace_id = self.get_span_bigint(id)?.trace_id;
+        let trace_id = self.get_span_f64(id)?.trace_id;
         let name: SpanString = name.into();
         Ok(self
             .change_buffer_state
             .get_trace(&trace_id)
             .and_then(|t| t.meta.get(&name))
-            .map(|v| v.to_string()))
+            .map(|v| JsValue::from_str(&v.to_string()))
+            .unwrap_or(JsValue::NULL))
     }
 
-    #[napi]
-    pub fn get_trace_metric_attr(&mut self, id: BigInt, name: String) -> Result<Option<f64>> {
+    #[wasm_bindgen(js_name = "getTraceMetricAttr")]
+    pub fn get_trace_metric_attr(&mut self, id: f64, name: &str) -> Result<JsValue, JsValue> {
         self.flush_change_queue()?;
-        let trace_id = self.get_span_bigint(id)?.trace_id;
+        let trace_id = self.get_span_f64(id)?.trace_id;
         let name: SpanString = name.into();
         Ok(self
             .change_buffer_state
             .get_trace(&trace_id)
             .and_then(|t| t.metrics.get(&name))
-            .copied())
+            .map(|v| JsValue::from_f64(*v))
+            .unwrap_or(JsValue::NULL))
     }
 
-    #[napi]
-    pub fn get_trace_origin(&mut self, id: BigInt) -> Result<Option<String>> {
+    #[wasm_bindgen(js_name = "getTraceOrigin")]
+    pub fn get_trace_origin(&mut self, id: f64) -> Result<JsValue, JsValue> {
         self.flush_change_queue()?;
-        let trace_id = self.get_span_bigint(id)?.trace_id;
+        let trace_id = self.get_span_f64(id)?.trace_id;
         Ok(self
             .change_buffer_state
             .get_trace(&trace_id)
             .and_then(|t| t.origin.as_ref())
-            .map(|v| v.to_string()))
+            .map(|v| JsValue::from_str(&v.to_string()))
+            .unwrap_or(JsValue::NULL))
     }
+}
+
+/// Export WASM memory so JS can create views into it
+#[wasm_bindgen(js_name = "getWasmMemory")]
+pub fn get_wasm_memory() -> JsValue {
+    wasm_bindgen::memory()
+}
+
+/// Export OpCode values as a JS object.
+/// Values match the `#[repr(u64)]` OpCode enum in libdd-trace-utils.
+#[wasm_bindgen(js_name = "getOpCodes")]
+pub fn get_op_codes() -> JsValue {
+    let obj = js_sys::Object::new();
+    let entries: &[(&str, u32)] = &[
+        ("Create", 0),
+        ("SetMetaAttr", 1),
+        ("SetMetricAttr", 2),
+        ("SetServiceName", 3),
+        ("SetResourceName", 4),
+        ("SetError", 5),
+        ("SetStart", 6),
+        ("SetDuration", 7),
+        ("SetType", 8),
+        ("SetName", 9),
+        ("SetTraceMetaAttr", 10),
+        ("SetTraceMetricsAttr", 11),
+        ("SetTraceOrigin", 12),
+    ];
+    for (name, val) in entries {
+        js_sys::Reflect::set(&obj, &JsValue::from_str(name), &JsValue::from_f64(*val as f64))
+            .unwrap();
+    }
+    obj.into()
 }

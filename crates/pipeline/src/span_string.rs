@@ -1,11 +1,11 @@
 use libdd_trace_utils::span::SpanText;
 use serde::Serialize;
 use std::borrow::Borrow;
+use std::fmt::*;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
-use std::fmt::*;
 
-#[derive(Default, Eq, PartialEq, Serialize, Clone)]
+#[derive(Default, Debug, Eq, PartialEq, Serialize, Clone)]
 pub struct SpanString(pub Arc<str>);
 
 impl Hash for SpanString {
