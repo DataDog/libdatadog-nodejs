@@ -8,7 +8,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 anyhow = "1"
-datadog-library-config = { package = "libdd-library-config", git = "https://github.com/DataDog/libdatadog.git", tag = "v29.0.0" }
+libdd-library-config = { git = "https://github.com/DataDog/libdatadog.git", tag = "v29.0.0" }
 
 napi = { version = "2" }
 napi-derive = { version = "2", default-features = false }
