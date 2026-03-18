@@ -784,6 +784,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "libdd-library-config"
+version = "1.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v29.0.0#001bd56fcbba34fa4ec3f9798a6c4fbcddeffa40"
+dependencies = [
+ "anyhow",
+ "libdd-trace-protobuf",
+ "memfd",
+ "prost",
+ "rand",
+ "rmp",
+ "rmp-serde",
+ "rustix",
+ "serde",
+ "serde_yaml",
+]
+
+[[package]]
 name = "libdd-libunwind-sys"
 version = "29.0.0"
 source = "git+https://github.com/DataDog/libdatadog.git?tag=v29.0.0#001bd56fcbba34fa4ec3f9798a6c4fbcddeffa40"
@@ -815,6 +832,16 @@ dependencies = [
  "tracing",
  "uuid",
  "winver",
+]
+
+[[package]]
+name = "libdd-trace-protobuf"
+version = "1.1.0"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v29.0.0#001bd56fcbba34fa4ec3f9798a6c4fbcddeffa40"
+dependencies = [
+ "prost",
+ "serde",
+ "serde_bytes",
 ]
 
 [[package]]
@@ -1327,7 +1354,7 @@ name = "process-discovery"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "datadog-library-config",
+ "libdd-library-config",
  "napi",
  "napi-derive",
 ]
@@ -1637,6 +1664,16 @@ dependencies = [
  "js-sys",
  "serde",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "serde_bytes"
+version = "0.11.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5d440709e79d88e51ac01c4b72fc6cb7314017bb7da9eeff678aa94c10e3ea8"
+dependencies = [
+ "serde",
+ "serde_core",
 ]
 
 [[package]]

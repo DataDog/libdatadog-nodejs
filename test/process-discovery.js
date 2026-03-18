@@ -15,6 +15,8 @@ const metadata = new process_discovery.TracerMetadata(
   'my_svc',
   'my_env',
   'my_version',
+  'entrypoint.name:server,svc.auto:my_svc',
+  'abc123def456abc123def456abc123def456abc123def456abc123def456abc123',
 )
 
 const cfg_handle = process_discovery.storeMetadata(metadata)
