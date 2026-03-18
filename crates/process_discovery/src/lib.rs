@@ -1,7 +1,7 @@
 use napi::{Error, Status};
 use napi_derive::napi;
 
-use libdd_library_config::tracer_metadata;
+use datadog_library_config::tracer_metadata;
 
 #[napi]
 pub struct NapiAnonymousFileHandle {
