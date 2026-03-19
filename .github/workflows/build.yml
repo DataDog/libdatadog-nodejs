@@ -33,7 +33,7 @@ jobs:
           crate: '${{ matrix.crate }}'
 
   build:
-    uses: Datadog/action-prebuildify/.github/workflows/build.yml@main
+    uses: Datadog/action-prebuildify/.github/workflows/build.yml@d4e89247e6dd34f485c0f92c12f0cc739c2f8c92 # main @ 2026-03-16, last known working version
     needs: build-test-wasm
     with:
       package-manager: 'yarn'
