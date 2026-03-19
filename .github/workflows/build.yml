@@ -33,11 +33,12 @@ jobs:
           crate: '${{ matrix.crate }}'
 
   build:
-    uses: Datadog/action-prebuildify/.github/workflows/build.yml@d4e89247e6dd34f485c0f92c12f0cc739c2f8c92 # main @ 2026-03-16, last known working version
+    uses: Datadog/action-prebuildify/.github/workflows/build.yml@main
     needs: build-test-wasm
     with:
       package-manager: 'yarn'
       cache: false
+      node-gyp-build-major: 3
       min-node-version: 18
       rust: true
       only: darwin-arm64,darwin-x64,linux-arm64,linux-x64
