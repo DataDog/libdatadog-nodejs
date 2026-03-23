@@ -4,10 +4,21 @@ const { describe, it, before, beforeEach } = require('node:test')
 const assert = require('node:assert')
 const crypto = require('crypto')
 
-const { NativeSpanState, OpCode } = require('..').maybeLoad('pipeline')
+const pipeline = require('..').maybeLoad('pipeline')
+const { WasmSpanState } = pipeline
+const OpCode = pipeline.getOpCodes()
+const wasmMemory = pipeline.getWasmMemory()
 
-function getRandomBigInt (byteCount) {
-  return BigInt('0x' + crypto.randomBytes(byteCount).toString('hex'))
+function getRandomBytes (byteCount) {
+  return new Uint8Array(crypto.randomBytes(byteCount))
+}
+
+function bytesToBigInt (bytes) {
+  let val = 0n
+  for (let i = 0; i < bytes.length; i++) {
+    val = (val << 8n) | BigInt(bytes[i])
+  }
+  return val
 }
 
 // The Span and NativeSpansInterface classes act as a sketch of what should
@@ -18,9 +29,9 @@ function getRandomBigInt (byteCount) {
 class Span {
   constructor (nativeSpans, traceId, parentId) {
     this.nativeSpans = nativeSpans
-    this.traceId = traceId || [getRandomBigInt(8), getRandomBigInt(8)]
-    this.parentId = parentId || 0n
-    this.spanId = getRandomBigInt(8)
+    this.traceId = traceId || [getRandomBytes(8), getRandomBytes(8)]
+    this.parentId = parentId || new Uint8Array(8)
+    this.spanId = getRandomBytes(8)
     this._startTime = BigInt(Date.now()) * 1000000n
 
     this.nativeSpans.queueOp(OpCode.Create, this.spanId, ['u128', this.traceId], ['u64', this.parentId])
@@ -93,11 +104,11 @@ Object.entries(spanAccessors).forEach(([prop, [getter, setter, valueType]]) => {
   })
 })
 
+const CHANGE_QUEUE_SIZE = 64 * 1024
+const STRING_TABLE_INPUT_SIZE = 10 * 1024
+
 class NativeSpansInterface {
   constructor (options = {}) {
-    this.changeQueueBuffer = Buffer.alloc(64 * 1024)
-    this.stringTableInputBuffer = Buffer.alloc(10 * 1024)
-    this.samplingBuffer = Buffer.alloc(1024)
     this.flushBuffer = Buffer.alloc(10 * 1024)
 
     this.cqbIndex = 8 // Start at 8 since first u64 is count
@@ -105,24 +116,38 @@ class NativeSpansInterface {
     this.stibCount = 0
     this.stringMap = new Map()
 
-    this.state = new NativeSpanState(
+    this.state = new WasmSpanState(
       options.agentUrl || process.env.AGENT_URL || 'http://127.0.0.1:8126',
       options.tracerVersion || '1.0.0',
       options.lang || 'nodejs',
       options.langVersion || process.version,
       options.langInterpreter || 'v8',
-      this.changeQueueBuffer,
-      this.stringTableInputBuffer,
+      CHANGE_QUEUE_SIZE,
+      STRING_TABLE_INPUT_SIZE,
       options.pid ?? process.pid,
-      options.tracerService || 'test-service',
-      this.samplingBuffer
+      options.tracerService || 'test-service'
     )
+
+    // Get pointers into WASM memory for direct buffer access
+    this._wasmMemory = wasmMemory
+    this._cqbPtr = this.state.change_queue_ptr()
+    this._refreshViews()
+  }
+
+  _refreshViews () {
+    this._cqbView = new DataView(this._wasmMemory.buffer, this._cqbPtr)
+    this._cqbBytes = new Uint8Array(this._wasmMemory.buffer, this._cqbPtr)
   }
 
   resetChangeQueue () {
     this.cqbIndex = 8
     this.cqbCount = 0
-    this.changeQueueBuffer.fill(0)
+    // Check if WASM memory was detached/grown
+    if (this._wasmMemory.buffer !== this._cqbView.buffer) {
+      this._refreshViews()
+    }
+    this._cqbView.setUint32(0, 0, true)
+    this._cqbView.setUint32(4, 0, true)
   }
 
   flushChangeQueue () {
@@ -140,46 +165,60 @@ class NativeSpansInterface {
     return id
   }
 
+  // Write 8 big-endian bytes as a little-endian u64 into the change buffer
+  _writeBytesLE (bytes, offset) {
+    const buf = this._cqbBytes
+    for (let i = 0; i < 8; i++) {
+      buf[offset + i] = bytes[7 - i]
+    }
+  }
+
   queueOp (op, spanId, ...args) {
+    // Check if WASM memory was detached/grown
+    if (this._wasmMemory.buffer !== this._cqbView.buffer) {
+      this._refreshViews()
+    }
+
     // Check if Rust flushed the queue (wrote 0 to count position)
-    if (this.changeQueueBuffer.readBigUInt64LE(0) === 0n && this.cqbCount > 0) {
+    if (this._cqbView.getUint32(0, true) === 0 && this.cqbCount > 0) {
       this.cqbIndex = 8
       this.cqbCount = 0
     }
 
-    this.changeQueueBuffer.writeBigUInt64LE(BigInt(op), this.cqbIndex)
+    const view = this._cqbView
+    view.setBigUint64(this.cqbIndex, BigInt(op), true)
     this.cqbIndex += 8
-    this.changeQueueBuffer.writeBigUInt64LE(spanId, this.cqbIndex)
+    this._writeBytesLE(spanId, this.cqbIndex)
     this.cqbIndex += 8
 
     for (const arg of args) {
       if (typeof arg === 'string') {
         const stringId = this.getStringId(arg)
-        this.changeQueueBuffer.writeUint32LE(stringId, this.cqbIndex)
+        view.setUint32(this.cqbIndex, stringId, true)
         this.cqbIndex += 4
       } else {
         const [typ, num] = arg
         switch (typ) {
           case 'u64':
-            this.changeQueueBuffer.writeBigUInt64LE(num, this.cqbIndex)
+            this._writeBytesLE(num, this.cqbIndex)
             this.cqbIndex += 8
             break
           case 'u128':
-            this.changeQueueBuffer.writeBigUInt64LE(num[0], this.cqbIndex)
+            this._writeBytesLE(num[0], this.cqbIndex)
             this.cqbIndex += 8
-            this.changeQueueBuffer.writeBigUInt64LE(num[1], this.cqbIndex)
+            this._writeBytesLE(num[1], this.cqbIndex)
             this.cqbIndex += 8
             break
           case 'i64':
-            this.changeQueueBuffer.writeBigInt64LE(num, this.cqbIndex)
+            view.setBigInt64(this.cqbIndex, num, true)
             this.cqbIndex += 8
             break
           case 'i32':
-            this.changeQueueBuffer.writeInt32LE(num, this.cqbIndex)
+            view.setInt32(this.cqbIndex, num, true)
             this.cqbIndex += 4
             break
           case 'f64':
-            this.changeQueueBuffer.writeDoubleLE(num, this.cqbIndex)
+            view.setFloat64(this.cqbIndex, num, true)
             this.cqbIndex += 8
             break
           default:
@@ -189,7 +228,7 @@ class NativeSpansInterface {
     }
 
     this.cqbCount++
-    this.changeQueueBuffer.writeBigUInt64LE(BigInt(this.cqbCount), 0)
+    view.setBigUint64(0, BigInt(this.cqbCount), true)
   }
 
   createSpan (traceId, parentId) {
@@ -201,7 +240,10 @@ class NativeSpansInterface {
     let index = 0
     for (const span of spans) {
       const spanId = span.spanId ?? span
-      this.flushBuffer.writeBigUint64LE(spanId, index)
+      // Write big-endian span ID bytes as little-endian u64
+      for (let i = 0; i < 8; i++) {
+        this.flushBuffer[index + i] = spanId[7 - i]
+      }
       index += 8
     }
     return this.state.flushChunk(spans.length, true, this.flushBuffer)
@@ -220,8 +262,8 @@ describe('pipeline', () => {
   })
 
   describe('module exports', () => {
-    it('should export NativeSpanState', () => {
-      assert(NativeSpanState)
+    it('should export WasmSpanState', () => {
+      assert(WasmSpanState)
     })
 
     it('should export OpCode', () => {
@@ -241,9 +283,9 @@ describe('pipeline', () => {
     })
   })
 
-  describe('NativeSpanState', () => {
+  describe('WasmSpanState', () => {
     it('should create an instance', () => {
-      assert(nativeSpans.state instanceof NativeSpanState)
+      assert(nativeSpans.state instanceof WasmSpanState)
     })
   })
 
@@ -351,15 +393,9 @@ describe('pipeline', () => {
   })
 
   describe('sampling', () => {
-    it('should call sample without failing', () => {
-      const span = nativeSpans.createSpan()
-      span.name = 'sample-test-span'
-
-      // Write span ID to sampling buffer (shared via SendPtr)
-      nativeSpans.samplingBuffer.writeBigUInt64LE(span.spanId, 0)
-
-      const result = nativeSpans.state.sample()
-      assert.strictEqual(typeof result, 'boolean')
+    it('should not expose sample() in WASM module', () => {
+      // Sampling is handled JS-side; the WASM module does not expose a sample() method
+      assert.strictEqual(typeof nativeSpans.state.sample, 'undefined')
     })
   })
 
@@ -391,7 +427,8 @@ describe('pipeline', () => {
         const result = await nativeSpans.flushSpans(span)
         assert(result)
       } catch (err) {
-        if (err.message?.includes('Network') || err.message?.includes('Connect') || err.message?.includes('connect')) {
+        const msg = typeof err === 'string' ? err : err.message || ''
+        if (msg.includes('Network') || msg.includes('Connect') || msg.includes('connect')) {
           t.skip('no agent running')
         } else {
           throw err

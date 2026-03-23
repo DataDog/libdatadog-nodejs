@@ -174,31 +174,38 @@ impl WasmSpanState {
         self.change_buffer_state.string_table_evict_one(key);
     }
 
-    fn get_span_f64(&self, id: f64) -> Result<&libdd_trace_utils::span::v04::Span<WasmTraceData>, JsValue> {
-        let span_id = id as u64;
+    fn parse_span_id(id: &[u8]) -> Result<u64, JsValue> {
+        let bytes: [u8; 8] = id
+            .try_into()
+            .map_err(|_| JsValue::from_str("span ID must be exactly 8 bytes"))?;
+        Ok(u64::from_be_bytes(bytes))
+    }
+
+    fn get_span(&self, id: &[u8]) -> Result<&libdd_trace_utils::span::v04::Span<WasmTraceData>, JsValue> {
+        let span_id = Self::parse_span_id(id)?;
         self.change_buffer_state
             .get_span(&span_id)
             .map_err(|e| JsValue::from_str(&e.to_string()))
     }
 
     #[wasm_bindgen(js_name = "getServiceName")]
-    pub fn get_service_name(&mut self, id: f64) -> Result<String, JsValue> {
+    pub fn get_service_name(&mut self, id: &[u8]) -> Result<String, JsValue> {
         self.flush_change_queue()?;
-        Ok(self.get_span_f64(id)?.service.to_string())
+        Ok(self.get_span(id)?.service.to_string())
     }
 
     #[wasm_bindgen(js_name = "getResourceName")]
-    pub fn get_resource_name(&mut self, id: f64) -> Result<String, JsValue> {
+    pub fn get_resource_name(&mut self, id: &[u8]) -> Result<String, JsValue> {
         self.flush_change_queue()?;
-        Ok(self.get_span_f64(id)?.resource.to_string())
+        Ok(self.get_span(id)?.resource.to_string())
     }
 
     #[wasm_bindgen(js_name = "getMetaAttr")]
-    pub fn get_meta_attr(&mut self, id: f64, name: &str) -> Result<JsValue, JsValue> {
+    pub fn get_meta_attr(&mut self, id: &[u8], name: &str) -> Result<JsValue, JsValue> {
         self.flush_change_queue()?;
         let name: SpanString = name.into();
         Ok(self
-            .get_span_f64(id)?
+            .get_span(id)?
             .meta
             .get(&name)
             .map(|v| JsValue::from_str(&v.to_string()))
@@ -206,11 +213,11 @@ impl WasmSpanState {
     }
 
     #[wasm_bindgen(js_name = "getMetricAttr")]
-    pub fn get_metric_attr(&mut self, id: f64, name: &str) -> Result<JsValue, JsValue> {
+    pub fn get_metric_attr(&mut self, id: &[u8], name: &str) -> Result<JsValue, JsValue> {
         self.flush_change_queue()?;
         let name: SpanString = name.into();
         Ok(self
-            .get_span_f64(id)?
+            .get_span(id)?
             .metrics
             .get(&name)
             .map(|v| JsValue::from_f64(*v))
@@ -218,39 +225,39 @@ impl WasmSpanState {
     }
 
     #[wasm_bindgen(js_name = "getError")]
-    pub fn get_error(&mut self, id: f64) -> Result<i32, JsValue> {
+    pub fn get_error(&mut self, id: &[u8]) -> Result<i32, JsValue> {
         self.flush_change_queue()?;
-        Ok(self.get_span_f64(id)?.error)
+        Ok(self.get_span(id)?.error)
     }
 
     #[wasm_bindgen(js_name = "getStart")]
-    pub fn get_start(&mut self, id: f64) -> Result<f64, JsValue> {
+    pub fn get_start(&mut self, id: &[u8]) -> Result<f64, JsValue> {
         self.flush_change_queue()?;
-        Ok(self.get_span_f64(id)?.start as f64)
+        Ok(self.get_span(id)?.start as f64)
     }
 
     #[wasm_bindgen(js_name = "getDuration")]
-    pub fn get_duration(&mut self, id: f64) -> Result<f64, JsValue> {
+    pub fn get_duration(&mut self, id: &[u8]) -> Result<f64, JsValue> {
         self.flush_change_queue()?;
-        Ok(self.get_span_f64(id)?.duration as f64)
+        Ok(self.get_span(id)?.duration as f64)
     }
 
     #[wasm_bindgen(js_name = "getType")]
-    pub fn get_type(&mut self, id: f64) -> Result<String, JsValue> {
+    pub fn get_type(&mut self, id: &[u8]) -> Result<String, JsValue> {
         self.flush_change_queue()?;
-        Ok(self.get_span_f64(id)?.r#type.to_string())
+        Ok(self.get_span(id)?.r#type.to_string())
     }
 
     #[wasm_bindgen(js_name = "getName")]
-    pub fn get_name(&mut self, id: f64) -> Result<String, JsValue> {
+    pub fn get_name(&mut self, id: &[u8]) -> Result<String, JsValue> {
         self.flush_change_queue()?;
-        Ok(self.get_span_f64(id)?.name.to_string())
+        Ok(self.get_span(id)?.name.to_string())
     }
 
     #[wasm_bindgen(js_name = "getTraceMetaAttr")]
-    pub fn get_trace_meta_attr(&mut self, id: f64, name: &str) -> Result<JsValue, JsValue> {
+    pub fn get_trace_meta_attr(&mut self, id: &[u8], name: &str) -> Result<JsValue, JsValue> {
         self.flush_change_queue()?;
-        let trace_id = self.get_span_f64(id)?.trace_id;
+        let trace_id = self.get_span(id)?.trace_id;
         let name: SpanString = name.into();
         Ok(self
             .change_buffer_state
@@ -261,9 +268,9 @@ impl WasmSpanState {
     }
 
     #[wasm_bindgen(js_name = "getTraceMetricAttr")]
-    pub fn get_trace_metric_attr(&mut self, id: f64, name: &str) -> Result<JsValue, JsValue> {
+    pub fn get_trace_metric_attr(&mut self, id: &[u8], name: &str) -> Result<JsValue, JsValue> {
         self.flush_change_queue()?;
-        let trace_id = self.get_span_f64(id)?.trace_id;
+        let trace_id = self.get_span(id)?.trace_id;
         let name: SpanString = name.into();
         Ok(self
             .change_buffer_state
@@ -274,9 +281,9 @@ impl WasmSpanState {
     }
 
     #[wasm_bindgen(js_name = "getTraceOrigin")]
-    pub fn get_trace_origin(&mut self, id: f64) -> Result<JsValue, JsValue> {
+    pub fn get_trace_origin(&mut self, id: &[u8]) -> Result<JsValue, JsValue> {
         self.flush_change_queue()?;
-        let trace_id = self.get_span_f64(id)?.trace_id;
+        let trace_id = self.get_span(id)?.trace_id;
         Ok(self
             .change_buffer_state
             .get_trace(&trace_id)
