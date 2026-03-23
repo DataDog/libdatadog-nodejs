@@ -2,6 +2,7 @@ use libdatadog_nodejs_capabilities::WasmCapabilities;
 use libdd_data_pipeline::trace_exporter::agent_response::AgentResponse;
 use libdd_data_pipeline::trace_exporter::TraceExporter;
 use std::ffi::CStr;
+use std::time::Duration;
 
 use wasm_bindgen::prelude::*;
 
@@ -12,6 +13,8 @@ mod span_bytes;
 
 mod trace_data;
 use trace_data::*;
+
+mod stats;
 
 use libdd_trace_utils::change_buffer::{ChangeBuffer, ChangeBufferState};
 
@@ -29,6 +32,7 @@ pub struct WasmSpanState {
     string_table_input: Vec<u8>,
     exporter: TraceExporter<WasmCapabilities>,
     change_buffer_state: ChangeBufferState<WasmTraceData>,
+    stats_collector: Option<stats::StatsCollector>,
 }
 
 #[wasm_bindgen]
@@ -44,6 +48,11 @@ impl WasmSpanState {
         string_table_input_size: u32,
         pid: u32,
         tracer_service: &str,
+        stats_enabled: bool,
+        hostname: &str,
+        env: &str,
+        app_version: &str,
+        runtime_id: &str,
     ) -> Result<WasmSpanState, JsValue> {
         let mut builder = TraceExporter::<WasmCapabilities>::builder();
         builder
@@ -67,11 +76,30 @@ impl WasmSpanState {
             .build()
             .map_err(|e| JsValue::from_str(&format!("{:?}", e)))?;
 
+        let stats_collector = if stats_enabled {
+            Some(stats::StatsCollector::new(
+                Duration::from_secs(10),
+                url.to_string(),
+                stats::StatsMeta {
+                    hostname: hostname.to_string(),
+                    env: env.to_string(),
+                    version: app_version.to_string(),
+                    lang: lang.to_string(),
+                    tracer_version: tracer_version.to_string(),
+                    runtime_id: runtime_id.to_string(),
+                    service: tracer_service.to_string(),
+                },
+            ))
+        } else {
+            None
+        };
+
         Ok(WasmSpanState {
             change_queue,
             string_table_input: vec![0u8; string_table_input_size as usize],
             exporter,
             change_buffer_state,
+            stats_collector,
         })
     }
 
@@ -120,6 +148,12 @@ impl WasmSpanState {
             .flush_chunk(span_ids, first_is_local_root)
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
+        // Feed spans to stats concentrator before sending (spans have
+        // _dd.top_level and _dd.measured already set by flush_chunk)
+        if let Some(collector) = &mut self.stats_collector {
+            collector.add_spans(&spans_vec);
+        }
+
         let resp = self
             .exporter
             .send_trace_chunks_async(vec![spans_vec])
@@ -132,6 +166,22 @@ impl WasmSpanState {
         response_str
             .map(|s| JsValue::from_str(&s))
             .map_err(|e| JsValue::from_str(&format!("{:?}", e)))
+    }
+
+    /// Flush aggregated stats to the agent's /v0.6/stats endpoint.
+    ///
+    /// Should be called periodically (e.g. every 10s) from JS, and with
+    /// `force=true` on shutdown.
+    #[wasm_bindgen(js_name = "flushStats")]
+    pub async fn flush_stats(&mut self, force: bool) -> Result<bool, JsValue> {
+        if let Some(collector) = &mut self.stats_collector {
+            collector
+                .flush(force)
+                .await
+                .map_err(|e| JsValue::from_str(&e))
+        } else {
+            Ok(false)
+        }
     }
 
     #[wasm_bindgen(js_name = "flushChangeQueue")]
@@ -178,7 +228,7 @@ impl WasmSpanState {
         let bytes: [u8; 8] = id
             .try_into()
             .map_err(|_| JsValue::from_str("span ID must be exactly 8 bytes"))?;
-        Ok(u64::from_be_bytes(bytes))
+        Ok(u64::from_le_bytes(bytes))
     }
 
     fn get_span(&self, id: &[u8]) -> Result<&libdd_trace_utils::span::v04::Span<WasmTraceData>, JsValue> {

@@ -16,3 +16,12 @@ panic = "abort"
 strip = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+# Local path override for development — point to local libdatadog checkout
+# with new CreateSpan/BatchSetMeta opcodes. Remove before release.
+[patch."https://github.com/DataDog/libdatadog.git"]
+libdd-trace-utils = { path = "/Users/bryan.english/libdatadog/libdd-trace-utils" }
+libdd-trace-stats = { path = "/Users/bryan.english/libdatadog/libdd-trace-stats" }
+libdd-trace-protobuf = { path = "/Users/bryan.english/libdatadog/libdd-trace-protobuf" }
+libdd-capabilities = { path = "/Users/bryan.english/libdatadog/libdd-capabilities" }
+libdd-data-pipeline = { path = "/Users/bryan.english/libdatadog/libdd-data-pipeline" }

@@ -884,7 +884,6 @@ dependencies = [
 [[package]]
 name = "libdd-capabilities"
 version = "0.1.0"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer#a1eb2d9f693214390b0c0bb51e6d6ecbd7944b3e"
 dependencies = [
  "anyhow",
  "bytes",
@@ -928,7 +927,6 @@ dependencies = [
 [[package]]
 name = "libdd-common"
 version = "2.0.1"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer#a1eb2d9f693214390b0c0bb51e6d6ecbd7944b3e"
 dependencies = [
  "anyhow",
  "bytes",
@@ -991,7 +989,6 @@ dependencies = [
 [[package]]
 name = "libdd-data-pipeline"
 version = "2.0.1"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer#a1eb2d9f693214390b0c0bb51e6d6ecbd7944b3e"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -1028,7 +1025,6 @@ dependencies = [
 [[package]]
 name = "libdd-ddsketch"
 version = "1.0.1"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer#a1eb2d9f693214390b0c0bb51e6d6ecbd7944b3e"
 dependencies = [
  "prost",
 ]
@@ -1036,7 +1032,6 @@ dependencies = [
 [[package]]
 name = "libdd-dogstatsd-client"
 version = "1.0.1"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer#a1eb2d9f693214390b0c0bb51e6d6ecbd7944b3e"
 dependencies = [
  "anyhow",
  "cadence",
@@ -1089,7 +1084,6 @@ dependencies = [
 [[package]]
 name = "libdd-tinybytes"
 version = "1.1.0"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer#a1eb2d9f693214390b0c0bb51e6d6ecbd7944b3e"
 dependencies = [
  "serde",
 ]
@@ -1097,7 +1091,6 @@ dependencies = [
 [[package]]
 name = "libdd-trace-normalization"
 version = "1.0.2"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer#a1eb2d9f693214390b0c0bb51e6d6ecbd7944b3e"
 dependencies = [
  "anyhow",
  "libdd-trace-protobuf",
@@ -1106,7 +1099,6 @@ dependencies = [
 [[package]]
 name = "libdd-trace-protobuf"
 version = "2.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer#a1eb2d9f693214390b0c0bb51e6d6ecbd7944b3e"
 dependencies = [
  "prost",
  "serde",
@@ -1116,7 +1108,6 @@ dependencies = [
 [[package]]
 name = "libdd-trace-stats"
 version = "1.0.3"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer#a1eb2d9f693214390b0c0bb51e6d6ecbd7944b3e"
 dependencies = [
  "hashbrown 0.15.5",
  "libdd-ddsketch 1.0.1",
@@ -1127,7 +1118,6 @@ dependencies = [
 [[package]]
 name = "libdd-trace-utils"
 version = "2.0.2"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer#a1eb2d9f693214390b0c0bb51e6d6ecbd7944b3e"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1146,6 +1136,7 @@ dependencies = [
  "rmp",
  "rmp-serde",
  "rmpv",
+ "rustc-hash",
  "serde",
  "serde_json",
  "tokio",
@@ -1692,13 +1683,18 @@ checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 name = "pipeline"
 version = "0.1.0"
 dependencies = [
+ "bytes",
  "console_error_panic_hook",
  "getrandom 0.2.17",
+ "http",
  "js-sys",
  "libdatadog-nodejs-capabilities",
  "libdd-capabilities",
  "libdd-data-pipeline",
+ "libdd-trace-protobuf",
+ "libdd-trace-stats",
  "libdd-trace-utils",
+ "rmp-serde",
  "serde",
  "uuid",
  "wasm-bindgen",
