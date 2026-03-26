@@ -49,9 +49,9 @@ checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
 name = "arc-swap"
-version = "1.8.2"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9f3647c145568cec02c42054e07bdf9a5a698e15b466fb2341bfc393cd24aa5"
+checksum = "a07d1f37ff60921c83bdfc7407723bdefe89b44b98a9b772f225c8f9d67141a6"
 dependencies = [
  "rustversion",
 ]
@@ -81,9 +81,9 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
 name = "aws-lc-rs"
-version = "1.16.1"
+version = "1.16.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94bffc006df10ac2a68c83692d734a465f8ee6c5b384d8545a636f81d858f4bf"
+checksum = "a054912289d18629dc78375ba2c3726a3afe3ff71b4edba9dedfca0e3446d1fc"
 dependencies = [
  "aws-lc-sys",
  "zeroize",
@@ -91,9 +91,9 @@ dependencies = [
 
 [[package]]
 name = "aws-lc-sys"
-version = "0.38.0"
+version = "0.39.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4321e568ed89bb5a7d291a7f37997c2c0df89809d7b6d12062c81ddb54aa782e"
+checksum = "1fa7e52a4c5c547c741610a2c6f123f3881e409b714cd27e6798ef020c514f0a"
 dependencies = [
  "cc",
  "cmake",
@@ -829,9 +829,9 @@ dependencies = [
 
 [[package]]
 name = "itoa"
-version = "1.0.17"
+version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92ecc6618181def0457392ccd0ee51198e065e016d1d527a7ac1b6dc7c1f09d2"
+checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
 name = "jobserver"
@@ -884,6 +884,7 @@ dependencies = [
 [[package]]
 name = "libdd-capabilities"
 version = "0.1.0"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer#d7cee8386e30c7e0d26149f56d7029da0dde15c6"
 dependencies = [
  "anyhow",
  "bytes",
@@ -927,6 +928,7 @@ dependencies = [
 [[package]]
 name = "libdd-common"
 version = "2.0.1"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer#d7cee8386e30c7e0d26149f56d7029da0dde15c6"
 dependencies = [
  "anyhow",
  "bytes",
@@ -989,6 +991,7 @@ dependencies = [
 [[package]]
 name = "libdd-data-pipeline"
 version = "2.0.1"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer#d7cee8386e30c7e0d26149f56d7029da0dde15c6"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -1025,6 +1028,7 @@ dependencies = [
 [[package]]
 name = "libdd-ddsketch"
 version = "1.0.1"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer#d7cee8386e30c7e0d26149f56d7029da0dde15c6"
 dependencies = [
  "prost",
 ]
@@ -1032,6 +1036,7 @@ dependencies = [
 [[package]]
 name = "libdd-dogstatsd-client"
 version = "1.0.1"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer#d7cee8386e30c7e0d26149f56d7029da0dde15c6"
 dependencies = [
  "anyhow",
  "cadence",
@@ -1084,6 +1089,7 @@ dependencies = [
 [[package]]
 name = "libdd-tinybytes"
 version = "1.1.0"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer#d7cee8386e30c7e0d26149f56d7029da0dde15c6"
 dependencies = [
  "serde",
 ]
@@ -1091,6 +1097,7 @@ dependencies = [
 [[package]]
 name = "libdd-trace-normalization"
 version = "1.0.2"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer#d7cee8386e30c7e0d26149f56d7029da0dde15c6"
 dependencies = [
  "anyhow",
  "libdd-trace-protobuf",
@@ -1099,6 +1106,7 @@ dependencies = [
 [[package]]
 name = "libdd-trace-protobuf"
 version = "2.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer#d7cee8386e30c7e0d26149f56d7029da0dde15c6"
 dependencies = [
  "prost",
  "serde",
@@ -1108,6 +1116,7 @@ dependencies = [
 [[package]]
 name = "libdd-trace-stats"
 version = "1.0.3"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer#d7cee8386e30c7e0d26149f56d7029da0dde15c6"
 dependencies = [
  "hashbrown 0.15.5",
  "libdd-ddsketch 1.0.1",
@@ -1118,6 +1127,7 @@ dependencies = [
 [[package]]
 name = "libdd-trace-utils"
 version = "2.0.2"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer#d7cee8386e30c7e0d26149f56d7029da0dde15c6"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1963,9 +1973,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.9"
+version = "0.103.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7df23109aa6c1567d1c575b9952556388da57401e4ace1d15f79eedad0d8f53"
+checksum = "df33b2b81ac578cabaf06b89b0631153a3f416b0a886e8a7a1707fb51abbd1ef"
 dependencies = [
  "aws-lc-rs",
  "ring",
@@ -2209,9 +2219,9 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "symbolic-common"
-version = "12.17.2"
+version = "12.17.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "751a2823d606b5d0a7616499e4130a516ebd01a44f39811be2b9600936509c23"
+checksum = "52ca086c1eb5c7ee74b151ba83c6487d5d33f8c08ad991b86f3f58f6629e68d5"
 dependencies = [
  "debugid",
  "memmap2",
@@ -2221,9 +2231,9 @@ dependencies = [
 
 [[package]]
 name = "symbolic-demangle"
-version = "12.17.2"
+version = "12.17.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "79b237cfbe320601dd24b4ac817a5b68bb28f5508e33f08d42be0682cadc8ac9"
+checksum = "baa911a28a62823aaf2cc2e074212492a3ee69d0d926cc8f5b12b4a108ff5c0c"
 dependencies = [
  "cpp_demangle 0.5.1",
  "msvc-demangler",
@@ -2382,9 +2392,9 @@ checksum = "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
 
 [[package]]
 name = "unicode-segmentation"
-version = "1.12.0"
+version = "1.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6ccf251212114b54433ec949fd6a7841275f9ada20dddd2f29e9ceea4501493"
+checksum = "9629274872b2bfaf8d66f5f15725007f635594914870f65218920345aa11aa8c"
 
 [[package]]
 name = "unicode-xid"
@@ -3067,18 +3077,18 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
-version = "0.8.42"
+version = "0.8.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2578b716f8a7a858b7f02d5bd870c14bf4ddbbcf3a4c05414ba6503640505e3"
+checksum = "efbb2a062be311f2ba113ce66f697a4dc589f85e78a4aea276200804cea0ed87"
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.42"
+version = "0.8.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e6cc098ea4d3bd6246687de65af3f920c430e236bee1e3bf2e441463f08a02f"
+checksum = "0e8bc7269b54418e7aeeef514aa68f8690b8c0489a06b0136e5f57c4c5ccab89"
 dependencies = [
  "proc-macro2",
  "quote",
