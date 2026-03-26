@@ -1,0 +1,32 @@
+{
+    "name": "Node (Alpine ARM64)",
+    "build": {
+        "dockerfile": "Dockerfile-alpine"
+    },
+
+// Ensure ARM64 platform
+    "runArgs": [
+        "--platform=linux/arm64",
+        "--network=host"
+    ],
+    // Persist npm cache
+    "mounts": [
+        {
+            "source": "devcontainer-npm-cache-${devcontainerId}",
+            "target": "/root/.npm",
+            "type": "volume"
+        }
+    ],
+    // Install useful Alpine + Node tooling + Rust + libdatadog build dependencies
+    "onCreateCommand": "apk add --no-cache git bash build-base python3 autoconf automake libtool gcc libc-dev curl musl-dev linux-headers libgcc gcompat && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && source ~/.cargo/env && rustup target add aarch64-unknown-linux-gnu",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "dbaeumer.vscode-eslint",
+                "esbenp.prettier-vscode",
+                "ms-vscode.vscode-typescript-next",
+                "ms-azuretools.vscode-docker"
+            ]
+        }
+    }
+}
