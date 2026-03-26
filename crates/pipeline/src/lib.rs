@@ -168,6 +168,13 @@ impl WasmSpanState {
             collector.add_spans(&spans_vec);
         }
 
+        // Recycle any previously prepared spans that were never sent (e.g.
+        // if the prior send was skipped by JS back-pressure). Reusing the
+        // pre-allocated HashMaps avoids allocator fragmentation in WASM.
+        if let Some(old_spans) = self.prepared_spans.borrow_mut().take() {
+            self.cbs.borrow_mut().recycle_spans(old_spans);
+        }
+
         // Store prepared spans for the subsequent sendPreparedChunk call
         *self.prepared_spans.borrow_mut() = Some(spans_vec);
         Ok(true)

@@ -1,0 +1,26 @@
+[package]
+name = "pipeline-native"
+version = "0.1.0"
+edition = "2021"
+description = "Native (napi) binding for pipeline span management and trace export"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+napi = { version = "2", features = ["async", "serde-json"] }
+napi-derive = "2"
+serde = { version = "1.0", features = ["derive"] }
+libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", branch = "bengl/capability-on-change-buffer" }
+libdd-capabilities-impl = { git = "https://github.com/DataDog/libdatadog.git", branch = "bengl/capability-on-change-buffer" }
+libdd-data-pipeline = { git = "https://github.com/DataDog/libdatadog.git", branch = "bengl/capability-on-change-buffer", default-features = false }
+libdd-trace-utils = { git = "https://github.com/DataDog/libdatadog.git", branch = "bengl/capability-on-change-buffer", default-features = false, features = ["change-buffer"] }
+libdd-trace-stats = { git = "https://github.com/DataDog/libdatadog.git", branch = "bengl/capability-on-change-buffer", default-features = false }
+libdd-trace-protobuf = { git = "https://github.com/DataDog/libdatadog.git", branch = "bengl/capability-on-change-buffer", default-features = false }
+rmp-serde = "1"
+bytes = "1"
+http = "1"
+tokio = { version = "1", features = ["sync"] }
+
+[build-dependencies]
+napi-build = "2"
