@@ -31,6 +31,7 @@ extern "C" {
 /// Wasm [`HttpClientTrait`] implementation that delegates to Node.js HTTP.
 ///
 /// Named `DefaultHttpClient` to match the native version's public API.
+#[derive(Clone, Debug)]
 pub struct DefaultHttpClient;
 
 impl HttpClientTrait for DefaultHttpClient {
