@@ -17,5 +17,8 @@ serde-wasm-bindgen = "0.4"
 [dev-dependencies]
 wasm-bindgen-test = "0.3.50"
 
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O', '--enable-bulk-memory']
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2", features = ["js"] }

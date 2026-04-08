@@ -18,5 +18,8 @@ futures-core = "0.3"
 anyhow = "1"
 libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", branch = "yannham/change-buffer-perf" }
 
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O', '--enable-bulk-memory']
+
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

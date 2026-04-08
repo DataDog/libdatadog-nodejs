@@ -22,5 +22,8 @@ bytes = "1"
 http = "1"
 tokio = { version = "1", features = ["sync"] }
 
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O', '--enable-bulk-memory']
+
 [build-dependencies]
 napi-build = "2"
