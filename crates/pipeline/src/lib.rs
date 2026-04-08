@@ -449,24 +449,30 @@ pub fn get_wasm_memory() -> JsValue {
 }
 
 /// Export OpCode values as a JS object.
-/// Values match the `#[repr(u16)]` OpCode enum in libdd-trace-utils.
+/// Values match the `#[repr(u16)]` OpCode enum in libdd-trace-utils,
+/// which uses bit-encoded simple opcodes: (field_idx << 3) | kind.
+/// Complex opcodes start at 32.
 #[wasm_bindgen(js_name = "getOpCodes")]
 pub fn get_op_codes() -> JsValue {
     let obj = js_sys::Object::new();
     let entries: &[(&str, u32)] = &[
-        ("Create", 0),
-        ("SetMetaAttr", 1),
-        ("SetMetricAttr", 2),
-        ("SetServiceName", 3),
-        ("SetResourceName", 4),
-        ("SetError", 5),
-        ("SetStart", 6),
-        ("SetDuration", 7),
-        ("SetType", 8),
-        ("SetName", 9),
-        ("SetTraceMetaAttr", 10),
-        ("SetTraceMetricsAttr", 11),
-        ("SetTraceOrigin", 12),
+        ("SetServiceName",      0),   // (0<<3)|SET_STR(0)
+        ("SetError",            1),   // (0<<3)|SET_I32(1)
+        ("SetStart",            2),   // (0<<3)|SET_I64(2)
+        ("SetMetaAttr",         3),   // (0<<3)|MAP_STR(3)
+        ("SetMetricAttr",       4),   // (0<<3)|MAP_F64(4)
+        ("SetTraceOrigin",      5),   // (0<<3)|TRACE_SET_STR(5)
+        ("SetTraceMetaAttr",    6),   // (0<<3)|TRACE_MAP_STR(6)
+        ("SetTraceMetricsAttr", 7),   // (0<<3)|TRACE_MAP_F64(7)
+        ("SetName",             8),   // (1<<3)|SET_STR(0)
+        ("SetDuration",         10),  // (1<<3)|SET_I64(2)
+        ("SetResourceName",     16),  // (2<<3)|SET_STR(0)
+        ("SetType",             24),  // (3<<3)|SET_STR(0)
+        ("Create",              32),  // complex op
+        ("CreateSpan",          33),  // complex op
+        ("CreateSpanFull",      34),  // complex op
+        ("BatchSetMeta",        35),  // complex op
+        ("BatchSetMetric",      36),  // complex op
     ];
     for (name, val) in entries {
         js_sys::Reflect::set(&obj, &JsValue::from_str(name), &JsValue::from_f64(*val as f64))

@@ -33,6 +33,15 @@ function getRandomU64 () {
   return bytes.readUIntBE(0, 6)
 }
 
+// Convert a u64 number to an 8-byte little-endian Uint8Array.
+// Used to pass span IDs to WASM getter methods that expect &[u8; 8].
+function u64ToLE8 (n) {
+  const buf = new Uint8Array(8)
+  const view = new DataView(buf.buffer)
+  view.setBigUint64(0, BigInt(n), true)
+  return buf
+}
+
 // WASM-adapted NativeSpansInterface
 class WasmSpansInterface {
   constructor (state, wasmMemory) {
@@ -165,7 +174,8 @@ class WasmSpansInterface {
       view.setBigUint64(index, BigInt(spanId), true)
       index += 8
     }
-    return this.state.flushChunk(spans.length, true, flushBuf)
+    this.state.prepareChunk(spans.length, true, flushBuf)
+    return this.state.sendPreparedChunk()
   }
 }
 
@@ -179,7 +189,12 @@ const state = new WasmSpanState(
   64 * 1024,  // change_queue_size
   10 * 1024,  // string_table_input_size
   process.pid,
-  'test-service'
+  'test-service',
+  false,       // stats_enabled
+  '',          // hostname
+  '',          // env
+  '',          // app_version
+  ''           // runtime_id
 )
 
 const iface = new WasmSpansInterface(state, wasmMemory)
@@ -193,11 +208,11 @@ const iface = new WasmSpansInterface(state, wasmMemory)
   iface.queueOp(OpCode.SetType, span.spanId, 'web')
   iface.queueOp(OpCode.SetError, span.spanId, ['i32', 0])
 
-  assert.strictEqual(state.getName(span.spanId), 'test-span')
-  assert.strictEqual(state.getServiceName(span.spanId), 'my-service')
-  assert.strictEqual(state.getResourceName(span.spanId), '/api/test')
-  assert.strictEqual(state.getType(span.spanId), 'web')
-  assert.strictEqual(state.getError(span.spanId), 0)
+  assert.strictEqual(state.getName(u64ToLE8(span.spanId)), 'test-span')
+  assert.strictEqual(state.getServiceName(u64ToLE8(span.spanId)), 'my-service')
+  assert.strictEqual(state.getResourceName(u64ToLE8(span.spanId)), '/api/test')
+  assert.strictEqual(state.getType(u64ToLE8(span.spanId)), 'web')
+  assert.strictEqual(state.getError(u64ToLE8(span.spanId)), 0)
   console.log('PASS: span creation and basic attributes')
 }
 
@@ -208,8 +223,8 @@ const iface = new WasmSpansInterface(state, wasmMemory)
   iface.queueOp(OpCode.SetMetaAttr, span.spanId, 'http.method', 'GET')
   iface.queueOp(OpCode.SetMetricAttr, span.spanId, 'http.status_code', ['f64', 200])
 
-  assert.strictEqual(state.getMetaAttr(span.spanId, 'http.method'), 'GET')
-  assert.strictEqual(state.getMetricAttr(span.spanId, 'http.status_code'), 200)
+  assert.strictEqual(state.getMetaAttr(u64ToLE8(span.spanId), 'http.method'), 'GET')
+  assert.strictEqual(state.getMetricAttr(u64ToLE8(span.spanId), 'http.status_code'), 200)
   console.log('PASS: meta and metric attributes')
 }
 
@@ -221,9 +236,9 @@ const iface = new WasmSpansInterface(state, wasmMemory)
   iface.queueOp(OpCode.SetTraceMetricsAttr, span.spanId, '_sampling_priority_v1', ['f64', 1])
   iface.queueOp(OpCode.SetTraceOrigin, span.spanId, 'synthetics')
 
-  assert.strictEqual(state.getTraceMetaAttr(span.spanId, '_dd.p.dm'), '-0')
-  assert.strictEqual(state.getTraceMetricAttr(span.spanId, '_sampling_priority_v1'), 1)
-  assert.strictEqual(state.getTraceOrigin(span.spanId), 'synthetics')
+  assert.strictEqual(state.getTraceMetaAttr(u64ToLE8(span.spanId), '_dd.p.dm'), '-0')
+  assert.strictEqual(state.getTraceMetricAttr(u64ToLE8(span.spanId), '_sampling_priority_v1'), 1)
+  assert.strictEqual(state.getTraceOrigin(u64ToLE8(span.spanId)), 'synthetics')
   console.log('PASS: trace-level attributes')
 }
 
@@ -232,7 +247,7 @@ const iface = new WasmSpansInterface(state, wasmMemory)
   iface.resetChangeQueue()
   const span = iface.createSpan()
   iface.queueOp(OpCode.SetMetaAttr, span.spanId, 'evict-key', 'evict-val')
-  assert.strictEqual(state.getMetaAttr(span.spanId, 'evict-key'), 'evict-val')
+  assert.strictEqual(state.getMetaAttr(u64ToLE8(span.spanId), 'evict-key'), 'evict-val')
 
   const keyId = iface.stringMap.get('evict-key')
   state.stringTableEvict(keyId)
@@ -257,7 +272,8 @@ server.listen(0, '127.0.0.1', async () => {
     // Create a new state pointing at the mock agent
     const flushState = new WasmSpanState(
       url, '1.0.0', 'nodejs', process.version, 'v8',
-      64 * 1024, 10 * 1024, process.pid, 'test-service'
+      64 * 1024, 10 * 1024, process.pid, 'test-service',
+      false, '', '', '', ''
     )
     const flushIface = new WasmSpansInterface(flushState, wasmMemory)
 
