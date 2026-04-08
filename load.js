@@ -23,19 +23,14 @@ function maybeLoad (name) {
 }
 
 function load (name) {
-  console.log(`WASM LOAD CALLED with ${name}`);
   const filename = find(name)
   const filenameWASM = findWASM(name)
 
   if (filename) {
-    console.log(`Successfully loaded ${filename}`);
     return runtimeRequire(filename)
   } else if (filenameWASM) {
-    console.log(`Successfully loaded WASM filename ${filenameWASM}`);
     return runtimeRequire(filenameWASM)
   }
-
-  console.log(`Couldn't load anything`);
   throw new Error(`Could not find a ${name} binary for ${PLATFORM}${LIBC}-${ARCH} nor a ${name} WASM module.`)
 }
 
