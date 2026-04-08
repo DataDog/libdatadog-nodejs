@@ -13,11 +13,11 @@ wasm-bindgen-futures = "0.4"
 js-sys = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 libdatadog-nodejs-capabilities = { path = "../capabilities" }
-libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", branch = "yannham/change-buffer-perf2" }
-libdd-data-pipeline = { git = "https://github.com/DataDog/libdatadog.git", branch = "yannham/change-buffer-perf2", default-features = false }
-libdd-trace-utils = { git = "https://github.com/DataDog/libdatadog.git", branch = "yannham/change-buffer-perf2", default-features = false, features = ["change-buffer"] }
-libdd-trace-stats = { git = "https://github.com/DataDog/libdatadog.git", branch = "yannham/change-buffer-perf2", default-features = false }
-libdd-trace-protobuf = { git = "https://github.com/DataDog/libdatadog.git", branch = "yannham/change-buffer-perf2", default-features = false }
+libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", branch = "yannham/change-buffer-perf" }
+libdd-data-pipeline = { git = "https://github.com/DataDog/libdatadog.git", branch = "yannham/change-buffer-perf", default-features = false }
+libdd-trace-utils = { git = "https://github.com/DataDog/libdatadog.git", branch = "yannham/change-buffer-perf", default-features = false, features = ["change-buffer"] }
+libdd-trace-stats = { git = "https://github.com/DataDog/libdatadog.git", branch = "yannham/change-buffer-perf", default-features = false }
+libdd-trace-protobuf = { git = "https://github.com/DataDog/libdatadog.git", branch = "yannham/change-buffer-perf", default-features = false }
 rmp-serde = "1"
 bytes = "1"
 http = "1"
