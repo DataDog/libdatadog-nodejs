@@ -162,14 +162,14 @@ impl NativeSpanState {
 
     /// Insert a string into the string table.
     #[napi]
-    pub fn string_table_insert_one(&self, key: u32, val: String) {
+    pub fn string_table_insert_one(&self, key: u16, val: String) {
         let mut inner = self.inner.borrow_mut();
         inner.cbs.string_table_insert_one(key, val.into());
     }
 
     /// Evict a string from the string table.
     #[napi]
-    pub fn string_table_evict(&self, key: u32) {
+    pub fn string_table_evict(&self, key: u16) {
         let mut inner = self.inner.borrow_mut();
         inner.cbs.string_table_evict_one(key);
     }

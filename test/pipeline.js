@@ -111,7 +111,7 @@ class NativeSpansInterface {
   constructor (options = {}) {
     this.flushBuffer = Buffer.alloc(10 * 1024)
 
-    this.cqbIndex = 8 // Start at 8 since first u64 is count
+    this.cqbIndex = 4 // Start at 4 since first u32 is count
     this.cqbCount = 0
     this.stibCount = 0
     this.stringMap = new Map()
@@ -140,14 +140,13 @@ class NativeSpansInterface {
   }
 
   resetChangeQueue () {
-    this.cqbIndex = 8
+    this.cqbIndex = 4
     this.cqbCount = 0
     // Check if WASM memory was detached/grown
     if (this._wasmMemory.buffer !== this._cqbView.buffer) {
       this._refreshViews()
     }
     this._cqbView.setUint32(0, 0, true)
-    this._cqbView.setUint32(4, 0, true)
   }
 
   flushChangeQueue () {
@@ -181,21 +180,21 @@ class NativeSpansInterface {
 
     // Check if Rust flushed the queue (wrote 0 to count position)
     if (this._cqbView.getUint32(0, true) === 0 && this.cqbCount > 0) {
-      this.cqbIndex = 8
+      this.cqbIndex = 4
       this.cqbCount = 0
     }
 
     const view = this._cqbView
-    view.setBigUint64(this.cqbIndex, BigInt(op), true)
-    this.cqbIndex += 8
+    view.setUint16(this.cqbIndex, op, true)
+    this.cqbIndex += 2
     this._writeBytesLE(spanId, this.cqbIndex)
     this.cqbIndex += 8
 
     for (const arg of args) {
       if (typeof arg === 'string') {
         const stringId = this.getStringId(arg)
-        view.setUint32(this.cqbIndex, stringId, true)
-        this.cqbIndex += 4
+        view.setUint16(this.cqbIndex, stringId, true)
+        this.cqbIndex += 2
       } else {
         const [typ, num] = arg
         switch (typ) {
@@ -228,7 +227,7 @@ class NativeSpansInterface {
     }
 
     this.cqbCount++
-    view.setBigUint64(0, BigInt(this.cqbCount), true)
+    view.setUint32(0, this.cqbCount, true)
   }
 
   createSpan (traceId, parentId) {

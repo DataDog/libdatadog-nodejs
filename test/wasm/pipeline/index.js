@@ -49,14 +49,14 @@ class WasmSpansInterface {
     const stLen = state.string_table_input_len()
     this.stringTableInputBuffer = new DataView(wasmMemory.buffer, stPtr, stLen)
 
-    this.cqbIndex = 8 // Start at 8 since first u64 is count
+    this.cqbIndex = 4 // Start at 4 since first u32 is count
     this.cqbCount = 0
     this.stibCount = 0
     this.stringMap = new Map()
   }
 
   resetChangeQueue () {
-    this.cqbIndex = 8
+    this.cqbIndex = 4
     this.cqbCount = 0
     // Zero out the change queue buffer
     const bytes = new Uint8Array(
@@ -89,15 +89,15 @@ class WasmSpansInterface {
     this.changeQueueBuffer = new DataView(this.wasmMemory.buffer, cqPtr, cqLen)
 
     // Check if Rust flushed the queue
-    const currentCount = this.changeQueueBuffer.getBigUint64(0, true)
-    if (currentCount === 0n && this.cqbCount > 0) {
-      this.cqbIndex = 8
+    const currentCount = this.changeQueueBuffer.getUint32(0, true)
+    if (currentCount === 0 && this.cqbCount > 0) {
+      this.cqbIndex = 4
       this.cqbCount = 0
     }
 
-    // Write OpCode as u64
-    this.changeQueueBuffer.setBigUint64(this.cqbIndex, BigInt(op), true)
-    this.cqbIndex += 8
+    // Write OpCode as u16
+    this.changeQueueBuffer.setUint16(this.cqbIndex, op, true)
+    this.cqbIndex += 2
     // Write SpanId as u64
     this.changeQueueBuffer.setBigUint64(this.cqbIndex, BigInt(spanId), true)
     this.cqbIndex += 8
@@ -105,8 +105,8 @@ class WasmSpansInterface {
     for (const arg of args) {
       if (typeof arg === 'string') {
         const stringId = this.getStringId(arg)
-        this.changeQueueBuffer.setUint32(this.cqbIndex, stringId, true)
-        this.cqbIndex += 4
+        this.changeQueueBuffer.setUint16(this.cqbIndex, stringId, true)
+        this.cqbIndex += 2
       } else {
         const [typ, num] = arg
         switch (typ) {
@@ -141,7 +141,7 @@ class WasmSpansInterface {
     }
 
     this.cqbCount++
-    this.changeQueueBuffer.setBigUint64(0, BigInt(this.cqbCount), true)
+    this.changeQueueBuffer.setUint32(0, this.cqbCount, true)
   }
 
   createSpan (traceId, parentId) {

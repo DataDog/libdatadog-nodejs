@@ -252,7 +252,7 @@ impl WasmSpanState {
     }
 
     #[wasm_bindgen(js_name = "stringTableInsertOne")]
-    pub fn string_table_insert_one(&self, key: u32, val: &str) {
+    pub fn string_table_insert_one(&self, key: u16, val: &str) {
         self.cbs.borrow_mut()
             .string_table_insert_one(key, val.into());
     }
@@ -296,7 +296,7 @@ impl WasmSpanState {
         let mut index: usize = 0;
         let mut remaining = count as usize;
         while remaining > 0 {
-            let key: u32 = get_num(&self.string_table_input, &mut index);
+            let key: u16 = get_num(&self.string_table_input, &mut index);
             let str_slice = &self.string_table_input[index..];
             let val = unsafe {
                 CStr::from_ptr(str_slice.as_ptr() as *const _)
@@ -313,7 +313,7 @@ impl WasmSpanState {
     }
 
     #[wasm_bindgen(js_name = "stringTableEvict")]
-    pub fn string_table_evict(&self, key: u32) {
+    pub fn string_table_evict(&self, key: u16) {
         self.cbs.borrow_mut().string_table_evict_one(key);
     }
 
@@ -449,7 +449,7 @@ pub fn get_wasm_memory() -> JsValue {
 }
 
 /// Export OpCode values as a JS object.
-/// Values match the `#[repr(u64)]` OpCode enum in libdd-trace-utils.
+/// Values match the `#[repr(u16)]` OpCode enum in libdd-trace-utils.
 #[wasm_bindgen(js_name = "getOpCodes")]
 pub fn get_op_codes() -> JsValue {
     let obj = js_sys::Object::new();
