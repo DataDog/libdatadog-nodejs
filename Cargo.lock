@@ -885,7 +885,7 @@ dependencies = [
 [[package]]
 name = "libdd-capabilities"
 version = "0.1.0"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-perf#6c2a22ffba270d828e559aa31cc125d6a1f64ad4"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-perf#bddd96d490b4f26dbbb1005f2b82a7f4c9141a09"
 dependencies = [
  "anyhow",
  "bytes",
@@ -896,7 +896,7 @@ dependencies = [
 [[package]]
 name = "libdd-capabilities-impl"
 version = "0.1.0"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-perf#6c2a22ffba270d828e559aa31cc125d6a1f64ad4"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-perf#bddd96d490b4f26dbbb1005f2b82a7f4c9141a09"
 dependencies = [
  "bytes",
  "http",
@@ -942,7 +942,7 @@ dependencies = [
 [[package]]
 name = "libdd-common"
 version = "2.0.1"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-perf#6c2a22ffba270d828e559aa31cc125d6a1f64ad4"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-perf#bddd96d490b4f26dbbb1005f2b82a7f4c9141a09"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1009,7 +1009,7 @@ dependencies = [
 [[package]]
 name = "libdd-data-pipeline"
 version = "2.0.1"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-perf#6c2a22ffba270d828e559aa31cc125d6a1f64ad4"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-perf#bddd96d490b4f26dbbb1005f2b82a7f4c9141a09"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -1046,7 +1046,7 @@ dependencies = [
 [[package]]
 name = "libdd-ddsketch"
 version = "1.0.1"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-perf#6c2a22ffba270d828e559aa31cc125d6a1f64ad4"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-perf#bddd96d490b4f26dbbb1005f2b82a7f4c9141a09"
 dependencies = [
  "prost",
 ]
@@ -1054,7 +1054,7 @@ dependencies = [
 [[package]]
 name = "libdd-dogstatsd-client"
 version = "1.0.1"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-perf#6c2a22ffba270d828e559aa31cc125d6a1f64ad4"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-perf#bddd96d490b4f26dbbb1005f2b82a7f4c9141a09"
 dependencies = [
  "anyhow",
  "cadence",
@@ -1107,7 +1107,7 @@ dependencies = [
 [[package]]
 name = "libdd-tinybytes"
 version = "1.1.0"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-perf#6c2a22ffba270d828e559aa31cc125d6a1f64ad4"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-perf#bddd96d490b4f26dbbb1005f2b82a7f4c9141a09"
 dependencies = [
  "serde",
 ]
@@ -1115,7 +1115,7 @@ dependencies = [
 [[package]]
 name = "libdd-trace-normalization"
 version = "1.0.2"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-perf#6c2a22ffba270d828e559aa31cc125d6a1f64ad4"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-perf#bddd96d490b4f26dbbb1005f2b82a7f4c9141a09"
 dependencies = [
  "anyhow",
  "libdd-trace-protobuf",
@@ -1124,7 +1124,7 @@ dependencies = [
 [[package]]
 name = "libdd-trace-protobuf"
 version = "2.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-perf#6c2a22ffba270d828e559aa31cc125d6a1f64ad4"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-perf#bddd96d490b4f26dbbb1005f2b82a7f4c9141a09"
 dependencies = [
  "prost",
  "serde",
@@ -1134,7 +1134,7 @@ dependencies = [
 [[package]]
 name = "libdd-trace-stats"
 version = "1.0.3"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-perf#6c2a22ffba270d828e559aa31cc125d6a1f64ad4"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-perf#bddd96d490b4f26dbbb1005f2b82a7f4c9141a09"
 dependencies = [
  "hashbrown 0.15.5",
  "libdd-ddsketch 1.0.1",
@@ -1145,7 +1145,7 @@ dependencies = [
 [[package]]
 name = "libdd-trace-utils"
 version = "2.0.2"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-perf#6c2a22ffba270d828e559aa31cc125d6a1f64ad4"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-perf#bddd96d490b4f26dbbb1005f2b82a7f4c9141a09"
 dependencies = [
  "anyhow",
  "bytes",
