@@ -29,5 +29,3 @@ libdd-tinybytes = { path = "/home/yannhamdaoui/dd/libdatadog-jsperf/libdd-tinyby
 libdd-trace-normalization = { path = "/home/yannhamdaoui/dd/libdatadog-jsperf/libdd-trace-normalization" }
 libdd-dogstatsd-client = { path = "/home/yannhamdaoui/dd/libdatadog-jsperf/libdd-dogstatsd-client" }
 libdd-ddsketch = { path = "/home/yannhamdaoui/dd/libdatadog-jsperf/libdd-ddsketch" }
-
-
