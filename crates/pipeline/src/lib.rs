@@ -7,9 +7,6 @@ use std::time::Duration;
 
 use wasm_bindgen::prelude::*;
 
-mod span_string;
-use span_string::*;
-
 mod span_bytes;
 
 mod trace_data;
@@ -90,8 +87,8 @@ impl WasmSpanState {
             unsafe { ChangeBuffer::from_raw_parts(change_queue.as_mut_ptr(), change_queue.len()) };
         let change_buffer_state = ChangeBufferState::new(
             change_buffer,
-            tracer_service.into(),
-            lang.into(),
+            tracer_service,
+            lang,
             pid,
         );
 
@@ -255,7 +252,7 @@ impl WasmSpanState {
             let val = pairs[i + 1]
                 .as_string()
                 .ok_or_else(|| JsValue::from_str("default meta value must be a string"))?;
-            tags.push((key.into(), val.into()));
+            tags.push((key, val));
             i += 2;
         }
         self.cbs.borrow_mut().set_default_meta(tags);
@@ -265,7 +262,7 @@ impl WasmSpanState {
     #[wasm_bindgen(js_name = "stringTableInsertOne")]
     pub fn string_table_insert_one(&self, key: u32, val: &str) {
         self.cbs.borrow_mut()
-            .string_table_insert_one(key, val.into());
+            .string_table_insert_one(key, val);
     }
 
     /// Set a meta tag using pre-resolved string table IDs.
@@ -313,7 +310,7 @@ impl WasmSpanState {
             .to_owned();
             index += val.len();
             self.cbs.borrow_mut()
-                .string_table_insert_one(key, val.into());
+                .string_table_insert_one(key, &val);
             remaining -= 1;
         }
         Ok(())
@@ -346,7 +343,6 @@ impl WasmSpanState {
         self.cbs.borrow_mut().materialize_slot(slot);
         let cbs = self.cbs.borrow();
         let span = cbs.get_span(slot).map_err(|e| JsValue::from_str(&e.to_string()))?;
-        let name: SpanString = name.into();
         Ok(span.meta.iter().find(|(k, _)| *k == name)
             .map(|(_, v)| JsValue::from_str(&v.to_string()))
             .unwrap_or(JsValue::NULL))
@@ -358,7 +354,6 @@ impl WasmSpanState {
         self.cbs.borrow_mut().materialize_slot(slot);
         let cbs = self.cbs.borrow();
         let span = cbs.get_span(slot).map_err(|e| JsValue::from_str(&e.to_string()))?;
-        let name: SpanString = name.into();
         Ok(span.metrics.iter().find(|(k, _)| *k == name)
             .map(|(_, v)| JsValue::from_f64(*v))
             .unwrap_or(JsValue::NULL))
@@ -410,7 +405,6 @@ impl WasmSpanState {
         let cbs = self.cbs.borrow();
         let trace_id = cbs.get_span(slot)
             .map_err(|e| JsValue::from_str(&e.to_string()))?.trace_id;
-        let name: SpanString = name.into();
         Ok(cbs.get_trace(&trace_id)
             .and_then(|t| t.meta.iter().find(|(k, _)| *k == name))
             .map(|(_, v)| JsValue::from_str(&v.to_string()))
@@ -423,7 +417,6 @@ impl WasmSpanState {
         let cbs = self.cbs.borrow();
         let trace_id = cbs.get_span(slot)
             .map_err(|e| JsValue::from_str(&e.to_string()))?.trace_id;
-        let name: SpanString = name.into();
         Ok(cbs.get_trace(&trace_id)
             .and_then(|t| t.metrics.iter().find(|(k, _)| *k == name))
             .map(|(_, v)| JsValue::from_f64(*v))

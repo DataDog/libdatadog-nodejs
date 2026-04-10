@@ -11,12 +11,12 @@ crate-type = ["cdylib"]
 napi = { version = "2", features = ["async", "serde-json"] }
 napi-derive = "2"
 serde = { version = "1.0", features = ["derive"] }
-libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", branch = "yannham/change-buffer-alloc" }
-libdd-capabilities-impl = { git = "https://github.com/DataDog/libdatadog.git", branch = "yannham/change-buffer-alloc" }
-libdd-data-pipeline = { git = "https://github.com/DataDog/libdatadog.git", branch = "yannham/change-buffer-alloc", default-features = false }
-libdd-trace-utils = { git = "https://github.com/DataDog/libdatadog.git", branch = "yannham/change-buffer-alloc", default-features = false, features = ["change-buffer"] }
-libdd-trace-stats = { git = "https://github.com/DataDog/libdatadog.git", branch = "yannham/change-buffer-alloc", default-features = false }
-libdd-trace-protobuf = { git = "https://github.com/DataDog/libdatadog.git", branch = "yannham/change-buffer-alloc", default-features = false }
+libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", branch = "yannham/change-buffer-noarc" }
+libdd-capabilities-impl = { git = "https://github.com/DataDog/libdatadog.git", branch = "yannham/change-buffer-noarc" }
+libdd-data-pipeline = { git = "https://github.com/DataDog/libdatadog.git", branch = "yannham/change-buffer-noarc", default-features = false }
+libdd-trace-utils = { git = "https://github.com/DataDog/libdatadog.git", branch = "yannham/change-buffer-noarc", default-features = false, features = ["change-buffer"] }
+libdd-trace-stats = { git = "https://github.com/DataDog/libdatadog.git", branch = "yannham/change-buffer-noarc", default-features = false }
+libdd-trace-protobuf = { git = "https://github.com/DataDog/libdatadog.git", branch = "yannham/change-buffer-noarc", default-features = false }
 rmp-serde = "1"
 bytes = "1"
 http = "1"

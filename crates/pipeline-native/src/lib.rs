@@ -9,9 +9,6 @@ use napi_derive::napi;
 
 use libdd_trace_utils::change_buffer::{ChangeBuffer, ChangeBufferState};
 
-mod span_string;
-use span_string::*;
-
 mod span_bytes;
 
 mod trace_data;
@@ -91,8 +88,8 @@ impl NativeSpanState {
         };
         let change_buffer_state = ChangeBufferState::new(
             change_buffer,
-            tracer_service.into(),
-            lang.into(),
+            &tracer_service,
+            &lang,
             pid,
         );
 
@@ -164,7 +161,7 @@ impl NativeSpanState {
     #[napi]
     pub fn string_table_insert_one(&self, key: u32, val: String) {
         let mut inner = self.inner.borrow_mut();
-        inner.cbs.string_table_insert_one(key, val.into());
+        inner.cbs.string_table_insert_one(key, &val);
     }
 
     /// Evict a string from the string table.
@@ -247,8 +244,7 @@ impl NativeSpanState {
         inner.cbs.flush_change_buffer().map_err(|e| Error::from_reason(e.to_string()))?;
         inner.cbs.materialize_slot(slot);
         let span = inner.cbs.get_span(slot).map_err(|e| Error::from_reason(e.to_string()))?;
-        let key: NativeSpanString = name.into();
-        Ok(span.meta.iter().find(|(k, _)| *k == key).map(|(_, v)| v.to_string()))
+        Ok(span.meta.iter().find(|(k, _)| *k == name.as_str()).map(|(_, v)| v.to_string()))
     }
 
     #[napi]
@@ -257,7 +253,6 @@ impl NativeSpanState {
         inner.cbs.flush_change_buffer().map_err(|e| Error::from_reason(e.to_string()))?;
         inner.cbs.materialize_slot(slot);
         let span = inner.cbs.get_span(slot).map_err(|e| Error::from_reason(e.to_string()))?;
-        let key: NativeSpanString = name.into();
-        Ok(span.metrics.iter().find(|(k, _)| *k == key).map(|(_, v)| *v))
+        Ok(span.metrics.iter().find(|(k, _)| *k == name.as_str()).map(|(_, v)| *v))
     }
 }
