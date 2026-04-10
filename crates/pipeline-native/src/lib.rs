@@ -10,7 +10,6 @@ use napi_derive::napi;
 use libdd_trace_utils::change_buffer::{ChangeBuffer, ChangeBufferState};
 
 mod span_string;
-use span_string::*;
 
 mod span_bytes;
 
@@ -248,8 +247,9 @@ impl NativeSpanState {
         inner.cbs.flush_change_buffer().map_err(|e| Error::from_reason(e.to_string()))?;
         let span_id = parse_span_id(&id)?;
         let span = inner.cbs.get_span(&span_id).map_err(|e| Error::from_reason(e.to_string()))?;
-        let key: NativeSpanString = name.into();
-        Ok(span.meta.get(&key).map(|v| v.to_string()))
+        // NativeSpanString: Borrow<str> with content-based Hash, so &str lookup
+        // works correctly without constructing a temporary NativeSpanString.
+        Ok(span.meta.get(name.as_str()).map(|v| v.to_string()))
     }
 
     #[napi]
@@ -258,8 +258,7 @@ impl NativeSpanState {
         inner.cbs.flush_change_buffer().map_err(|e| Error::from_reason(e.to_string()))?;
         let span_id = parse_span_id(&id)?;
         let span = inner.cbs.get_span(&span_id).map_err(|e| Error::from_reason(e.to_string()))?;
-        let key: NativeSpanString = name.into();
-        Ok(span.metrics.get(&key).copied())
+        Ok(span.metrics.get(name.as_str()).copied())
     }
 }
 

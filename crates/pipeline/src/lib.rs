@@ -351,9 +351,10 @@ impl WasmSpanState {
     #[wasm_bindgen(js_name = "getMetaAttr")]
     pub fn get_meta_attr(&self, id: &[u8], name: &str) -> Result<JsValue, JsValue> {
         self.flush_change_queue()?;
-        let name: SpanString = name.into();
         self.with_span(id, |s| {
-            s.meta.get(&name)
+            // SpanString: Borrow<str> with content-based Hash, so &str lookup
+            // works correctly without constructing a temporary SpanString.
+            s.meta.get(name)
                 .map(|v| JsValue::from_str(&v.to_string()))
                 .unwrap_or(JsValue::NULL)
         })
@@ -362,9 +363,8 @@ impl WasmSpanState {
     #[wasm_bindgen(js_name = "getMetricAttr")]
     pub fn get_metric_attr(&self, id: &[u8], name: &str) -> Result<JsValue, JsValue> {
         self.flush_change_queue()?;
-        let name: SpanString = name.into();
         self.with_span(id, |s| {
-            s.metrics.get(&name)
+            s.metrics.get(name)
                 .map(|v| JsValue::from_f64(*v))
                 .unwrap_or(JsValue::NULL)
         })
@@ -407,9 +407,8 @@ impl WasmSpanState {
         let cbs = self.cbs.borrow();
         let trace_id = cbs.get_span(&span_id)
             .map_err(|e| JsValue::from_str(&e.to_string()))?.trace_id;
-        let name: SpanString = name.into();
         Ok(cbs.get_trace(&trace_id)
-            .and_then(|t| t.meta.get(&name))
+            .and_then(|t| t.meta.get(name))
             .map(|v| JsValue::from_str(&v.to_string()))
             .unwrap_or(JsValue::NULL))
     }
@@ -421,9 +420,8 @@ impl WasmSpanState {
         let cbs = self.cbs.borrow();
         let trace_id = cbs.get_span(&span_id)
             .map_err(|e| JsValue::from_str(&e.to_string()))?.trace_id;
-        let name: SpanString = name.into();
         Ok(cbs.get_trace(&trace_id)
-            .and_then(|t| t.metrics.get(&name))
+            .and_then(|t| t.metrics.get(name))
             .map(|v| JsValue::from_f64(*v))
             .unwrap_or(JsValue::NULL))
     }

@@ -11,6 +11,7 @@ crate-type = ["cdylib"]
 napi = { version = "2", features = ["async", "serde-json"] }
 napi-derive = "2"
 serde = { version = "1.0", features = ["derive"] }
+bumpalo = "3"
 libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", branch = "yannham/change-buffer-alloc" }
 libdd-capabilities-impl = { git = "https://github.com/DataDog/libdatadog.git", branch = "yannham/change-buffer-alloc" }
 libdd-data-pipeline = { git = "https://github.com/DataDog/libdatadog.git", branch = "yannham/change-buffer-alloc", default-features = false }

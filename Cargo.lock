@@ -876,7 +876,7 @@ dependencies = [
  "futures-core",
  "http",
  "js-sys",
- "libdd-capabilities",
+ "libdd-capabilities 0.1.0 (git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer)",
  "serde_json",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -895,16 +895,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "libdd-capabilities"
+version = "0.1.0"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc#8e33f619ccc4136bbb92ac13d241e3cd633b7bfe"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "http",
+ "thiserror",
+]
+
+[[package]]
 name = "libdd-capabilities-impl"
 version = "0.1.0"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer#8e33f619ccc4136bbb92ac13d241e3cd633b7bfe"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc#8e33f619ccc4136bbb92ac13d241e3cd633b7bfe"
 dependencies = [
  "bytes",
  "http",
  "http-body-util",
  "hyper",
- "libdd-capabilities",
- "libdd-common 2.0.1",
+ "libdd-capabilities 0.1.0 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
+ "libdd-common 2.0.1 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
 ]
 
 [[package]]
@@ -957,10 +968,41 @@ dependencies = [
  "http-body",
  "http-body-util",
  "hyper",
+ "hyper-util",
+ "libc",
+ "libdd-capabilities 0.1.0 (git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer)",
+ "nix 0.29.0",
+ "pin-project",
+ "regex",
+ "serde",
+ "static_assertions",
+ "thiserror",
+ "tokio",
+ "tower-service",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "libdd-common"
+version = "2.0.1"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc#8e33f619ccc4136bbb92ac13d241e3cd633b7bfe"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "cc",
+ "const_format",
+ "futures",
+ "futures-core",
+ "futures-util",
+ "hex",
+ "http",
+ "http-body",
+ "http-body-util",
+ "hyper",
  "hyper-rustls",
  "hyper-util",
  "libc",
- "libdd-capabilities",
+ "libdd-capabilities 0.1.0 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
  "nix 0.29.0",
  "pin-project",
  "regex",
@@ -1018,14 +1060,43 @@ dependencies = [
  "either",
  "http",
  "http-body-util",
- "libdd-capabilities",
- "libdd-common 2.0.1",
- "libdd-ddsketch 1.0.1",
- "libdd-dogstatsd-client",
- "libdd-tinybytes",
- "libdd-trace-protobuf",
- "libdd-trace-stats",
- "libdd-trace-utils",
+ "libdd-capabilities 0.1.0 (git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer)",
+ "libdd-common 2.0.1 (git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer)",
+ "libdd-ddsketch 1.0.1 (git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer)",
+ "libdd-dogstatsd-client 1.0.1 (git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer)",
+ "libdd-tinybytes 1.1.0 (git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer)",
+ "libdd-trace-protobuf 2.0.0 (git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer)",
+ "libdd-trace-stats 1.0.3 (git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer)",
+ "libdd-trace-utils 2.0.2 (git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer)",
+ "rmp-serde",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "libdd-data-pipeline"
+version = "2.0.1"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc#8e33f619ccc4136bbb92ac13d241e3cd633b7bfe"
+dependencies = [
+ "anyhow",
+ "arc-swap",
+ "bytes",
+ "either",
+ "http",
+ "http-body-util",
+ "libdd-capabilities 0.1.0 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
+ "libdd-common 2.0.1 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
+ "libdd-ddsketch 1.0.1 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
+ "libdd-dogstatsd-client 1.0.1 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
+ "libdd-tinybytes 1.1.0 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
+ "libdd-trace-protobuf 2.0.0 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
+ "libdd-trace-stats 1.0.3 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
+ "libdd-trace-utils 2.0.2 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
  "rmp-serde",
  "serde",
  "serde_json",
@@ -1053,6 +1124,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "libdd-ddsketch"
+version = "1.0.1"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc#8e33f619ccc4136bbb92ac13d241e3cd633b7bfe"
+dependencies = [
+ "prost",
+]
+
+[[package]]
 name = "libdd-dogstatsd-client"
 version = "1.0.1"
 source = "git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer#8e33f619ccc4136bbb92ac13d241e3cd633b7bfe"
@@ -1060,7 +1139,20 @@ dependencies = [
  "anyhow",
  "cadence",
  "http",
- "libdd-common 2.0.1",
+ "libdd-common 2.0.1 (git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer)",
+ "serde",
+ "tracing",
+]
+
+[[package]]
+name = "libdd-dogstatsd-client"
+version = "1.0.1"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc#8e33f619ccc4136bbb92ac13d241e3cd633b7bfe"
+dependencies = [
+ "anyhow",
+ "cadence",
+ "http",
+ "libdd-common 2.0.1 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
  "serde",
  "tracing",
 ]
@@ -1114,12 +1206,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "libdd-tinybytes"
+version = "1.1.0"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc#8e33f619ccc4136bbb92ac13d241e3cd633b7bfe"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "libdd-trace-normalization"
 version = "1.0.2"
 source = "git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer#8e33f619ccc4136bbb92ac13d241e3cd633b7bfe"
 dependencies = [
  "anyhow",
- "libdd-trace-protobuf",
+ "libdd-trace-protobuf 2.0.0 (git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer)",
+]
+
+[[package]]
+name = "libdd-trace-normalization"
+version = "1.0.2"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc#8e33f619ccc4136bbb92ac13d241e3cd633b7bfe"
+dependencies = [
+ "anyhow",
+ "libdd-trace-protobuf 2.0.0 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
 ]
 
 [[package]]
@@ -1133,14 +1242,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "libdd-trace-protobuf"
+version = "2.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc#8e33f619ccc4136bbb92ac13d241e3cd633b7bfe"
+dependencies = [
+ "prost",
+ "serde",
+ "serde_bytes",
+]
+
+[[package]]
 name = "libdd-trace-stats"
 version = "1.0.3"
 source = "git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer#8e33f619ccc4136bbb92ac13d241e3cd633b7bfe"
 dependencies = [
  "hashbrown 0.15.5",
- "libdd-ddsketch 1.0.1",
- "libdd-trace-protobuf",
- "libdd-trace-utils",
+ "libdd-ddsketch 1.0.1 (git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer)",
+ "libdd-trace-protobuf 2.0.0 (git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer)",
+ "libdd-trace-utils 2.0.2 (git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer)",
+]
+
+[[package]]
+name = "libdd-trace-stats"
+version = "1.0.3"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc#8e33f619ccc4136bbb92ac13d241e3cd633b7bfe"
+dependencies = [
+ "hashbrown 0.15.5",
+ "libdd-ddsketch 1.0.1 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
+ "libdd-trace-protobuf 2.0.0 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
+ "libdd-trace-utils 2.0.2 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
 ]
 
 [[package]]
@@ -1155,11 +1285,40 @@ dependencies = [
  "http-body",
  "http-body-util",
  "indexmap",
- "libdd-capabilities",
- "libdd-common 2.0.1",
- "libdd-tinybytes",
- "libdd-trace-normalization",
- "libdd-trace-protobuf",
+ "libdd-capabilities 0.1.0 (git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer)",
+ "libdd-common 2.0.1 (git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer)",
+ "libdd-tinybytes 1.1.0 (git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer)",
+ "libdd-trace-normalization 1.0.2 (git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer)",
+ "libdd-trace-protobuf 2.0.0 (git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer)",
+ "prost",
+ "rand",
+ "rmp",
+ "rmp-serde",
+ "rmpv",
+ "rustc-hash",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "libdd-trace-utils"
+version = "2.0.2"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc#8e33f619ccc4136bbb92ac13d241e3cd633b7bfe"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "futures",
+ "http",
+ "http-body",
+ "http-body-util",
+ "indexmap",
+ "libdd-capabilities 0.1.0 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
+ "libdd-common 2.0.1 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
+ "libdd-tinybytes 1.1.0 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
+ "libdd-trace-normalization 1.0.2 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
+ "libdd-trace-protobuf 2.0.0 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
  "prost",
  "rand",
  "rmp",
@@ -1715,17 +1874,18 @@ checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 name = "pipeline"
 version = "0.1.0"
 dependencies = [
+ "bumpalo",
  "bytes",
  "console_error_panic_hook",
  "getrandom 0.2.17",
  "http",
  "js-sys",
  "libdatadog-nodejs-capabilities",
- "libdd-capabilities",
- "libdd-data-pipeline",
- "libdd-trace-protobuf",
- "libdd-trace-stats",
- "libdd-trace-utils",
+ "libdd-capabilities 0.1.0 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
+ "libdd-data-pipeline 2.0.1 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
+ "libdd-trace-protobuf 2.0.0 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
+ "libdd-trace-stats 1.0.3 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
+ "libdd-trace-utils 2.0.2 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
  "rmp-serde",
  "serde",
  "uuid",
@@ -1738,14 +1898,15 @@ dependencies = [
 name = "pipeline-native"
 version = "0.1.0"
 dependencies = [
+ "bumpalo",
  "bytes",
  "http",
- "libdd-capabilities",
+ "libdd-capabilities 0.1.0 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
  "libdd-capabilities-impl",
- "libdd-data-pipeline",
- "libdd-trace-protobuf",
- "libdd-trace-stats",
- "libdd-trace-utils",
+ "libdd-data-pipeline 2.0.1 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
+ "libdd-trace-protobuf 2.0.0 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
+ "libdd-trace-stats 1.0.3 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
+ "libdd-trace-utils 2.0.2 (git+https://github.com/DataDog/libdatadog.git?branch=yannham%2Fchange-buffer-alloc)",
  "napi 2.16.17",
  "napi-build",
  "napi-derive 2.16.13",
@@ -2387,8 +2548,8 @@ dependencies = [
  "getrandom 0.2.17",
  "js-sys",
  "libdatadog-nodejs-capabilities",
- "libdd-capabilities",
- "libdd-data-pipeline",
+ "libdd-capabilities 0.1.0 (git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer)",
+ "libdd-data-pipeline 2.0.1 (git+https://github.com/DataDog/libdatadog.git?branch=bengl%2Fcapability-on-change-buffer)",
  "uuid",
  "wasm-bindgen",
  "wasm-bindgen-futures",
