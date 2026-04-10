@@ -19,6 +19,17 @@ mod stats;
 
 use libdd_trace_utils::change_buffer::{ChangeBuffer, ChangeBufferState};
 
+/// Insert or update a key-value pair in a Vec-based associative array.
+fn vec_insert<K: PartialEq, V>(vec: &mut Vec<(K, V)>, key: K, value: V) {
+    for entry in vec.iter_mut() {
+        if entry.0 == key {
+            entry.1 = value;
+            return;
+        }
+    }
+    vec.push((key, value));
+}
+
 mod utils;
 use utils::*;
 
@@ -152,16 +163,16 @@ impl WasmSpanState {
 
         let mut count = len;
         let mut index = 0;
-        let mut span_ids = Vec::with_capacity(count as usize);
+        let mut slots = Vec::with_capacity(count as usize);
         while count > 0 {
-            let span_id: u64 = get_num(chunk, &mut index);
-            span_ids.push(span_id);
+            let slot: u32 = get_num(chunk, &mut index);
+            slots.push(slot);
             count -= 1;
         }
 
         let spans_vec = self
             .cbs.borrow_mut()
-            .flush_chunk(span_ids, first_is_local_root)
+            .flush_chunk(slots, first_is_local_root)
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
         if let Some(collector) = self.stats_collector.borrow_mut().as_mut() {
@@ -260,8 +271,7 @@ impl WasmSpanState {
     /// Set a meta tag using pre-resolved string table IDs.
     /// No string marshalling — just integer args. Bypasses the change buffer.
     #[wasm_bindgen(js_name = "setMetaById")]
-    pub fn set_meta_by_id(&self, id: &[u8], key_id: u32, val_id: u32) -> Result<(), JsValue> {
-        let span_id = Self::parse_span_id(id)?;
+    pub fn set_meta_by_id(&self, slot: u32, key_id: u32, val_id: u32) -> Result<(), JsValue> {
         let mut cbs = self.cbs.borrow_mut();
         let key = cbs
             .get_string(key_id)
@@ -269,25 +279,22 @@ impl WasmSpanState {
         let val = cbs
             .get_string(val_id)
             .ok_or_else(|| JsValue::from_str("value string not found"))?;
-        cbs.span_mut(&span_id)
-            .map_err(|e| JsValue::from_str(&e.to_string()))?
-            .meta
-            .insert(key, val);
+        let span = cbs.span_mut(&slot)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        vec_insert(&mut span.meta, key, val);
         Ok(())
     }
 
     /// Set a metric tag using a pre-resolved string table ID for the key.
     #[wasm_bindgen(js_name = "setMetricById")]
-    pub fn set_metric_by_id(&self, id: &[u8], key_id: u32, val: f64) -> Result<(), JsValue> {
-        let span_id = Self::parse_span_id(id)?;
+    pub fn set_metric_by_id(&self, slot: u32, key_id: u32, val: f64) -> Result<(), JsValue> {
         let mut cbs = self.cbs.borrow_mut();
         let key = cbs
             .get_string(key_id)
             .ok_or_else(|| JsValue::from_str("key string not found"))?;
-        cbs.span_mut(&span_id)
-            .map_err(|e| JsValue::from_str(&e.to_string()))?
-            .metrics
-            .insert(key, val);
+        let span = cbs.span_mut(&slot)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        vec_insert(&mut span.metrics, key, val);
         Ok(())
     }
 
@@ -317,123 +324,117 @@ impl WasmSpanState {
         self.cbs.borrow_mut().string_table_evict_one(key);
     }
 
-    fn parse_span_id(id: &[u8]) -> Result<u64, JsValue> {
-        let bytes: [u8; 8] = id
-            .try_into()
-            .map_err(|_| JsValue::from_str("span ID must be exactly 8 bytes"))?;
-        Ok(u64::from_le_bytes(bytes))
-    }
-
-    fn with_span<R>(
-        &self,
-        id: &[u8],
-        f: impl FnOnce(&libdd_trace_utils::span::v04::Span<WasmTraceData>) -> R,
-    ) -> Result<R, JsValue> {
-        let span_id = Self::parse_span_id(id)?;
-        let cbs = self.cbs.borrow();
-        let span = cbs.get_span(&span_id)
-            .map_err(|e| JsValue::from_str(&e.to_string()))?;
-        Ok(f(span))
-    }
-
     #[wasm_bindgen(js_name = "getServiceName")]
-    pub fn get_service_name(&self, id: &[u8]) -> Result<String, JsValue> {
+    pub fn get_service_name(&self, slot: u32) -> Result<String, JsValue> {
         self.flush_change_queue()?;
-        self.with_span(id, |s| s.service.to_string())
+        let cbs = self.cbs.borrow();
+        let span = cbs.get_span(slot).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        Ok(span.service.to_string())
     }
 
     #[wasm_bindgen(js_name = "getResourceName")]
-    pub fn get_resource_name(&self, id: &[u8]) -> Result<String, JsValue> {
+    pub fn get_resource_name(&self, slot: u32) -> Result<String, JsValue> {
         self.flush_change_queue()?;
-        self.with_span(id, |s| s.resource.to_string())
+        let cbs = self.cbs.borrow();
+        let span = cbs.get_span(slot).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        Ok(span.resource.to_string())
     }
 
     #[wasm_bindgen(js_name = "getMetaAttr")]
-    pub fn get_meta_attr(&self, id: &[u8], name: &str) -> Result<JsValue, JsValue> {
+    pub fn get_meta_attr(&self, slot: u32, name: &str) -> Result<JsValue, JsValue> {
         self.flush_change_queue()?;
+        self.cbs.borrow_mut().materialize_slot(slot);
+        let cbs = self.cbs.borrow();
+        let span = cbs.get_span(slot).map_err(|e| JsValue::from_str(&e.to_string()))?;
         let name: SpanString = name.into();
-        self.with_span(id, |s| {
-            s.meta.get(&name)
-                .map(|v| JsValue::from_str(&v.to_string()))
-                .unwrap_or(JsValue::NULL)
-        })
+        Ok(span.meta.iter().find(|(k, _)| *k == name)
+            .map(|(_, v)| JsValue::from_str(&v.to_string()))
+            .unwrap_or(JsValue::NULL))
     }
 
     #[wasm_bindgen(js_name = "getMetricAttr")]
-    pub fn get_metric_attr(&self, id: &[u8], name: &str) -> Result<JsValue, JsValue> {
+    pub fn get_metric_attr(&self, slot: u32, name: &str) -> Result<JsValue, JsValue> {
         self.flush_change_queue()?;
+        self.cbs.borrow_mut().materialize_slot(slot);
+        let cbs = self.cbs.borrow();
+        let span = cbs.get_span(slot).map_err(|e| JsValue::from_str(&e.to_string()))?;
         let name: SpanString = name.into();
-        self.with_span(id, |s| {
-            s.metrics.get(&name)
-                .map(|v| JsValue::from_f64(*v))
-                .unwrap_or(JsValue::NULL)
-        })
+        Ok(span.metrics.iter().find(|(k, _)| *k == name)
+            .map(|(_, v)| JsValue::from_f64(*v))
+            .unwrap_or(JsValue::NULL))
     }
 
     #[wasm_bindgen(js_name = "getError")]
-    pub fn get_error(&self, id: &[u8]) -> Result<i32, JsValue> {
+    pub fn get_error(&self, slot: u32) -> Result<i32, JsValue> {
         self.flush_change_queue()?;
-        self.with_span(id, |s| s.error)
+        let cbs = self.cbs.borrow();
+        let span = cbs.get_span(slot).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        Ok(span.error)
     }
 
     #[wasm_bindgen(js_name = "getStart")]
-    pub fn get_start(&self, id: &[u8]) -> Result<f64, JsValue> {
+    pub fn get_start(&self, slot: u32) -> Result<f64, JsValue> {
         self.flush_change_queue()?;
-        self.with_span(id, |s| s.start as f64)
+        let cbs = self.cbs.borrow();
+        let span = cbs.get_span(slot).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        Ok(span.start as f64)
     }
 
     #[wasm_bindgen(js_name = "getDuration")]
-    pub fn get_duration(&self, id: &[u8]) -> Result<f64, JsValue> {
+    pub fn get_duration(&self, slot: u32) -> Result<f64, JsValue> {
         self.flush_change_queue()?;
-        self.with_span(id, |s| s.duration as f64)
+        let cbs = self.cbs.borrow();
+        let span = cbs.get_span(slot).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        Ok(span.duration as f64)
     }
 
     #[wasm_bindgen(js_name = "getType")]
-    pub fn get_type(&self, id: &[u8]) -> Result<String, JsValue> {
+    pub fn get_type(&self, slot: u32) -> Result<String, JsValue> {
         self.flush_change_queue()?;
-        self.with_span(id, |s| s.r#type.to_string())
+        let cbs = self.cbs.borrow();
+        let span = cbs.get_span(slot).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        Ok(span.r#type.to_string())
     }
 
     #[wasm_bindgen(js_name = "getName")]
-    pub fn get_name(&self, id: &[u8]) -> Result<String, JsValue> {
+    pub fn get_name(&self, slot: u32) -> Result<String, JsValue> {
         self.flush_change_queue()?;
-        self.with_span(id, |s| s.name.to_string())
+        let cbs = self.cbs.borrow();
+        let span = cbs.get_span(slot).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        Ok(span.name.to_string())
     }
 
     #[wasm_bindgen(js_name = "getTraceMetaAttr")]
-    pub fn get_trace_meta_attr(&self, id: &[u8], name: &str) -> Result<JsValue, JsValue> {
+    pub fn get_trace_meta_attr(&self, slot: u32, name: &str) -> Result<JsValue, JsValue> {
         self.flush_change_queue()?;
-        let span_id = Self::parse_span_id(id)?;
         let cbs = self.cbs.borrow();
-        let trace_id = cbs.get_span(&span_id)
+        let trace_id = cbs.get_span(slot)
             .map_err(|e| JsValue::from_str(&e.to_string()))?.trace_id;
         let name: SpanString = name.into();
         Ok(cbs.get_trace(&trace_id)
-            .and_then(|t| t.meta.get(&name))
-            .map(|v| JsValue::from_str(&v.to_string()))
+            .and_then(|t| t.meta.iter().find(|(k, _)| *k == name))
+            .map(|(_, v)| JsValue::from_str(&v.to_string()))
             .unwrap_or(JsValue::NULL))
     }
 
     #[wasm_bindgen(js_name = "getTraceMetricAttr")]
-    pub fn get_trace_metric_attr(&self, id: &[u8], name: &str) -> Result<JsValue, JsValue> {
+    pub fn get_trace_metric_attr(&self, slot: u32, name: &str) -> Result<JsValue, JsValue> {
         self.flush_change_queue()?;
-        let span_id = Self::parse_span_id(id)?;
         let cbs = self.cbs.borrow();
-        let trace_id = cbs.get_span(&span_id)
+        let trace_id = cbs.get_span(slot)
             .map_err(|e| JsValue::from_str(&e.to_string()))?.trace_id;
         let name: SpanString = name.into();
         Ok(cbs.get_trace(&trace_id)
-            .and_then(|t| t.metrics.get(&name))
-            .map(|v| JsValue::from_f64(*v))
+            .and_then(|t| t.metrics.iter().find(|(k, _)| *k == name))
+            .map(|(_, v)| JsValue::from_f64(*v))
             .unwrap_or(JsValue::NULL))
     }
 
     #[wasm_bindgen(js_name = "getTraceOrigin")]
-    pub fn get_trace_origin(&self, id: &[u8]) -> Result<JsValue, JsValue> {
+    pub fn get_trace_origin(&self, slot: u32) -> Result<JsValue, JsValue> {
         self.flush_change_queue()?;
-        let span_id = Self::parse_span_id(id)?;
         let cbs = self.cbs.borrow();
-        let trace_id = cbs.get_span(&span_id)
+        let trace_id = cbs.get_span(slot)
             .map_err(|e| JsValue::from_str(&e.to_string()))?.trace_id;
         Ok(cbs.get_trace(&trace_id)
             .and_then(|t| t.origin.as_ref())

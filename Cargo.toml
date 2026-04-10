@@ -13,8 +13,21 @@ codegen-units = 1
 lto = true
 opt-level = "z"
 panic = "abort"
-strip = true
+strip = "none"
+debug = 1
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[patch."https://github.com/DataDog/libdatadog.git"]
+libdd-trace-utils = { path = "/Users/bryan.english/libdatadog-local/libdd-trace-utils" }
+libdd-capabilities = { path = "/Users/bryan.english/libdatadog-local/libdd-capabilities" }
+libdd-data-pipeline = { path = "/Users/bryan.english/libdatadog-local/libdd-data-pipeline" }
+libdd-trace-protobuf = { path = "/Users/bryan.english/libdatadog-local/libdd-trace-protobuf" }
+libdd-trace-stats = { path = "/Users/bryan.english/libdatadog-local/libdd-trace-stats" }
+libdd-common = { path = "/Users/bryan.english/libdatadog-local/libdd-common" }
+libdd-tinybytes = { path = "/Users/bryan.english/libdatadog-local/libdd-tinybytes" }
+libdd-trace-normalization = { path = "/Users/bryan.english/libdatadog-local/libdd-trace-normalization" }
+libdd-dogstatsd-client = { path = "/Users/bryan.english/libdatadog-local/libdd-dogstatsd-client" }
+libdd-ddsketch = { path = "/Users/bryan.english/libdatadog-local/libdd-ddsketch" }
 
 

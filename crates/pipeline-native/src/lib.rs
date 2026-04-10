@@ -189,15 +189,15 @@ impl NativeSpanState {
 
         let mut count = len;
         let mut index = 0;
-        let mut span_ids = Vec::with_capacity(count as usize);
+        let mut slots = Vec::with_capacity(count as usize);
         while count > 0 {
-            let span_id: u64 = get_num(&chunk, &mut index);
-            span_ids.push(span_id);
+            let slot: u32 = get_num(&chunk, &mut index);
+            slots.push(slot);
             count -= 1;
         }
 
         let spans_vec = inner.cbs
-            .flush_chunk(span_ids, first_is_local_root)
+            .flush_chunk(slots, first_is_local_root)
             .map_err(|e| Error::from_reason(e.to_string()))?;
 
         self.prepared_chunks.borrow_mut().push(spans_vec);
@@ -234,38 +234,30 @@ impl NativeSpanState {
     // -- Getter methods --
 
     #[napi]
-    pub fn get_service_name(&self, id: Buffer) -> Result<String> {
+    pub fn get_service_name(&self, slot: u32) -> Result<String> {
         let mut inner = self.inner.borrow_mut();
         inner.cbs.flush_change_buffer().map_err(|e| Error::from_reason(e.to_string()))?;
-        let span_id = parse_span_id(&id)?;
-        let span = inner.cbs.get_span(&span_id).map_err(|e| Error::from_reason(e.to_string()))?;
+        let span = inner.cbs.get_span(slot).map_err(|e| Error::from_reason(e.to_string()))?;
         Ok(span.service.to_string())
     }
 
     #[napi]
-    pub fn get_meta_attr(&self, id: Buffer, name: String) -> Result<Option<String>> {
+    pub fn get_meta_attr(&self, slot: u32, name: String) -> Result<Option<String>> {
         let mut inner = self.inner.borrow_mut();
         inner.cbs.flush_change_buffer().map_err(|e| Error::from_reason(e.to_string()))?;
-        let span_id = parse_span_id(&id)?;
-        let span = inner.cbs.get_span(&span_id).map_err(|e| Error::from_reason(e.to_string()))?;
+        inner.cbs.materialize_slot(slot);
+        let span = inner.cbs.get_span(slot).map_err(|e| Error::from_reason(e.to_string()))?;
         let key: NativeSpanString = name.into();
-        Ok(span.meta.get(&key).map(|v| v.to_string()))
+        Ok(span.meta.iter().find(|(k, _)| *k == key).map(|(_, v)| v.to_string()))
     }
 
     #[napi]
-    pub fn get_metric_attr(&self, id: Buffer, name: String) -> Result<Option<f64>> {
+    pub fn get_metric_attr(&self, slot: u32, name: String) -> Result<Option<f64>> {
         let mut inner = self.inner.borrow_mut();
         inner.cbs.flush_change_buffer().map_err(|e| Error::from_reason(e.to_string()))?;
-        let span_id = parse_span_id(&id)?;
-        let span = inner.cbs.get_span(&span_id).map_err(|e| Error::from_reason(e.to_string()))?;
+        inner.cbs.materialize_slot(slot);
+        let span = inner.cbs.get_span(slot).map_err(|e| Error::from_reason(e.to_string()))?;
         let key: NativeSpanString = name.into();
-        Ok(span.metrics.get(&key).copied())
+        Ok(span.metrics.iter().find(|(k, _)| *k == key).map(|(_, v)| *v))
     }
-}
-
-fn parse_span_id(id: &[u8]) -> Result<u64> {
-    let bytes: [u8; 8] = id
-        .try_into()
-        .map_err(|_| Error::from_reason("span ID must be exactly 8 bytes"))?;
-    Ok(u64::from_le_bytes(bytes))
 }
