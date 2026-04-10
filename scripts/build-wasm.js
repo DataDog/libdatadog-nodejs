@@ -14,7 +14,7 @@ const os = require('os');
 const childProcess = require('child_process');
 
 const isMacOS = os.platform() === 'darwin';
-const noWasmOpt = isMacOS ? '--no-opt' : '';
+const noWasmOpt = '--no-opt';
 const library = process.argv[2];
 
 const env = {
