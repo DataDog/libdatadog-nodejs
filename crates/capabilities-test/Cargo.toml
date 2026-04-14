@@ -1,0 +1,16 @@
+[package]
+name = "capabilities-test"
+version = "0.1.0"
+edition = "2021"
+description = "Wasm test harness for SpawnCapability and SleepCapability"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+libdatadog-nodejs-capabilities = { path = "../capabilities" }
+libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", branch = "jwiriath/runtime-capability" }
+console_error_panic_hook = "0.1"

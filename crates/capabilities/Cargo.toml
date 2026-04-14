@@ -15,8 +15,9 @@ serde_json = "1.0"
 http = "1"
 bytes = "1.4"
 futures-core = "0.3"
+futures-util = { version = "0.3", default-features = false, features = ["alloc", "channel"] }
 anyhow = "1"
-libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", branch = "jwiriath/capability-traits-architecture" }
+libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", branch = "jwiriath/runtime-capability" }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

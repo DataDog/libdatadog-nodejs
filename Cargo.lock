@@ -49,9 +49,9 @@ checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
 name = "arc-swap"
-version = "1.8.2"
+version = "1.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9f3647c145568cec02c42054e07bdf9a5a698e15b466fb2341bfc393cd24aa5"
+checksum = "6a3a1fd6f75306b68087b831f025c712524bcb19aad54e557b1129cfa0a2b207"
 dependencies = [
  "rustversion",
 ]
@@ -174,11 +174,23 @@ checksum = "1e748733b7cbc798e1434b6ac524f0c1ff2ab456fe201501e6497c8417a4fc33"
 
 [[package]]
 name = "cadence"
-version = "1.7.0"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7aff0c323415907f37007d645d7499c378df47efb3e33ffc1f397fa4e549b2e"
+checksum = "5ca08f6db9f0c963249cf23a27820f9d973d2acaad4d6bfaeb858b58ebd58a6a"
 dependencies = [
  "crossbeam-channel",
+]
+
+[[package]]
+name = "capabilities-test"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "js-sys",
+ "libdatadog-nodejs-capabilities",
+ "libdd-capabilities",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]
@@ -835,9 +847,9 @@ checksum = "09edd9e8b54e49e587e4f6295a7d29c3ea94d469cb40ab8ca70b288248a81db2"
 
 [[package]]
 name = "libc"
-version = "0.2.182"
+version = "0.2.183"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6800badb6cb2082ffd7b6a67e6125bb39f18782f793520caee8cb8846be06112"
+checksum = "b5b646652bf6661599e1da8901b3b9522896f01e736bad5f723fe7a3a27f899d"
 
 [[package]]
 name = "libdatadog-nodejs-capabilities"
@@ -846,6 +858,7 @@ dependencies = [
  "anyhow",
  "bytes",
  "futures-core",
+ "futures-util",
  "http",
  "js-sys",
  "libdd-capabilities",
@@ -858,12 +871,24 @@ dependencies = [
 [[package]]
 name = "libdd-capabilities"
 version = "0.1.0"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture#b03ced3af42c153de53ec3d0a276ade87d47ad98"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fruntime-capability#628bd2c145c69addc207c17d01eb60cd2fad6af3"
 dependencies = [
  "anyhow",
  "bytes",
  "http",
  "thiserror",
+]
+
+[[package]]
+name = "libdd-capabilities-impl"
+version = "0.1.0"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fruntime-capability#628bd2c145c69addc207c17d01eb60cd2fad6af3"
+dependencies = [
+ "bytes",
+ "http",
+ "libdd-capabilities",
+ "libdd-common 3.0.2",
+ "tokio",
 ]
 
 [[package]]
@@ -901,8 +926,8 @@ dependencies = [
 
 [[package]]
 name = "libdd-common"
-version = "1.1.0"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture#b03ced3af42c153de53ec3d0a276ade87d47ad98"
+version = "3.0.2"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fruntime-capability#628bd2c145c69addc207c17d01eb60cd2fad6af3"
 dependencies = [
  "anyhow",
  "bytes",
@@ -916,16 +941,20 @@ dependencies = [
  "http-body",
  "http-body-util",
  "hyper",
+ "hyper-rustls",
  "hyper-util",
  "libc",
  "libdd-capabilities",
  "nix 0.29.0",
  "pin-project",
  "regex",
+ "rustls",
+ "rustls-native-certs",
  "serde",
  "static_assertions",
  "thiserror",
  "tokio",
+ "tokio-rustls",
  "tower-service",
  "windows-sys 0.52.0",
 ]
@@ -942,7 +971,7 @@ dependencies = [
  "chrono",
  "http",
  "libc",
- "libdd-common 1.1.0 (git+https://github.com/DataDog/libdatadog.git?tag=v26.0.0)",
+ "libdd-common 1.1.0",
  "libdd-telemetry",
  "nix 0.29.0",
  "num-derive",
@@ -964,19 +993,23 @@ dependencies = [
 
 [[package]]
 name = "libdd-data-pipeline"
-version = "1.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture#b03ced3af42c153de53ec3d0a276ade87d47ad98"
+version = "3.0.1"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fruntime-capability#628bd2c145c69addc207c17d01eb60cd2fad6af3"
 dependencies = [
  "anyhow",
  "arc-swap",
+ "async-trait",
  "bytes",
  "either",
+ "getrandom 0.2.17",
  "http",
  "http-body-util",
  "libdd-capabilities",
- "libdd-common 1.1.0 (git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture)",
- "libdd-ddsketch 1.0.0 (git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture)",
+ "libdd-capabilities-impl",
+ "libdd-common 3.0.2",
+ "libdd-ddsketch 1.0.1",
  "libdd-dogstatsd-client",
+ "libdd-shared-runtime",
  "libdd-tinybytes",
  "libdd-trace-protobuf",
  "libdd-trace-stats",
@@ -1001,22 +1034,36 @@ dependencies = [
 
 [[package]]
 name = "libdd-ddsketch"
-version = "1.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture#b03ced3af42c153de53ec3d0a276ade87d47ad98"
+version = "1.0.1"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fruntime-capability#628bd2c145c69addc207c17d01eb60cd2fad6af3"
 dependencies = [
  "prost",
 ]
 
 [[package]]
 name = "libdd-dogstatsd-client"
-version = "1.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture#b03ced3af42c153de53ec3d0a276ade87d47ad98"
+version = "2.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fruntime-capability#628bd2c145c69addc207c17d01eb60cd2fad6af3"
 dependencies = [
  "anyhow",
  "cadence",
  "http",
- "libdd-common 1.1.0 (git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture)",
+ "libdd-common 3.0.2",
  "serde",
+ "tracing",
+]
+
+[[package]]
+name = "libdd-shared-runtime"
+version = "1.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fruntime-capability#628bd2c145c69addc207c17d01eb60cd2fad6af3"
+dependencies = [
+ "async-trait",
+ "futures",
+ "libdd-capabilities",
+ "libdd-common 3.0.2",
+ "tokio",
+ "tokio-util",
  "tracing",
 ]
 
@@ -1034,8 +1081,8 @@ dependencies = [
  "hyper",
  "hyper-util",
  "libc",
- "libdd-common 1.1.0 (git+https://github.com/DataDog/libdatadog.git?tag=v26.0.0)",
- "libdd-ddsketch 1.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v26.0.0)",
+ "libdd-common 1.1.0",
+ "libdd-ddsketch 1.0.0",
  "serde",
  "serde_json",
  "sys-info",
@@ -1049,15 +1096,15 @@ dependencies = [
 [[package]]
 name = "libdd-tinybytes"
 version = "1.1.0"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture#b03ced3af42c153de53ec3d0a276ade87d47ad98"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fruntime-capability#628bd2c145c69addc207c17d01eb60cd2fad6af3"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "libdd-trace-normalization"
-version = "1.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture#b03ced3af42c153de53ec3d0a276ade87d47ad98"
+version = "2.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fruntime-capability#628bd2c145c69addc207c17d01eb60cd2fad6af3"
 dependencies = [
  "anyhow",
  "libdd-trace-protobuf",
@@ -1065,8 +1112,8 @@ dependencies = [
 
 [[package]]
 name = "libdd-trace-protobuf"
-version = "1.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture#b03ced3af42c153de53ec3d0a276ade87d47ad98"
+version = "3.0.1"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fruntime-capability#628bd2c145c69addc207c17d01eb60cd2fad6af3"
 dependencies = [
  "prost",
  "serde",
@@ -1075,29 +1122,32 @@ dependencies = [
 
 [[package]]
 name = "libdd-trace-stats"
-version = "1.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture#b03ced3af42c153de53ec3d0a276ade87d47ad98"
+version = "2.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fruntime-capability#628bd2c145c69addc207c17d01eb60cd2fad6af3"
 dependencies = [
  "hashbrown 0.15.5",
- "libdd-ddsketch 1.0.0 (git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture)",
+ "libdd-ddsketch 1.0.1",
  "libdd-trace-protobuf",
  "libdd-trace-utils",
 ]
 
 [[package]]
 name = "libdd-trace-utils"
-version = "1.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture#b03ced3af42c153de53ec3d0a276ade87d47ad98"
+version = "3.0.1"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fruntime-capability#628bd2c145c69addc207c17d01eb60cd2fad6af3"
 dependencies = [
  "anyhow",
+ "base64",
  "bytes",
  "futures",
+ "getrandom 0.2.17",
  "http",
  "http-body",
  "http-body-util",
  "indexmap",
  "libdd-capabilities",
- "libdd-common 1.1.0 (git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Fcapability-traits-architecture)",
+ "libdd-capabilities-impl",
+ "libdd-common 3.0.2",
  "libdd-tinybytes",
  "libdd-trace-normalization",
  "libdd-trace-protobuf",
@@ -1515,9 +1565,9 @@ checksum = "d6790f58c7ff633d8771f42965289203411a5e5c68388703c06e14f24770b41e"
 
 [[package]]
 name = "openssl-probe"
-version = "0.2.1"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
+checksum = "d05e27ee213611ffe7d6348b942e8f942b37114c00cc03cec254295a4a17852e"
 
 [[package]]
 name = "os_info"
@@ -1811,9 +1861,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-native-certs"
-version = "0.8.3"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "612460d5f7bea540c490b2b6395d8e34a953e52b491accd6c86c8164c5932a63"
+checksum = "9980d917ebb0c0536119ba501e90834767bffc3d60641457fd84a1f3fd337923"
 dependencies = [
  "openssl-probe",
  "rustls-pki-types",
@@ -1865,9 +1915,9 @@ dependencies = [
 
 [[package]]
 name = "schannel"
-version = "0.1.28"
+version = "0.1.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "891d81b926048e76efe18581bf793546b4c0eaf8448d72be8de2bbee5fd166e1"
+checksum = "91c1b7e4904c873ef0710c1f407dde2e6287de2bebc1bbbf7d430bb7cbffd939"
 dependencies = [
  "windows-sys 0.61.2",
 ]
@@ -2050,12 +2100,12 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
 name = "socket2"
-version = "0.6.2"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86f4aa3ad99f2088c990dfa82d367e19cb29268ed67c574d10d0a4bfe71f07e0"
+checksum = "3a766e1110788c36f4fa1c2b71b387a7815aa65f88ce0229841826633d93723e"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2275,9 +2325,9 @@ checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 
 [[package]]
 name = "uuid"
-version = "1.21.0"
+version = "1.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b672338555252d43fd2240c714dc444b8c6fb0a5c5335e65a07bba7742735ddb"
+checksum = "a68d3c8f01c0cfa54a75291d83601161799e4a89a39e0929f4b0354d88757a37"
 dependencies = [
  "getrandom 0.4.2",
  "js-sys",
@@ -2644,15 +2694,6 @@ dependencies = [
 
 [[package]]
 name = "windows-sys"
-version = "0.60.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2f500e4d28234f72040990ec9d39e3a6b950f9f22d3dba18416c35882612bcb"
-dependencies = [
- "windows-targets 0.53.5",
-]
-
-[[package]]
-name = "windows-sys"
 version = "0.61.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ae137229bcbd6cdf0f7b80a31df61766145077ddf49416a728b02cb3921ff3fc"
@@ -2945,18 +2986,18 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
-version = "0.8.40"
+version = "0.8.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a789c6e490b576db9f7e6b6d661bcc9799f7c0ac8352f56ea20193b2681532e5"
+checksum = "f2578b716f8a7a858b7f02d5bd870c14bf4ddbbcf3a4c05414ba6503640505e3"
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.40"
+version = "0.8.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f65c489a7071a749c849713807783f70672b28094011623e200cb86dcb835953"
+checksum = "7e6cc098ea4d3bd6246687de65af3f920c430e236bee1e3bf2e441463f08a02f"
 dependencies = [
  "proc-macro2",
  "quote",

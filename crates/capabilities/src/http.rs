@@ -1,7 +1,7 @@
 // Copyright 2026-Present Datadog, Inc. https://www.datadoghq.com/
 // SPDX-License-Identifier: Apache-2.0
 
-//! Wasm implementation of [`HttpClientTrait`] backed by Node.js `http.request`.
+//! Wasm implementation of [`HttpClientCapability`] backed by Node.js `http.request`.
 //!
 //! The JS transport is imported via `wasm_bindgen(module = ...)` from
 //! `http_transport.js`, which ships alongside the wasm output.
@@ -14,7 +14,7 @@ use js_sys;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 
-use libdd_capabilities::http::{HttpClientTrait, HttpError};
+use libdd_capabilities::http::{HttpClientCapability, HttpError};
 use libdd_capabilities::maybe_send::MaybeSend;
 
 #[wasm_bindgen(module = "/src/http_transport.js")]
@@ -28,13 +28,11 @@ extern "C" {
     ) -> js_sys::Promise;
 }
 
-/// Wasm [`HttpClientTrait`] implementation that delegates to Node.js HTTP.
-///
-/// Named `DefaultHttpClient` to match the native version's public API.
+/// Wasm [`HttpClientCapability`] implementation that delegates to Node.js HTTP.
 #[derive(Clone, Debug)]
-pub struct DefaultHttpClient;
+pub struct WasmHttpClient;
 
-impl HttpClientTrait for DefaultHttpClient {
+impl HttpClientCapability for WasmHttpClient {
     fn new_client() -> Self {
         Self
     }

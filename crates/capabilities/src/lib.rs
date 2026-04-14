@@ -8,23 +8,30 @@
 //! this type as the generic parameter for libdatadog structs.
 
 pub mod http;
+pub mod sleep;
+pub mod spawn;
 
 use core::future::Future;
+use std::time::Duration;
 
-pub use http::DefaultHttpClient;
-use libdd_capabilities::http::{HttpClientTrait, HttpError};
+use futures_util::future::RemoteHandle;
+
+pub use http::WasmHttpClient;
+use libdd_capabilities::http::{HttpClientCapability, HttpError};
+use libdd_capabilities::sleep::SleepCapability;
+use libdd_capabilities::spawn::SpawnCapability;
 use libdd_capabilities::MaybeSend;
+pub use sleep::WasmSleepCapability;
+pub use spawn::WasmSpawnCapability;
 
 /// Bundle struct for wasm platform capabilities.
 ///
-/// Delegates to [`DefaultHttpClient`] for HTTP. As more capability traits are
-/// added (spawn, sleep, etc.), additional fields and impls are added here
-/// without changing the type identity — consumers see the same
-/// `WasmCapabilities` throughout.
+/// Delegates to [`WasmHttpClient`] for HTTP, [`WasmSleepCapability`] for
+/// sleep, and [`WasmSpawnCapability`] for task spawning.
 #[derive(Clone, Debug)]
 pub struct WasmCapabilities;
 
-impl HttpClientTrait for WasmCapabilities {
+impl HttpClientCapability for WasmCapabilities {
     fn new_client() -> Self {
         Self
     }
@@ -33,6 +40,24 @@ impl HttpClientTrait for WasmCapabilities {
         &self,
         req: ::http::Request<bytes::Bytes>,
     ) -> impl Future<Output = Result<::http::Response<bytes::Bytes>, HttpError>> + MaybeSend {
-        DefaultHttpClient.request(req)
+        WasmHttpClient.request(req)
+    }
+}
+
+impl SleepCapability for WasmCapabilities {
+    fn sleep(&self, duration: Duration) -> impl Future<Output = ()> + MaybeSend {
+        WasmSleepCapability.sleep(duration)
+    }
+}
+
+impl SpawnCapability for WasmCapabilities {
+    type JoinHandle<T: MaybeSend + 'static> = RemoteHandle<T>;
+
+    fn spawn<F, T>(&self, future: F) -> RemoteHandle<T>
+    where
+        F: Future<Output = T> + MaybeSend + 'static,
+        T: MaybeSend + 'static,
+    {
+        WasmSpawnCapability.spawn(future)
     }
 }
