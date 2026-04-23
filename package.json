@@ -36,6 +36,6 @@
     "eslint-plugin-import-x": "^4.12.2",
     "eslint-plugin-n": "^17.24.0",
     "eslint-plugin-unicorn": "^63.0.0",
-    "globals": "^17.4.0"
+    "globals": "^17.5.0"
   }
 }
