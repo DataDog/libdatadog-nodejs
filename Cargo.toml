@@ -13,21 +13,15 @@ codegen-units = 1
 lto = true
 opt-level = "z"
 panic = "abort"
-strip = "none"
-debug = 1
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[patch."https://github.com/DataDog/libdatadog.git"]
-libdd-trace-utils = { path = "/Users/bryan.english/libdatadog-local/libdd-trace-utils" }
-libdd-capabilities = { path = "/Users/bryan.english/libdatadog-local/libdd-capabilities" }
-libdd-data-pipeline = { path = "/Users/bryan.english/libdatadog-local/libdd-data-pipeline" }
-libdd-trace-protobuf = { path = "/Users/bryan.english/libdatadog-local/libdd-trace-protobuf" }
-libdd-trace-stats = { path = "/Users/bryan.english/libdatadog-local/libdd-trace-stats" }
-libdd-common = { path = "/Users/bryan.english/libdatadog-local/libdd-common" }
-libdd-tinybytes = { path = "/Users/bryan.english/libdatadog-local/libdd-tinybytes" }
-libdd-trace-normalization = { path = "/Users/bryan.english/libdatadog-local/libdd-trace-normalization" }
-libdd-dogstatsd-client = { path = "/Users/bryan.english/libdatadog-local/libdd-dogstatsd-client" }
-libdd-ddsketch = { path = "/Users/bryan.english/libdatadog-local/libdd-ddsketch" }
+# strip = "none"
+debug = true
 
 
+[patch.'https://github.com/DataDog/libdatadog.git']
+libdd-capabilities = { path = "../libdatadog_node_native_spans_worktree/libdd-capabilities" }
+libdd-capabilities-impl = { path = "../libdatadog_node_native_spans_worktree/libdd-capabilities-impl" }
+libdd-data-pipeline = { path = "../libdatadog_node_native_spans_worktree/libdd-data-pipeline" }
+libdd-trace-utils = {  path = "../libdatadog_node_native_spans_worktree/libdd-trace-utils" }
+libdd-trace-stats = {  path = "../libdatadog_node_native_spans_worktree/libdd-trace-stats" }
+libdd-trace-protobuf = {  path = "../libdatadog_node_native_spans_worktree/libdd-trace-protobuf" }
+libdd-library-config = {  path = "../libdatadog_node_native_spans_worktree/libdd-library-config" }
