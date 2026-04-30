@@ -83,7 +83,8 @@ impl WasmSpanState {
             .set_tracer_version(tracer_version)
             .set_language(lang)
             .set_language_version(lang_version)
-            .set_language_interpreter(lang_interpreter);
+            .set_language_interpreter(lang_interpreter)
+            .enable_agent_rates_payload_version();
 
         let mut change_queue = vec![0u8; change_queue_size as usize];
         let change_buffer =
@@ -474,4 +475,9 @@ pub fn get_op_codes() -> JsValue {
             .unwrap();
     }
     obj.into()
+}
+
+#[wasm_bindgen(js_name = "setStorage")]
+pub fn set_storage(new_storage: &JsValue) {
+    libdatadog_nodejs_capabilities::http::set_storage(new_storage);
 }
