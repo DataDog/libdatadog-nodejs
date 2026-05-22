@@ -11,18 +11,9 @@ fn apply_default_signals(
     config: libdd_crashtracker::CrashtrackerConfiguration,
 ) -> libdd_crashtracker::CrashtrackerConfiguration {
     if config.signals().is_empty() {
-        libdd_crashtracker::CrashtrackerConfiguration::new(
-            config.additional_files().clone(),
-            config.create_alt_stack(),
-            config.use_alt_stack(),
-            config.endpoint().clone(),
-            config.resolve_frames(),
-            vec![], // Empty vec will be replaced with default_signals() in new() in libdatadog
-            Some(config.timeout()),
-            config.unix_socket_path().clone(),
-            config.demangle_names(),
-        )
-        .unwrap()
+        let mut value = serde_json::to_value(&config).unwrap();
+        value["signals"] = serde_json::to_value(libdd_crashtracker::default_signals()).unwrap();
+        serde_json::from_value(value).unwrap()
     } else {
         config
     }

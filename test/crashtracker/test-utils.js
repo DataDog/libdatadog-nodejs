@@ -6,6 +6,7 @@ const crashtracker = libdatadog.load('crashtracker')
 function initTestCrashtracker () {
   crashtracker.init({
     additional_files: [],
+    collect_all_threads: true,
     create_alt_stack: true,
     use_alt_stack: true,
     endpoint: {
