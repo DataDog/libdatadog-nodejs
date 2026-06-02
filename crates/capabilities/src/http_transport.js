@@ -7,6 +7,21 @@ module.exports.setStorage = function (new_storage) {
   storage = new_storage;
 }
 
+// Optional observer invoked with each agent response's raw headers
+// (Node's flat [name, value, name, value, ...] array). Lets the host tracer
+// read response-only headers (e.g. Datadog-Container-Tags-Hash) that are not
+// otherwise surfaced through the wasm response body. Never throws into the
+// transport: a misbehaving observer must not break trace delivery.
+//
+// The observer runs synchronously on the response 'end' event, so it must be
+// non-blocking and return quickly — long-running synchronous work here would
+// stall the event loop.
+let responseHeaderObserver = null;
+
+module.exports.setResponseHeaderObserver = function (new_observer) {
+  responseHeaderObserver = new_observer;
+}
+
 module.exports.httpRequest = function (host, port, isHttps, head_ptr, head_len, body_ptr, body_len, wasm_memory) {
   const transport = isHttps ? https : http;
 
@@ -29,6 +44,16 @@ module.exports.httpRequest = function (host, port, isHttps, head_ptr, head_len, 
           res.on('data', (chunk) => chunks.push(chunk));
           res.on('end', () => {
             const body = Buffer.concat(chunks)
+            if (responseHeaderObserver !== null) {
+              try {
+                responseHeaderObserver(res.rawHeaders);
+              } catch (err) {
+                // Only read `err.message` (a string) rather than stringifying an
+                // arbitrary thrown value, so a hostile/throwing toString on the
+                // error can't turn the log line into its own failure path.
+                process.stderr.write("responseHeaderObserver error: " + (err && err.message) + "\n");
+              }
+            }
             resolve([
               res.statusCode,
               res.rawHeaders,

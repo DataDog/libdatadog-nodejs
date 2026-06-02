@@ -481,3 +481,8 @@ pub fn get_op_codes() -> JsValue {
 pub fn set_storage(new_storage: &JsValue) {
     libdatadog_nodejs_capabilities::http::set_storage(new_storage);
 }
+
+#[wasm_bindgen(js_name = "setResponseHeaderObserver")]
+pub fn set_response_header_observer(observer: &JsValue) {
+    libdatadog_nodejs_capabilities::http::set_response_header_observer(observer);
+}

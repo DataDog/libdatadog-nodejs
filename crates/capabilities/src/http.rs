@@ -37,6 +37,9 @@ extern "C" {
 
     #[wasm_bindgen(js_name = "setStorage")]
     pub fn set_storage(new_storage: &JsValue);
+
+    #[wasm_bindgen(js_name = "setResponseHeaderObserver")]
+    pub fn set_response_header_observer(observer: &JsValue);
 }
 
 /// Wasm [`HttpClientTrait`] implementation that delegates to Node.js HTTP.
