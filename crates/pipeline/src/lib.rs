@@ -84,6 +84,14 @@ impl WasmSpanState {
             .set_language(lang)
             .set_language_version(lang_version)
             .set_language_interpreter(lang_interpreter)
+            // Populate the payload-level TracerMetadata (service/env/hostname/
+            // app_version) the agent receives. These values are already passed
+            // in for the stats collector; without these calls the trace
+            // payload's tracer metadata is sent empty.
+            .set_service(tracer_service)
+            .set_env(env)
+            .set_hostname(hostname)
+            .set_app_version(app_version)
             .enable_agent_rates_payload_version();
 
         let mut change_queue = vec![0u8; change_queue_size as usize];
