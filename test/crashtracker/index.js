@@ -38,7 +38,7 @@ const timeout = setTimeout(() => {
 
 let currentTest
 
-app.use(bodyParser.json())
+app.use(bodyParser.json({ limit: '10mb' }))
 
 app.post('/telemetry/proxy/api/v2/apmtelemetry', (req, res) => {
   res.status(200).send()
