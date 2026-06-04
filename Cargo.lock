@@ -244,6 +244,7 @@ dependencies = [
  "napi",
  "napi-derive",
  "rustls",
+ "serde_json",
 ]
 
 [[package]]
@@ -710,9 +711,33 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5b646652bf6661599e1da8901b3b9522896f01e736bad5f723fe7a3a27f899d"
 
 [[package]]
-name = "libdd-common"
+name = "libdd-capabilities"
 version = "2.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v29.0.0#001bd56fcbba34fa4ec3f9798a6c4fbcddeffa40"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v35.0.0#aa78483fba211c72ca3759c76318895f45e0184b"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "http",
+ "thiserror",
+]
+
+[[package]]
+name = "libdd-capabilities-impl"
+version = "2.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v35.0.0#aa78483fba211c72ca3759c76318895f45e0184b"
+dependencies = [
+ "bytes",
+ "http",
+ "http-body-util",
+ "libdd-capabilities",
+ "libdd-common",
+ "tokio",
+]
+
+[[package]]
+name = "libdd-common"
+version = "4.2.0"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v35.0.0#aa78483fba211c72ca3759c76318895f45e0184b"
 dependencies = [
  "anyhow",
  "bytes",
@@ -746,12 +771,13 @@ dependencies = [
 [[package]]
 name = "libdd-crashtracker"
 version = "1.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v29.0.0#001bd56fcbba34fa4ec3f9798a6c4fbcddeffa40"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v35.0.0#aa78483fba211c72ca3759c76318895f45e0184b"
 dependencies = [
  "anyhow",
  "blazesym",
  "cc",
  "chrono",
+ "errno",
  "http",
  "libc",
  "libdd-common",
@@ -778,7 +804,7 @@ dependencies = [
 [[package]]
 name = "libdd-ddsketch"
 version = "1.0.1"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v29.0.0#001bd56fcbba34fa4ec3f9798a6c4fbcddeffa40"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v35.0.0#aa78483fba211c72ca3759c76318895f45e0184b"
 dependencies = [
  "prost",
 ]
@@ -802,8 +828,9 @@ dependencies = [
 
 [[package]]
 name = "libdd-libunwind-sys"
-version = "29.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v29.0.0#001bd56fcbba34fa4ec3f9798a6c4fbcddeffa40"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "227f0e30af5fbb91d1b3768db7997fdd1ded87c44b371663783c4ff3eb686908"
 dependencies = [
  "cc",
  "libc",
@@ -811,12 +838,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "libdd-shared-runtime"
+version = "1.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v35.0.0#aa78483fba211c72ca3759c76318895f45e0184b"
+dependencies = [
+ "async-trait",
+ "futures",
+ "futures-util",
+ "libdd-capabilities",
+ "libdd-capabilities-impl",
+ "libdd-common",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "wasm-bindgen-futures",
+]
+
+[[package]]
 name = "libdd-telemetry"
-version = "3.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v29.0.0#001bd56fcbba34fa4ec3f9798a6c4fbcddeffa40"
+version = "5.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v35.0.0#aa78483fba211c72ca3759c76318895f45e0184b"
 dependencies = [
  "anyhow",
+ "async-trait",
  "base64",
+ "bytes",
  "futures",
  "hashbrown 0.15.5",
  "http",
@@ -824,6 +870,7 @@ dependencies = [
  "libc",
  "libdd-common",
  "libdd-ddsketch",
+ "libdd-shared-runtime",
  "serde",
  "serde_json",
  "sys-info",
@@ -1238,9 +1285,9 @@ checksum = "d6790f58c7ff633d8771f42965289203411a5e5c68388703c06e14f24770b41e"
 
 [[package]]
 name = "openssl-probe"
-version = "0.2.1"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
+checksum = "d05e27ee213611ffe7d6348b942e8f942b37114c00cc03cec254295a4a17852e"
 
 [[package]]
 name = "os_info"
@@ -1531,9 +1578,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-native-certs"
-version = "0.8.3"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "612460d5f7bea540c490b2b6395d8e34a953e52b491accd6c86c8164c5932a63"
+checksum = "9980d917ebb0c0536119ba501e90834767bffc3d60641457fd84a1f3fd337923"
 dependencies = [
  "openssl-probe",
  "rustls-pki-types",
