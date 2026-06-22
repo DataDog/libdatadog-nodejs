@@ -8,7 +8,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 anyhow = "1"
-libdd-library-config = { git = "https://github.com/DataDog/libdatadog.git", tag = "v35.0.0", features = ["otel-thread-ctx"] }
+libdd-library-config = { git = "https://github.com/DataDog/libdatadog.git", tag = "v36.0.0", features = ["otel-thread-ctx"] }
 
 napi = { version = "2" }
 napi-derive = { version = "2", default-features = false }

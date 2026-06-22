@@ -812,7 +812,7 @@ dependencies = [
 [[package]]
 name = "libdd-library-config"
 version = "2.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v35.0.0#aa78483fba211c72ca3759c76318895f45e0184b"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v36.0.0#b2a83ff19a2f4760d180bd9eb9e91f41566ba5b9"
 dependencies = [
  "anyhow",
  "libc",
@@ -884,7 +884,7 @@ dependencies = [
 [[package]]
 name = "libdd-trace-protobuf"
 version = "3.0.2"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v35.0.0#aa78483fba211c72ca3759c76318895f45e0184b"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v36.0.0#b2a83ff19a2f4760d180bd9eb9e91f41566ba5b9"
 dependencies = [
  "prost",
  "serde",
