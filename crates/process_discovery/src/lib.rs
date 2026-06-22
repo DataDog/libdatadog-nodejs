@@ -21,6 +21,16 @@ pub struct TracerMetadata {
     pub service_version: Option<String>,
     pub process_tags: Option<String>,
     pub container_id: Option<String>,
+    /// Ordered list of attribute key names for thread-level OTEP-4947
+    /// context records. Key indices on the wire index into this list.
+    /// libdatadog's OTel process-context conversion prepends the
+    /// implicit `datadog.local_root_span_id` entry at wire index 0, so
+    /// callers should only set their additional keys here — entry 0 in
+    /// this list corresponds to wire key index 1.
+    ///
+    /// `null`/omitted (the default) disables the thread-context-related
+    /// attributes in the OTel process context entirely.
+    pub threadlocal_attribute_keys: Option<Vec<String>>,
 }
 
 #[napi]
@@ -36,6 +46,7 @@ pub fn store_metadata(data: &TracerMetadata) -> napi::Result<NapiAnonymousFileHa
         service_version: data.service_version.clone(),
         process_tags: data.process_tags.clone(),
         container_id: data.container_id.clone(),
+        threadlocal_attribute_keys: data.threadlocal_attribute_keys.clone(),
     });
 
     match res {
