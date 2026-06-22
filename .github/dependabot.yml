@@ -34,6 +34,24 @@ updates:
         update-types:
           - "minor"
 
+  - package-ecosystem: "npm"
+    directory: "/test/crashtracker"
+    schedule:
+      interval: "weekly"
+    versioning-strategy: "increase"
+    labels:
+      - dependabot
+      - dependencies
+      - javascript
+      - semver-patch
+    groups:
+      patch-updates:
+        update-types:
+          - "patch"
+      minor-updates:
+        update-types:
+          - "minor"
+
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
