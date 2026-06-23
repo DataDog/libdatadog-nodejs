@@ -9,7 +9,16 @@ run_test() {
     yarn --cwd "$dir" install
   fi
   echo "Running $1"
-  node "$1"
+  # node:test does not force the process to exit when the event loop is kept
+  # active by async work that has already settled (e.g. the wasm trace
+  # exporter's runtime machinery after a flush). For the long-lived real
+  # consumer that is expected; for the test runner we force a clean exit once
+  # all tests have finished. Only applies to files that use node:test.
+  if grep -q "node:test" "$1"; then
+    node --test-force-exit "$1"
+  else
+    node "$1"
+  fi
 }
 
 # Run top-level test files
@@ -26,3 +35,7 @@ for d in test/*/; do
       ;;
   esac
 done
+
+# The wasm trace exporter integration test runs against its own in-process mock
+# agent, so run it directly (other test/wasm/* modules remain manual for now).
+run_test test/wasm/trace_exporter/index.js
