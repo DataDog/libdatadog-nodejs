@@ -1,0 +1,21 @@
+[package]
+name = "libdatadog-nodejs-capabilities"
+version = "0.1.0"
+edition = "2021"
+description = "Wasm capability implementations for libdatadog-nodejs (backed by JS transports)"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+http = "1"
+bytes = "1.4"
+futures-core = "0.3"
+anyhow = "1"
+libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", branch = "main" }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
