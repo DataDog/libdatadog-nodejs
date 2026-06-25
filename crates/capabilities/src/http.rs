@@ -30,6 +30,7 @@ extern "C" {
         host: &str,
         port: u16,
         is_https: bool,
+        socket_path: &str,
         head_ptr: *const u8,
         head_len: u32,
         body_ptr: *const u8,
@@ -65,24 +66,41 @@ impl HttpClientCapability for DefaultHttpClient {
     ) -> impl Future<Output = Result<http::Response<Bytes>, HttpError>> + MaybeSend {
         async move {
             let scheme = req.uri().scheme_str().unwrap_or("http");
-            let is_https = scheme == "https";
-            let host = req
-                .uri()
-                .host()
-                .ok_or_else(|| HttpError::InvalidRequest(anyhow::anyhow!("missing host in URI")))?
-                .to_owned();
-            let port = req
-                .uri()
-                .port_u16()
-                .unwrap_or(if is_https { 443 } else { 80 });
 
-            let head = serialize_request_head(&req, &host, port, is_https)?;
+            // Unix domain socket / Windows named pipe: ddcommon's `parse_uri`
+            // hex-encodes the socket path into the URI authority (there is no
+            // standard URL form for socket paths). On wasm the request bypasses
+            // ddcommon's native (hyper) connector and reaches us directly, so we
+            // decode the path here and route over the socket instead of TCP.
+            let (host, port, is_https, socket_path) = if scheme == "unix" || scheme == "windows" {
+                (String::new(), 0u16, false, decode_socket_path(req.uri())?)
+            } else {
+                let is_https = scheme == "https";
+                let host = req.uri().host().ok_or_else(|| {
+                    HttpError::InvalidRequest(anyhow::anyhow!("missing host in URI"))
+                })?;
+                let port = req
+                    .uri()
+                    .port_u16()
+                    .unwrap_or(if is_https { 443 } else { 80 });
+                (host.to_owned(), port, is_https, String::new())
+            };
+
+            // For a socket request there is no meaningful network host; HTTP/1.1
+            // still requires a Host header, so send a stable placeholder (the
+            // agent does not validate Host over a socket).
+            let head = if socket_path.is_empty() {
+                serialize_request_head(&req, &host, port, is_https, false)?
+            } else {
+                serialize_request_head(&req, "localhost", port, is_https, true)?
+            };
             let body = req.into_body();
 
             let result = JsFuture::from(http_request(
                 &host,
                 port,
                 is_https,
+                &socket_path,
                 head.as_ptr(),
                 head.len() as u32,
                 body.as_ptr(),
@@ -155,16 +173,51 @@ fn parse_response_headers(header_js: Array<JsString>) -> Result<HeaderMap, HttpE
     Ok(headers)
 }
 
+/// Decode the socket path that ddcommon's `parse_uri` hex-encoded into the URI
+/// authority for `unix://` / `windows:` agent URLs (see `encode_uri_path_in_authority`
+/// in libdd-common). The authority is the lowercase hex of the raw path bytes.
+fn decode_socket_path(uri: &http::Uri) -> Result<String, HttpError> {
+    let authority = uri
+        .authority()
+        .ok_or_else(|| HttpError::InvalidRequest(anyhow::anyhow!("socket URI missing authority")))?
+        .as_str();
+    let bytes = hex_decode(authority).ok_or_else(|| {
+        HttpError::InvalidRequest(anyhow::anyhow!("socket path authority is not valid hex"))
+    })?;
+    String::from_utf8(bytes)
+        .map_err(|e| HttpError::InvalidRequest(anyhow::anyhow!("socket path is not utf-8: {e}")))
+}
+
+/// Minimal hex decoder for the socket-path authority. Returns `None` on any
+/// malformed input (odd length or non-hex digit) rather than panicking.
+fn hex_decode(s: &str) -> Option<Vec<u8>> {
+    let bytes = s.as_bytes();
+    if !bytes.len().is_multiple_of(2) {
+        return None;
+    }
+    let mut out = Vec::with_capacity(bytes.len() / 2);
+    for pair in bytes.chunks_exact(2) {
+        let hi = (pair[0] as char).to_digit(16)?;
+        let lo = (pair[1] as char).to_digit(16)?;
+        out.push((hi * 16 + lo) as u8);
+    }
+    Some(out)
+}
+
 /// Serialize the full HTTP/1.1 request head (request line + Host + Content-Length
 /// + user headers + terminating CRLF) into a contiguous byte buffer.
 ///
 /// The buffer is handed to JS by pointer; JS assigns it to
 /// `req._header`, bypassing Node's `_storeHeader` serialization.
+///
+/// `is_socket` requests (unix socket / named pipe) omit the `:port` suffix on
+/// the Host header — there is no TCP port for a socket transport.
 fn serialize_request_head(
     req: &http::Request<Bytes>,
     host: &str,
     port: u16,
     is_https: bool,
+    is_socket: bool,
 ) -> Result<Vec<u8>, HttpError> {
     let method = req.method().as_str();
     let path_and_query = req
@@ -184,9 +237,11 @@ fn serialize_request_head(
 
     buf.extend_from_slice(b"Host: ");
     buf.extend_from_slice(host.as_bytes());
-    let default_port = if is_https { 443 } else { 80 };
-    if port != default_port {
-        write!(&mut buf, ":{port}").map_err(|e| HttpError::Other(e.into()))?;
+    if !is_socket {
+        let default_port = if is_https { 443 } else { 80 };
+        if port != default_port {
+            write!(&mut buf, ":{port}").map_err(|e| HttpError::Other(e.into()))?;
+        }
     }
     buf.extend_from_slice(b"\r\n");
 

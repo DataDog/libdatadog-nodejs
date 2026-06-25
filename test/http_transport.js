@@ -9,6 +9,9 @@
 const { describe, it, before, after, beforeEach } = require('node:test')
 const assert = require('node:assert')
 const http = require('node:http')
+const os = require('node:os')
+const path = require('node:path')
+const fs = require('node:fs')
 
 const transport = require('../crates/capabilities/src/http_transport.js')
 
@@ -52,7 +55,8 @@ describe('http_transport response header observer', () => {
       'utf8'
     )
     // head occupies [0, head.length); body is empty (offset 0, length 0).
-    return transport.httpRequest('127.0.0.1', port, false, 0, head.length, 0, 0, fakeWasmMemory(head))
+    // Empty socketPath -> TCP transport.
+    return transport.httpRequest('127.0.0.1', port, false, '', 0, head.length, 0, 0, fakeWasmMemory(head))
   }
 
   it('invokes the observer with the raw response headers', async () => {
@@ -110,6 +114,44 @@ describe('http_transport response header observer', () => {
     assert.ok(body instanceof Uint8Array, 'body is a Uint8Array')
     // Must be exactly the agent's body — not whole-pool bytes or wrong length.
     assert.strictEqual(body.length, Buffer.byteLength(RESPONSE_BODY))
+    assert.strictEqual(Buffer.from(body).toString('utf8'), RESPONSE_BODY)
+  })
+})
+
+// Unix-domain-socket transport: a non-empty socketPath must route the request
+// over the socket instead of TCP. Skipped on Windows (no AF_UNIX path here).
+describe('http_transport unix socket', { skip: process.platform === 'win32' }, () => {
+  let server
+  let socketPath
+
+  before(async () => {
+    socketPath = path.join(os.tmpdir(), `libdd-uds-test-${process.pid}-${Date.now()}.sock`)
+    try { fs.unlinkSync(socketPath) } catch {}
+    server = http.createServer((req, res) => {
+      req.on('data', () => {})
+      req.on('end', () => {
+        res.end(RESPONSE_BODY)
+      })
+    })
+    await new Promise((resolve) => server.listen(socketPath, resolve))
+  })
+
+  after(() => new Promise((resolve) => server.close(() => {
+    try { fs.unlinkSync(socketPath) } catch {}
+    resolve()
+  })))
+
+  it('delivers the request over a unix socket and returns the response', async () => {
+    const head = Buffer.from(
+      'POST /v0.4/traces HTTP/1.1\r\nHost: localhost\r\n' +
+      'Content-Length: 0\r\nConnection: close\r\n\r\n',
+      'utf8'
+    )
+    // host/port empty/0; socketPath drives the connection.
+    const [status, , body] = await transport.httpRequest(
+      '', 0, false, socketPath, 0, head.length, 0, 0, fakeWasmMemory(head)
+    )
+    assert.strictEqual(status, 200)
     assert.strictEqual(Buffer.from(body).toString('utf8'), RESPONSE_BODY)
   })
 })

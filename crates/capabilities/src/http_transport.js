@@ -26,8 +26,12 @@ module.exports.setResponseHeaderObserver = function (new_observer) {
   responseHeaderObserver = new_observer;
 }
 
-module.exports.httpRequest = function (host, port, isHttps, head_ptr, head_len, body_ptr, body_len, wasm_memory) {
-  const transport = isHttps ? https : http;
+module.exports.httpRequest = function (host, port, isHttps, socketPath, head_ptr, head_len, body_ptr, body_len, wasm_memory) {
+  // A non-empty socketPath routes over a Unix domain socket (or Windows named
+  // pipe) instead of TCP. Sockets are always plaintext HTTP/1.1, so https is
+  // ignored in that mode.
+  const useSocket = typeof socketPath === 'string' && socketPath.length > 0;
+  const transport = useSocket ? http : (isHttps ? https : http);
 
   function isDetachedBufferError(err) {
     return err instanceof TypeError && /detached/i.test(err.message);
@@ -41,9 +45,12 @@ module.exports.httpRequest = function (host, port, isHttps, head_ptr, head_len, 
         const headView = new Uint8Array(wasm_memory.buffer, head_ptr, head_len);
         const bodyView = new Uint8Array(wasm_memory.buffer, body_ptr, body_len);
 
-        // host/port drive socket selection; method/path/headers are placeholders
-        // because we replace the rendered head below.
-        const req = transport.request({ host, port, method: 'POST', path: '/' }, (res) => {
+        // host/port (or socketPath) drive connection selection; method/path/
+        // headers are placeholders because we replace the rendered head below.
+        const requestOptions = useSocket
+          ? { socketPath, method: 'POST', path: '/' }
+          : { host, port, method: 'POST', path: '/' };
+        const req = transport.request(requestOptions, (res) => {
           const chunks = [];
           res.on('data', (chunk) => chunks.push(chunk));
           res.on('end', () => {
