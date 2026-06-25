@@ -81,6 +81,15 @@ class Span {
     return this.nativeSpans.state.getTraceOrigin(this.segmentId)
   }
 
+  setMetaStruct (key, bytes) {
+    this.nativeSpans.state.setMetaStruct(this.spanIdBig, key, bytes)
+    return this
+  }
+
+  getMetaStruct (key) {
+    return this.nativeSpans.state.getMetaStruct(this.spanIdBig, key)
+  }
+
   finish () {
     this.duration = BigInt(Date.now()) * 1000000n - this._startTime
     return this
@@ -379,6 +388,29 @@ describe('pipeline', () => {
 
       span.error = 1
       assert.strictEqual(span.error, 1)
+    })
+  })
+
+  describe('meta_struct', () => {
+    it('round-trips raw bytes by key', () => {
+      const span = nativeSpans.createSpan()
+      const value = new Uint8Array([0x82, 0xa1, 0x61, 0x01, 0xa1, 0x62, 0x02])
+      span.setMetaStruct('appsec', value)
+
+      assert.deepStrictEqual(span.getMetaStruct('appsec'), value)
+    })
+
+    it('returns null for an unset meta_struct key', () => {
+      const span = nativeSpans.createSpan()
+      assert.strictEqual(span.getMetaStruct('missing'), null)
+    })
+
+    it('overwrites an existing key on repeated set', () => {
+      const span = nativeSpans.createSpan()
+      span.setMetaStruct('k', new Uint8Array([1, 2, 3]))
+      span.setMetaStruct('k', new Uint8Array([9]))
+
+      assert.deepStrictEqual(span.getMetaStruct('k'), new Uint8Array([9]))
     })
   })
 

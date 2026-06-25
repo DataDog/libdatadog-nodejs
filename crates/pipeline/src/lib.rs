@@ -467,6 +467,40 @@ impl WasmSpanState {
         Ok(span.name.to_string())
     }
 
+    // `meta_struct` carries msgpack-encoded structured data (e.g. AppSec, Code
+    // Origin, Dynamic Instrumentation). There is no change-buffer opcode for it,
+    // so the value is written directly onto the span after draining the queue —
+    // meta_struct does not depend on any other queued op, so bypassing the queue
+    // ordering is safe (subsequent ops are applied on the next flush and never
+    // touch meta_struct).
+    #[wasm_bindgen(js_name = "setMetaStruct")]
+    pub fn set_meta_struct(
+        &self,
+        span_id: u64,
+        key: &str,
+        value: &[u8],
+    ) -> Result<(), JsValue> {
+        self.flush_change_queue()?;
+        let mut cbs = self.cbs.borrow_mut();
+        let span = cbs
+            .span_mut(span_id)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        span.meta_struct
+            .insert(key.into(), span_bytes::SpanBytesImpl(value.to_vec()));
+        Ok(())
+    }
+
+    #[wasm_bindgen(js_name = "getMetaStruct")]
+    pub fn get_meta_struct(&self, span_id: u64, key: &str) -> Result<JsValue, JsValue> {
+        self.flush_change_queue()?;
+        let cbs = self.cbs.borrow();
+        let span = cbs.get_span(span_id).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        // VecMap::get accepts &str directly (SpanString: Borrow<str>).
+        Ok(span.meta_struct.get(key)
+            .map(|v| JsValue::from(js_sys::Uint8Array::from(v.0.as_slice())))
+            .unwrap_or(JsValue::NULL))
+    }
+
     // Trace-level attributes live on the Segment (keyed by segment_id, which
     // JS allocates and shares across spans in the same local trace).
     #[wasm_bindgen(js_name = "getTraceMetaAttr")]
