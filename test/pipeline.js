@@ -90,6 +90,20 @@ class Span {
     return this.nativeSpans.state.getMetaStruct(this.spanIdBig, key)
   }
 
+  addSpanEvent (name, timeUnixNano, attributes = {}) {
+    this.nativeSpans.state.addSpanEvent(
+      this.spanIdBig,
+      name,
+      BigInt(timeUnixNano),
+      encodeSpanEventAttrs(attributes)
+    )
+    return this
+  }
+
+  getSpanEvents () {
+    return JSON.parse(this.nativeSpans.state.getSpanEventsJson(this.spanIdBig))
+  }
+
   finish () {
     this.duration = BigInt(Date.now()) * 1000000n - this._startTime
     return this
@@ -296,6 +310,41 @@ class NativeSpansInterface {
   }
 }
 
+// Build the flat span-event attribute buffer consumed by the Rust decoder
+// (`decode_span_event_attributes` in crates/pipeline/src/lib.rs). This mirrors
+// what dd-trace-js's `addSpanEvent` wrapper produces. Tags: String=0,
+// Boolean=1, Integer=2, Double=3, Array=4 (matching libdatadog's
+// AttributeArrayValue discriminants).
+function encodeSpanEventAttrs (attributes) {
+  const enc = new TextEncoder()
+  const chunks = []
+  const u32 = (n) => { const b = Buffer.alloc(4); b.writeUInt32LE(n >>> 0, 0); return b }
+  const i64 = (n) => { const b = Buffer.alloc(8); b.writeBigInt64LE(BigInt(n), 0); return b }
+  const f64 = (n) => { const b = Buffer.alloc(8); b.writeDoubleLE(n, 0); return b }
+  const str = (s) => { const sb = Buffer.from(enc.encode(s)); return Buffer.concat([u32(sb.length), sb]) }
+  // Returns `[tag][value]` — used both for single values and array items.
+  const scalar = (v) => {
+    if (typeof v === 'string') return Buffer.concat([Buffer.from([0]), str(v)])
+    if (typeof v === 'boolean') return Buffer.concat([Buffer.from([1]), Buffer.from([v ? 1 : 0])])
+    if (typeof v === 'number') {
+      return Number.isInteger(v)
+        ? Buffer.concat([Buffer.from([2]), i64(v)])
+        : Buffer.concat([Buffer.from([3]), f64(v)])
+    }
+    throw new TypeError(`unsupported span-event attribute value: ${typeof v}`)
+  }
+  for (const [key, value] of Object.entries(attributes)) {
+    chunks.push(str(key))
+    if (Array.isArray(value)) {
+      chunks.push(Buffer.from([4]), u32(value.length))
+      for (const item of value) chunks.push(scalar(item))
+    } else {
+      chunks.push(scalar(value))
+    }
+  }
+  return new Uint8Array(Buffer.concat(chunks))
+}
+
 describe('pipeline', () => {
   let nativeSpans
 
@@ -411,6 +460,93 @@ describe('pipeline', () => {
       span.setMetaStruct('k', new Uint8Array([9]))
 
       assert.deepStrictEqual(span.getMetaStruct('k'), new Uint8Array([9]))
+    })
+  })
+
+  describe('span_events', () => {
+    it('appends an event with no attributes', () => {
+      const span = nativeSpans.createSpan()
+      span.addSpanEvent('exception', 1727211691770716000n)
+
+      const events = span.getSpanEvents()
+      assert.strictEqual(events.length, 1)
+      assert.strictEqual(events[0].name, 'exception')
+      assert.strictEqual(events[0].time_unix_nano, 1727211691770716000)
+      // Empty attributes are skipped by libdatadog's serializer.
+      assert.strictEqual(events[0].attributes, undefined)
+    })
+
+    it('round-trips scalar attributes of every type with correct type tags', () => {
+      const span = nativeSpans.createSpan()
+      span.addSpanEvent('evt', 1000n, {
+        s: 'hello',
+        b: true,
+        i: 42,
+        d: 3.5
+      })
+
+      const [event] = span.getSpanEvents()
+      assert.strictEqual(event.name, 'evt')
+      assert.strictEqual(event.time_unix_nano, 1000)
+      // type tags: String=0, Boolean=1, Integer=2, Double=3
+      assert.deepStrictEqual(event.attributes.s, { type: 0, string_value: 'hello' })
+      assert.deepStrictEqual(event.attributes.b, { type: 1, bool_value: true })
+      assert.deepStrictEqual(event.attributes.i, { type: 2, int_value: 42 })
+      assert.deepStrictEqual(event.attributes.d, { type: 3, double_value: 3.5 })
+    })
+
+    it('round-trips an array attribute (type 4) with typed items', () => {
+      const span = nativeSpans.createSpan()
+      span.addSpanEvent('evt', 1n, { tags: ['a', 'b'], nums: [1, 2, 3] })
+
+      const [event] = span.getSpanEvents()
+      assert.deepStrictEqual(event.attributes.tags, {
+        type: 4,
+        array_value: { values: [{ type: 0, string_value: 'a' }, { type: 0, string_value: 'b' }] }
+      })
+      assert.deepStrictEqual(event.attributes.nums, {
+        type: 4,
+        array_value: { values: [{ type: 2, int_value: 1 }, { type: 2, int_value: 2 }, { type: 2, int_value: 3 }] }
+      })
+    })
+
+    it('appends multiple events in order', () => {
+      const span = nativeSpans.createSpan()
+      span.addSpanEvent('first', 1n)
+      span.addSpanEvent('second', 2n, { k: 'v' })
+
+      const events = span.getSpanEvents()
+      assert.strictEqual(events.length, 2)
+      assert.strictEqual(events[0].name, 'first')
+      assert.strictEqual(events[1].name, 'second')
+      assert.deepStrictEqual(events[1].attributes.k, { type: 0, string_value: 'v' })
+    })
+
+    it('returns an empty array for a span with no events', () => {
+      const span = nativeSpans.createSpan()
+      assert.deepStrictEqual(span.getSpanEvents(), [])
+    })
+
+    it('rejects a truncated attribute buffer instead of panicking', () => {
+      const span = nativeSpans.createSpan()
+      // key_len=5 but no key bytes follow → bounded read must error.
+      const bad = new Uint8Array([5, 0, 0, 0])
+      assert.throws(
+        () => span.nativeSpans.state.addSpanEvent(span.spanIdBig, 'evt', 1n, bad),
+        /truncated span-event attribute buffer/
+      )
+    })
+
+    it('rejects an overflowing key_len without trapping (wasm32 usize)', () => {
+      const span = nativeSpans.createSpan()
+      // key_len = 0xFFFFFFFF: on wasm32 `idx + key_len` would wrap and slip
+      // past the bound, trapping on the slice. The remaining-byte form must
+      // reject it as a truncated buffer instead.
+      const bad = new Uint8Array([0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00])
+      assert.throws(
+        () => span.nativeSpans.state.addSpanEvent(span.spanIdBig, 'evt', 1n, bad),
+        /truncated span-event attribute buffer/
+      )
     })
   })
 

@@ -1747,6 +1747,7 @@ dependencies = [
  "libdd-trace-utils",
  "rmp-serde",
  "serde",
+ "serde_json",
  "uuid",
  "wasm-bindgen",
  "wasm-bindgen-futures",

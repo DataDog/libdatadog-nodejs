@@ -18,6 +18,9 @@ use trace_data::*;
 mod stats;
 
 use libdd_trace_utils::change_buffer::{ChangeBuffer, ChangeBufferState};
+use libdd_trace_utils::span::v04::{AttributeAnyValue, AttributeArrayValue, SpanEvent};
+use span_string::SpanString;
+use std::collections::HashMap;
 
 mod utils;
 use utils::*;
@@ -25,6 +28,112 @@ use utils::*;
 #[wasm_bindgen(start)]
 fn init() {
     console_error_panic_hook::set_once();
+}
+
+// --- span event attribute decoding ---
+//
+// `addSpanEvent` receives its attributes as a flat little-endian buffer built
+// by dd-trace-js. Layout: repeated entries until the buffer is exhausted, each
+//   [key_len: u32][key: utf8][tag: u8] + value
+// where the value depends on `tag`:
+//   0 String  [len: u32][utf8]
+//   1 Boolean [u8 (0/1)]
+//   2 Integer [i64]
+//   3 Double  [f64]
+//   4 Array   [count: u32] then `count` items, each [item_tag: u8][scalar]
+//             (item_tag must be 0..=3; nested arrays are rejected)
+// The tags mirror libdatadog's `AttributeArrayValue` discriminants
+// (String=0, Boolean=1, Integer=2, Double=3, Array=4). Every read is bounded
+// against the buffer so a malformed/truncated buffer errors instead of
+// panicking (matching the hardening in `stringTableInsertMany`/`prepareChunk`).
+
+fn se_need(buf: &[u8], idx: usize, n: usize) -> Result<(), JsValue> {
+    // Avoid `idx + n` overflowing: on wasm32 `usize` is 32-bit, and `n` can be
+    // a u32-derived length (e.g. a crafted `key_len`) near `usize::MAX`, which
+    // would wrap and let a too-large read slip past the bound and trap on the
+    // slice. `idx` never exceeds `buf.len()` (it only advances after a checked
+    // read), so `buf.len() - idx` is the safe remaining-byte form.
+    if idx > buf.len() || n > buf.len() - idx {
+        return Err(JsValue::from_str(
+            "addSpanEvent: truncated span-event attribute buffer",
+        ));
+    }
+    Ok(())
+}
+
+fn se_read_u8(buf: &[u8], idx: &mut usize) -> Result<u8, JsValue> {
+    se_need(buf, *idx, 1)?;
+    let b = buf[*idx];
+    *idx += 1;
+    Ok(b)
+}
+
+fn se_read_u32(buf: &[u8], idx: &mut usize) -> Result<u32, JsValue> {
+    se_need(buf, *idx, 4)?;
+    Ok(get_num(buf, idx))
+}
+
+fn se_read_str(buf: &[u8], idx: &mut usize) -> Result<SpanString, JsValue> {
+    let len = se_read_u32(buf, idx)? as usize;
+    se_need(buf, *idx, len)?;
+    let s = std::str::from_utf8(&buf[*idx..*idx + len])
+        .map_err(|e| JsValue::from_str(&format!("addSpanEvent: invalid utf8: {e}")))?;
+    *idx += len;
+    Ok(s.into())
+}
+
+fn se_read_scalar(
+    buf: &[u8],
+    idx: &mut usize,
+    tag: u8,
+) -> Result<AttributeArrayValue<WasmTraceData>, JsValue> {
+    match tag {
+        0 => Ok(AttributeArrayValue::String(se_read_str(buf, idx)?)),
+        1 => Ok(AttributeArrayValue::Boolean(se_read_u8(buf, idx)? != 0)),
+        2 => {
+            se_need(buf, *idx, 8)?;
+            Ok(AttributeArrayValue::Integer(get_num(buf, idx)))
+        }
+        3 => {
+            se_need(buf, *idx, 8)?;
+            Ok(AttributeArrayValue::Double(get_num(buf, idx)))
+        }
+        _ => Err(JsValue::from_str(
+            "addSpanEvent: invalid span-event attribute tag",
+        )),
+    }
+}
+
+fn decode_span_event_attributes(
+    buf: &[u8],
+) -> Result<HashMap<SpanString, AttributeAnyValue<WasmTraceData>>, JsValue> {
+    let mut attributes = HashMap::new();
+    let mut idx = 0usize;
+    while idx < buf.len() {
+        let key = se_read_str(buf, &mut idx)?;
+        let tag = se_read_u8(buf, &mut idx)?;
+        let value = if tag == 4 {
+            let count = se_read_u32(buf, &mut idx)? as usize;
+            // Each item is at least 1 byte (its tag), so cap the pre-allocation
+            // to the remaining buffer: an inflated count can't force a huge
+            // allocation, and the per-item bounded reads catch truncation.
+            let mut items = Vec::with_capacity(count.min(buf.len().saturating_sub(idx)));
+            for _ in 0..count {
+                let item_tag = se_read_u8(buf, &mut idx)?;
+                if item_tag == 4 {
+                    return Err(JsValue::from_str(
+                        "addSpanEvent: nested arrays are not supported",
+                    ));
+                }
+                items.push(se_read_scalar(buf, &mut idx, item_tag)?);
+            }
+            AttributeAnyValue::Array(items)
+        } else {
+            AttributeAnyValue::SingleValue(se_read_scalar(buf, &mut idx, tag)?)
+        };
+        attributes.insert(key, value);
+    }
+    Ok(attributes)
 }
 
 #[wasm_bindgen]
@@ -499,6 +608,51 @@ impl WasmSpanState {
         Ok(span.meta_struct.get(key)
             .map(|v| JsValue::from(js_sys::Uint8Array::from(v.0.as_slice())))
             .unwrap_or(JsValue::NULL))
+    }
+
+    // Span events (OpenTelemetry-style) are serialized by libdatadog as the
+    // top-level v0.4 `span_events` field when present. Like meta_struct there
+    // is no change-buffer opcode, so the event is appended directly to the span
+    // after draining the queue (span_events do not depend on any other queued
+    // op, so bypassing queue ordering is safe). `attrs_buf` is the flat typed
+    // attribute encoding decoded by `decode_span_event_attributes`.
+    #[wasm_bindgen(js_name = "addSpanEvent")]
+    pub fn add_span_event(
+        &self,
+        span_id: u64,
+        name: &str,
+        time_unix_nano: u64,
+        attrs_buf: &[u8],
+    ) -> Result<(), JsValue> {
+        self.flush_change_queue()?;
+        // Decode before borrowing cbs mutably so a malformed buffer errors
+        // without holding the borrow.
+        let attributes = decode_span_event_attributes(attrs_buf)?;
+        let mut cbs = self.cbs.borrow_mut();
+        let span = cbs
+            .span_mut(span_id)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        span.span_events.push(SpanEvent {
+            time_unix_nano,
+            name: name.into(),
+            attributes,
+        });
+        Ok(())
+    }
+
+    // Test/inspection helper: serialize the span's events to JSON via the same
+    // serde `Serialize` impl libdatadog uses for the msgpack wire format, so
+    // the `type`/`*_value` shape mirrors exactly what is sent to the agent
+    // (String=0, Boolean=1, Integer=2, Double=3, Array=4).
+    #[wasm_bindgen(js_name = "getSpanEventsJson")]
+    pub fn get_span_events_json(&self, span_id: u64) -> Result<String, JsValue> {
+        self.flush_change_queue()?;
+        let cbs = self.cbs.borrow();
+        let span = cbs
+            .get_span(span_id)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        serde_json::to_string(&span.span_events)
+            .map_err(|e| JsValue::from_str(&format!("getSpanEventsJson: {e}")))
     }
 
     // Trace-level attributes live on the Segment (keyed by segment_id, which
