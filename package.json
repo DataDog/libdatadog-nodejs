@@ -1,6 +1,6 @@
 {
   "name": "@datadog/libdatadog",
-  "version": "0.1.0-pre",
+  "version": "1.0.0-pre",
   "description": "Node.js binding for libdatadog",
   "main": "index.js",
   "scripts": {
