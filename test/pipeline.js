@@ -781,6 +781,54 @@ describe('pipeline', () => {
     })
   })
 
+  describe('v0.5 output format', () => {
+    // Spin up a mock agent that records the request path, so we can assert the
+    // exporter targets /v0.4/traces by default and /v0.5/traces after
+    // setUseV05(true). (v0.5 itself drops meta_struct/span_events by design;
+    // here we only verify endpoint routing, which is the observable behavior.)
+    async function flushAndCapturePath (useV05) {
+      const http = require('node:http')
+      const seen = []
+      const server = http.createServer((req, res) => {
+        req.on('data', () => {})
+        req.on('end', () => {
+          seen.push({ method: req.method, url: req.url })
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end('{}')
+        })
+      })
+      await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+      const { port } = server.address()
+      const ns = new NativeSpansInterface({ agentUrl: `http://127.0.0.1:${port}` })
+      if (useV05) ns.state.setUseV05(true)
+      const span = ns.createSpan()
+      span.name = 'v05-span'
+      span.service = 'test-service'
+      span.resource = 'test-resource'
+      span.type = 'web'
+      span.duration = 1000000n
+      try {
+        await ns.flushSpans(span)
+        return seen.find(r => r.method === 'POST')
+      } finally {
+        server.closeAllConnections?.()
+        server.close()
+      }
+    }
+
+    it('targets /v0.4/traces by default', async () => {
+      const req = await flushAndCapturePath(false)
+      assert.ok(req, 'agent received a POST')
+      assert.strictEqual(req.url, '/v0.4/traces')
+    })
+
+    it('targets /v0.5/traces after setUseV05(true)', async () => {
+      const req = await flushAndCapturePath(true)
+      assert.ok(req, 'agent received a POST')
+      assert.strictEqual(req.url, '/v0.5/traces')
+    })
+  })
+
   describe('client-side stats', () => {
     it('aggregates and flushes stats to /v0.6/stats', async () => {
       const http = require('node:http')

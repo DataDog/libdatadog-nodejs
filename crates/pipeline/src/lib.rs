@@ -1,6 +1,8 @@
 use libdatadog_nodejs_capabilities::WasmCapabilities;
 use libdd_data_pipeline::trace_exporter::agent_response::AgentResponse;
-use libdd_data_pipeline::trace_exporter::{TraceExporter, TraceExporterBuilder};
+use libdd_data_pipeline::trace_exporter::{
+    TraceExporter, TraceExporterBuilder, TraceExporterOutputFormat,
+};
 use libdd_shared_runtime::LocalRuntime;
 use std::cell::{Cell, RefCell, UnsafeCell};
 use std::ffi::CStr;
@@ -168,6 +170,16 @@ pub struct WasmSpanState {
     /// alias across the await (UB). The guard makes a re-entrant call return
     /// an error instead.
     sending: Cell<bool>,
+    /// When true, the lazily-built exporter is configured for v0.5 output
+    /// (`/v0.5/traces`) instead of the default v0.4. v0.5 is a smaller, fixed
+    /// 12-field schema with NO slots for `meta_struct`/`span_events`/`span_links`,
+    /// so libdatadog's v0.5 serializer silently drops them — this mirrors
+    /// dd-trace-js master's v0.5 encoder and is intentional. Caller (dd-trace-js)
+    /// must only enable this after confirming the agent advertises `/v0.5/traces`
+    /// (libdd does NOT downgrade V05 the way it does V1). The output format is
+    /// fixed once the exporter is built on the first send, so `setUseV05` only
+    /// takes effect if called before then.
+    use_v05: Cell<bool>,
 }
 
 /// Clears an in-flight flag on drop, so an early return or a dropped future
@@ -256,7 +268,20 @@ impl WasmSpanState {
             stats_collector: RefCell::new(stats_collector),
             prepared_spans: RefCell::new(None),
             sending: Cell::new(false),
+            use_v05: Cell::new(false),
         })
+    }
+
+    /// Select v0.5 output for the trace exporter. Must be called before the
+    /// first `sendPreparedChunk` (the exporter is built lazily on first send and
+    /// the output format is fixed at build time; later calls have no effect).
+    ///
+    /// v0.5 silently drops `meta_struct` (and top-level `span_events`/`span_links`)
+    /// because the v0.5 wire schema has no slots for them — the caller is
+    /// responsible for only enabling this when the agent supports `/v0.5/traces`.
+    #[wasm_bindgen(js_name = "setUseV05")]
+    pub fn set_use_v05(&self, v: bool) {
+        self.use_v05.set(v);
     }
 
     #[wasm_bindgen]
@@ -373,9 +398,16 @@ impl WasmSpanState {
             // First send: build the exporter asynchronously. `build` is not
             // available on wasm (it needs a blocking runtime), so we drive
             // `build_async` here where we already have an async context.
-            let builder = unsafe { &mut *self.builder.get() }
+            let mut builder = unsafe { &mut *self.builder.get() }
                 .take()
                 .ok_or_else(|| JsValue::from_str("exporter builder already consumed"))?;
+            // Output format is decided here, at first build, and then fixed.
+            // v0.5 drops meta_struct/span_events/span_links by design (the v0.5
+            // schema has no slots for them); dd-trace-js only enables this after
+            // confirming agent `/v0.5/traces` support via `/info`.
+            if self.use_v05.get() {
+                builder.set_output_format(TraceExporterOutputFormat::V05);
+            }
             let built = builder
                 .build_async::<WasmCapabilities>()
                 .await
