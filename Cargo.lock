@@ -2407,23 +2407,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
 
 [[package]]
-name = "trace-exporter"
-version = "0.1.0"
-dependencies = [
- "console_error_panic_hook",
- "getrandom 0.2.17",
- "js-sys",
- "libdatadog-nodejs-capabilities",
- "libdd-capabilities 2.0.0 (git+https://github.com/DataDog/libdatadog.git?branch=main)",
- "libdd-data-pipeline",
- "libdd-shared-runtime 1.0.0 (git+https://github.com/DataDog/libdatadog.git?branch=main)",
- "uuid",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "wasm-bindgen-test",
-]
-
-[[package]]
 name = "tracing"
 version = "0.1.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"

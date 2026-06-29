@@ -35,7 +35,3 @@ for d in test/*/; do
       ;;
   esac
 done
-
-# The wasm trace exporter integration test runs against its own in-process mock
-# agent, so run it directly (other test/wasm/* modules remain manual for now).
-run_test test/wasm/trace_exporter/index.js
