@@ -434,17 +434,31 @@ impl WasmSpanState {
     /// `force=true` on shutdown.
     #[wasm_bindgen(js_name = "flushStats")]
     pub async fn flush_stats(&self, force: bool) -> Result<bool, JsValue> {
-        // Take the collector out of the RefCell so no borrow is held across the
-        // await (the send is async). This also guards re-entrancy: a second
-        // flushStats (or stats access from prepareChunk) during the await sees
-        // `None` and is a no-op instead of a double-borrow panic.
-        let mut collector = match self.stats_collector.borrow_mut().take() {
-            Some(collector) => collector,
-            None => return Ok(false),
+        // Build the stats request under a brief *synchronous* borrow, then drop
+        // the borrow BEFORE the async send. The collector therefore stays in
+        // `stats_collector`, so a concurrent `prepareChunk` during the in-flight
+        // send still reaches `add_spans` and those spans are counted. (Taking
+        // the collector out for the whole await would silently drop them from
+        // client-side stats.) No borrow is held across the await, so there is
+        // no double-borrow hazard from overlapping calls.
+        let req = {
+            let mut guard = self.stats_collector.borrow_mut();
+            match guard.as_mut() {
+                Some(collector) => collector
+                    .prepare_request(force)
+                    .map_err(|e| JsValue::from_str(&e))?,
+                None => return Ok(false),
+            }
         };
-        let result = collector.flush(force).await;
-        *self.stats_collector.borrow_mut() = Some(collector);
-        result.map_err(|e| JsValue::from_str(&e))
+        match req {
+            Some(req) => {
+                stats::StatsCollector::send_request(req)
+                    .await
+                    .map_err(|e| JsValue::from_str(&e))?;
+                Ok(true)
+            }
+            None => Ok(false),
+        }
     }
 
     /// Flush the queued change-buffer operations. On success always returns

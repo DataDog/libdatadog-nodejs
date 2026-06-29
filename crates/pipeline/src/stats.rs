@@ -76,14 +76,18 @@ impl StatsCollector {
         }
     }
 
-    /// Flush aggregated stats and send to the agent.
+    /// Drain aggregated stats into a ready-to-send request, **synchronously**.
     ///
-    /// Returns `Ok(true)` if stats were sent, `Ok(false)` if there was nothing
-    /// to send, or `Err` on transport failure.
-    pub async fn flush(&mut self, force: bool) -> Result<bool, String> {
+    /// Returns `Ok(None)` when there is nothing to flush. The concentrator is
+    /// drained and the sequence advanced as part of this call, so the returned
+    /// request must be sent (see `send_request`). Kept synchronous and separate
+    /// from the send so a caller can build the request under a brief borrow and
+    /// release the collector *before* the async send — leaving it available for
+    /// `add_spans` while the stats request is in flight.
+    pub fn prepare_request(&mut self, force: bool) -> Result<Option<http::Request<Bytes>>, String> {
         let buckets = self.concentrator.flush(now(), force);
         if buckets.is_empty() {
-            return Ok(false);
+            return Ok(None);
         }
 
         self.sequence += 1;
@@ -106,13 +110,35 @@ impl StatsCollector {
             .body(Bytes::from(body))
             .map_err(|e| format!("failed to build stats request: {e}"))?;
 
+        Ok(Some(req))
+    }
+
+    /// Send a prepared stats request to the agent. Does **not** borrow the
+    /// collector, so trace export (`add_spans`) can proceed during the await.
+    pub async fn send_request(req: http::Request<Bytes>) -> Result<(), String> {
         let client = DefaultHttpClient::new_client();
         client
             .request(req)
             .await
             .map_err(|e| format!("stats send error: {e:?}"))?;
+        Ok(())
+    }
 
-        Ok(true)
+    /// Flush aggregated stats and send to the agent.
+    ///
+    /// Returns `Ok(true)` if stats were sent, `Ok(false)` if there was nothing
+    /// to send, or `Err` on transport failure. Convenience wrapper around
+    /// `prepare_request` + `send_request`; callers that flush concurrently with
+    /// trace export should use those two directly so the collector isn't held
+    /// across the await (see `flushStats`).
+    pub async fn flush(&mut self, force: bool) -> Result<bool, String> {
+        match self.prepare_request(force)? {
+            Some(req) => {
+                Self::send_request(req).await?;
+                Ok(true)
+            }
+            None => Ok(false),
+        }
     }
 
     /// Update the agent URL (e.g. after reconfiguration).
