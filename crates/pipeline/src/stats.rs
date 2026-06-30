@@ -59,8 +59,6 @@ impl StatsCollector {
                     "consumer".to_string(),
                 ],
                 Vec::new(),
-                // override_max_entries_per_bucket: None => DEFAULT_MAX_ENTRIES_PER_BUCKET.
-                None,
             ),
             meta,
             agent_url,
