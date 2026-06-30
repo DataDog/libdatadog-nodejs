@@ -27,11 +27,18 @@ impl_from_bytes!(i64, 8);
 impl_from_bytes!(i32, 4);
 impl_from_bytes!(u32, 4);
 
-pub fn get_num<T: Copy + FromBytes>(buf: &[u8], index: &mut usize) -> T {
+/// Read a `T` from `buf` at `*index` (little-endian) and advance `*index`.
+///
+/// Returns `None` if the buffer is too short, so callers can't index out of
+/// bounds — the bounds check lives here rather than relying on every call site.
+/// The remaining-bytes form (`size > buf.len() - id`) is overflow-safe.
+pub(crate) fn get_num<T: Copy + FromBytes>(buf: &[u8], index: &mut usize) -> Option<T> {
     let id: usize = *index;
     let size = std::mem::size_of::<T>();
-    let result = &buf[id..(id + size)];
-    let result: T = T::from_bytes(result);
+    if id > buf.len() || size > buf.len() - id {
+        return None;
+    }
+    let result: T = T::from_bytes(&buf[id..id + size]);
     *index += size;
-    result
+    Some(result)
 }

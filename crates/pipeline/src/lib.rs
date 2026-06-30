@@ -73,7 +73,8 @@ fn se_read_u8(buf: &[u8], idx: &mut usize) -> Result<u8, JsValue> {
 
 fn se_read_u32(buf: &[u8], idx: &mut usize) -> Result<u32, JsValue> {
     se_need(buf, *idx, 4)?;
-    Ok(get_num(buf, idx))
+    get_num(buf, idx)
+        .ok_or_else(|| JsValue::from_str("addSpanEvent: truncated span-event attribute buffer"))
 }
 
 fn se_read_str(buf: &[u8], idx: &mut usize) -> Result<SpanString, JsValue> {
@@ -95,11 +96,15 @@ fn se_read_scalar(
         1 => Ok(AttributeArrayValue::Boolean(se_read_u8(buf, idx)? != 0)),
         2 => {
             se_need(buf, *idx, 8)?;
-            Ok(AttributeArrayValue::Integer(get_num(buf, idx)))
+            let n = get_num(buf, idx)
+                .ok_or_else(|| JsValue::from_str("addSpanEvent: truncated span-event attribute buffer"))?;
+            Ok(AttributeArrayValue::Integer(n))
         }
         3 => {
             se_need(buf, *idx, 8)?;
-            Ok(AttributeArrayValue::Double(get_num(buf, idx)))
+            let n = get_num(buf, idx)
+                .ok_or_else(|| JsValue::from_str("addSpanEvent: truncated span-event attribute buffer"))?;
+            Ok(AttributeArrayValue::Double(n))
         }
         _ => Err(JsValue::from_str(
             "addSpanEvent: invalid span-event attribute tag",
@@ -193,6 +198,11 @@ pub struct WasmSpanState {
     /// Extra HTTP headers for OTLP export (e.g. collector auth), as key/value
     /// pairs. Only applied when `otlp_endpoint` is set.
     otlp_headers: RefCell<Vec<(String, String)>>,
+    /// Latched message from a failed lazy `build_async`. Building is one-shot and
+    /// a failure is fatal (bad config), so once set every send returns it (as a
+    /// distinguishable error) instead of a misleading "builder already consumed",
+    /// letting the host stop retrying.
+    build_error: RefCell<Option<String>>,
 }
 
 /// Clears an in-flight flag on drop, so an early return or a dropped future
@@ -243,7 +253,8 @@ impl WasmSpanState {
         let mut change_queue = vec![0u8; change_queue_size as usize];
         let change_buffer = unsafe {
             ChangeBuffer::from_raw_parts(
-                std::ptr::NonNull::new(change_queue.as_mut_ptr()).unwrap(),
+                std::ptr::NonNull::new(change_queue.as_mut_ptr())
+                    .expect("Vec::as_mut_ptr is never null"),
                 change_queue.len(),
             )
         };
@@ -285,6 +296,7 @@ impl WasmSpanState {
             otlp_endpoint: RefCell::new(None),
             otlp_protocol: Cell::new(None),
             otlp_headers: RefCell::new(Vec::new()),
+            build_error: RefCell::new(None),
         })
     }
 
@@ -392,7 +404,8 @@ impl WasmSpanState {
         let mut index = 0;
         let mut span_ids = Vec::with_capacity(count as usize);
         while count > 0 {
-            let span_id: u64 = get_num(chunk, &mut index);
+            let span_id: u64 = get_num(chunk, &mut index)
+                .ok_or_else(|| JsValue::from_str("sendPreparedChunk: span id index out of bounds"))?;
             span_ids.push(span_id);
             count -= 1;
         }
@@ -446,6 +459,13 @@ impl WasmSpanState {
         // reference to the exporter for the duration of the awaits.
         let exporter_slot = unsafe { &mut *self.exporter.get() };
         if exporter_slot.is_none() {
+            // A previous build attempt failed. Building is one-shot and the
+            // failure is fatal (bad config won't fix itself), so return it
+            // consistently — as a distinguishable error the host bails on —
+            // rather than a misleading "builder already consumed".
+            if let Some(msg) = self.build_error.borrow().clone() {
+                return Err(build_failure_error(&msg));
+            }
             // First send: build the exporter asynchronously. `build` is not
             // available on wasm (it needs a blocking runtime), so we drive
             // `build_async` here where we already have an async context.
@@ -472,13 +492,22 @@ impl WasmSpanState {
                     builder.set_otlp_headers(headers.clone());
                 }
             }
-            let built = builder
-                .build_async::<WasmCapabilities>()
-                .await
-                .map_err(|e| JsValue::from_str(&format!("{:?}", e)))?;
-            *exporter_slot = Some(built);
+            match builder.build_async::<WasmCapabilities>().await {
+                Ok(built) => *exporter_slot = Some(built),
+                Err(e) => {
+                    // Latch the failure: the builder is now consumed and the
+                    // config won't change, so every later send must fail fast.
+                    let msg = format!("native exporter build failed: {e:?}");
+                    *self.build_error.borrow_mut() = Some(msg.clone());
+                    return Err(build_failure_error(&msg));
+                }
+            }
         }
-        let exporter = exporter_slot.as_mut().unwrap();
+        let exporter = match exporter_slot.as_mut() {
+            Some(exporter) => exporter,
+            // Unreachable: the block above either set `Some` or returned early.
+            None => return Err(build_failure_error("native exporter unavailable")),
+        };
         let resp = exporter
             .send_trace_chunks_async(vec![spans_vec])
             .await;
@@ -572,13 +601,11 @@ impl WasmSpanState {
         let buf = &self.string_table_input;
         while remaining > 0 {
             // Bound the read against the untrusted `count`: a count larger than
-            // the encoded entries must error, not index out of bounds.
-            if index + 4 > buf.len() {
-                return Err(JsValue::from_str(
-                    "stringTableInsertMany: count exceeds the entries in the input buffer",
-                ));
-            }
-            let key: u32 = get_num(buf, &mut index);
+            // the encoded entries must error, not index out of bounds. get_num
+            // does the (overflow-safe) bounds check and returns None past the end.
+            let key: u32 = get_num(buf, &mut index).ok_or_else(|| {
+                JsValue::from_str("stringTableInsertMany: count exceeds the entries in the input buffer")
+            })?;
             let str_slice = &buf[index..];
             // Bound the NUL scan to the input slice so a non-terminated string
             // can't read past the buffer, and advance past the NUL terminator
@@ -826,9 +853,18 @@ pub fn get_op_codes() -> JsValue {
     ];
     for (name, val) in entries {
         js_sys::Reflect::set(&obj, &JsValue::from_str(name), &JsValue::from_f64(*val as f64))
-            .unwrap();
+            .expect("Reflect::set on a freshly created object cannot fail");
     }
     obj.into()
+}
+
+/// Build a JS `Error` tagged `NativeExporterBuildError` so the host can
+/// recognise a fatal exporter-build failure (bad config) and stop retrying,
+/// rather than treating it as a transient send error.
+fn build_failure_error(msg: &str) -> JsValue {
+    let err = js_sys::Error::new(msg);
+    err.set_name("NativeExporterBuildError");
+    err.into()
 }
 
 #[wasm_bindgen(js_name = "setStorage")]

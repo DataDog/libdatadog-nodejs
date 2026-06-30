@@ -121,7 +121,12 @@ impl HttpClientCapability for WasmHttpClient {
             let body = Bytes::from(result.get2().to_vec());
 
             let mut builder = http::Response::builder().status(status);
-            *builder.headers_mut().unwrap() = headers;
+            // `headers_mut()` is `None` only when the builder already holds an
+            // error (e.g. an out-of-range status from the agent). Don't unwrap:
+            // skip the headers and let `body()` below surface that error.
+            if let Some(builder_headers) = builder.headers_mut() {
+                *builder_headers = headers;
+            }
             builder.body(body).map_err(|e| HttpError::Other(e.into()))
         }
     }
