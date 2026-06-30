@@ -827,6 +827,93 @@ describe('pipeline', () => {
       assert.ok(req, 'agent received a POST')
       assert.strictEqual(req.url, '/v0.5/traces')
     })
+
+    it('exports via OTLP HTTP after setOtlpEndpoint(url)', async () => {
+      // libdatadog maps its internal traces to OTLP and POSTs them to the
+      // configured endpoint instead of the Datadog agent. Confirms the OTLP
+      // path runs end-to-end over the wasm HTTP transport.
+      const http = require('node:http')
+      const seen = []
+      const server = http.createServer((req, res) => {
+        const chunks = []
+        req.on('data', c => chunks.push(c))
+        req.on('end', () => {
+          seen.push({
+            method: req.method,
+            url: req.url,
+            ct: req.headers['content-type'],
+            len: Buffer.concat(chunks).length
+          })
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end('{}')
+        })
+      })
+      await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+      const { port } = server.address()
+      const ns = new NativeSpansInterface({ agentUrl: `http://127.0.0.1:${port}` })
+      ns.state.setOtlpEndpoint(`http://127.0.0.1:${port}/v1/traces`)
+      const span = ns.createSpan()
+      span.name = 'otlp-span'
+      span.service = 'test-service'
+      span.resource = 'test-resource'
+      span.type = 'web'
+      span.duration = 1000000n
+      try {
+        await ns.flushSpans(span)
+        const req = seen.find(r => r.method === 'POST')
+        assert.ok(req, 'OTLP endpoint received a POST')
+        assert.strictEqual(req.url, '/v1/traces')
+        assert.match(req.ct || '', /json|protobuf/)
+        assert.ok(req.len > 0, 'OTLP body is non-empty')
+      } finally {
+        server.closeAllConnections?.()
+        server.close()
+      }
+    })
+
+    it('honors setOtlpProtocol(http/protobuf) and setOtlpHeaders', async () => {
+      const http = require('node:http')
+      let captured
+      const server = http.createServer((req, res) => {
+        req.on('data', () => {})
+        req.on('end', () => {
+          if (req.method === 'POST') {
+            captured = {
+              ct: req.headers['content-type'],
+              auth: req.headers.authorization
+            }
+          }
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end('{}')
+        })
+      })
+      await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+      const { port } = server.address()
+      const ns = new NativeSpansInterface({ agentUrl: `http://127.0.0.1:${port}` })
+      ns.state.setOtlpEndpoint(`http://127.0.0.1:${port}/v1/traces`)
+      ns.state.setOtlpProtocol('http/protobuf')
+      ns.state.setOtlpHeaders(['authorization', 'Bearer test-token'])
+      const span = ns.createSpan()
+      span.name = 'otlp-span'
+      span.service = 'test-service'
+      span.resource = 'test-resource'
+      span.type = 'web'
+      span.duration = 1000000n
+      try {
+        await ns.flushSpans(span)
+        assert.ok(captured, 'OTLP endpoint received a POST')
+        assert.match(captured.ct || '', /protobuf/)
+        assert.strictEqual(captured.auth, 'Bearer test-token')
+      } finally {
+        server.closeAllConnections?.()
+        server.close()
+      }
+    })
+
+    it('rejects unsupported OTLP protocols (e.g. grpc)', () => {
+      const ns = new NativeSpansInterface({ agentUrl: 'http://127.0.0.1:8126' })
+      assert.throws(() => ns.state.setOtlpProtocol('grpc'), /setOtlpProtocol|not supported/)
+    })
   })
 
   describe('client-side stats', () => {

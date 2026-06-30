@@ -3,6 +3,7 @@ use libdd_data_pipeline::trace_exporter::agent_response::AgentResponse;
 use libdd_data_pipeline::trace_exporter::{
     TraceExporter, TraceExporterBuilder, TraceExporterOutputFormat,
 };
+use libdd_data_pipeline::OtlpProtocol;
 use libdd_shared_runtime::LocalRuntime;
 use std::cell::{Cell, RefCell, UnsafeCell};
 use std::ffi::CStr;
@@ -180,6 +181,18 @@ pub struct WasmSpanState {
     /// fixed once the exporter is built on the first send, so `setUseV05` only
     /// takes effect if called before then.
     use_v05: Cell<bool>,
+    /// When set, the lazily-built exporter is configured to export traces via
+    /// OTLP HTTP to this endpoint (e.g. an OTel Collector) INSTEAD of the
+    /// Datadog agent. libdatadog maps its internal traces to OTLP, so no
+    /// JS-formatted spans are involved. Like `use_v05`, only takes effect if
+    /// set before the first send (when the exporter is built).
+    otlp_endpoint: RefCell<Option<String>>,
+    /// OTLP wire protocol (`http/json` default, or `http/protobuf`). Only
+    /// applied when `otlp_endpoint` is set.
+    otlp_protocol: Cell<Option<OtlpProtocol>>,
+    /// Extra HTTP headers for OTLP export (e.g. collector auth), as key/value
+    /// pairs. Only applied when `otlp_endpoint` is set.
+    otlp_headers: RefCell<Vec<(String, String)>>,
 }
 
 /// Clears an in-flight flag on drop, so an early return or a dropped future
@@ -269,6 +282,9 @@ impl WasmSpanState {
             prepared_spans: RefCell::new(None),
             sending: Cell::new(false),
             use_v05: Cell::new(false),
+            otlp_endpoint: RefCell::new(None),
+            otlp_protocol: Cell::new(None),
+            otlp_headers: RefCell::new(Vec::new()),
         })
     }
 
@@ -282,6 +298,36 @@ impl WasmSpanState {
     #[wasm_bindgen(js_name = "setUseV05")]
     pub fn set_use_v05(&self, v: bool) {
         self.use_v05.set(v);
+    }
+
+    /// Route trace export through libdatadog's OTLP HTTP exporter to `url`
+    /// instead of the Datadog agent. Must be called before the first send.
+    #[wasm_bindgen(js_name = "setOtlpEndpoint")]
+    pub fn set_otlp_endpoint(&self, url: String) {
+        *self.otlp_endpoint.borrow_mut() = Some(url);
+    }
+
+    /// Select the OTLP wire protocol: `http/json` (default) or `http/protobuf`.
+    /// Rejects unsupported values (e.g. `grpc`). Only takes effect with an OTLP
+    /// endpoint set, before the first send.
+    #[wasm_bindgen(js_name = "setOtlpProtocol")]
+    pub fn set_otlp_protocol(&self, protocol: String) -> Result<(), JsValue> {
+        let parsed = protocol
+            .parse::<OtlpProtocol>()
+            .map_err(|e| JsValue::from_str(&format!("setOtlpProtocol: {e}")))?;
+        self.otlp_protocol.set(Some(parsed));
+        Ok(())
+    }
+
+    /// Set extra HTTP headers for OTLP export as a flat `[key, value, ...]`
+    /// array. Only takes effect with an OTLP endpoint set, before the first send.
+    #[wasm_bindgen(js_name = "setOtlpHeaders")]
+    pub fn set_otlp_headers(&self, kv: Vec<String>) {
+        let headers = kv
+            .chunks_exact(2)
+            .map(|pair| (pair[0].clone(), pair[1].clone()))
+            .collect();
+        *self.otlp_headers.borrow_mut() = headers;
     }
 
     #[wasm_bindgen]
@@ -407,6 +453,19 @@ impl WasmSpanState {
             // confirming agent `/v0.5/traces` support via `/info`.
             if self.use_v05.get() {
                 builder.set_output_format(TraceExporterOutputFormat::V05);
+            }
+            // When an OTLP endpoint is configured, libdatadog exports traces via
+            // OTLP HTTP to that endpoint instead of the Datadog agent (mutually
+            // exclusive with the agent v0.4/v0.5 path).
+            if let Some(url) = self.otlp_endpoint.borrow().as_deref() {
+                builder.set_otlp_endpoint(url);
+                if let Some(protocol) = self.otlp_protocol.get() {
+                    builder.set_otlp_protocol(protocol);
+                }
+                let headers = self.otlp_headers.borrow();
+                if !headers.is_empty() {
+                    builder.set_otlp_headers(headers.clone());
+                }
             }
             let built = builder
                 .build_async::<WasmCapabilities>()
