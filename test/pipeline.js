@@ -863,7 +863,8 @@ describe('pipeline', () => {
         const req = seen.find(r => r.method === 'POST')
         assert.ok(req, 'OTLP endpoint received a POST')
         assert.strictEqual(req.url, '/v1/traces')
-        assert.match(req.ct || '', /json|protobuf/)
+        // No setOtlpProtocol call — pins the default wire protocol (http/json).
+        assert.match(req.ct || '', /json/)
         assert.ok(req.len > 0, 'OTLP body is non-empty')
       } finally {
         server.closeAllConnections?.()
@@ -880,7 +881,8 @@ describe('pipeline', () => {
           if (req.method === 'POST') {
             captured = {
               ct: req.headers['content-type'],
-              auth: req.headers.authorization
+              auth: req.headers.authorization,
+              custom: req.headers['x-custom']
             }
           }
           res.writeHead(200, { 'content-type': 'application/json' })
@@ -892,7 +894,9 @@ describe('pipeline', () => {
       const ns = new NativeSpansInterface({ agentUrl: `http://127.0.0.1:${port}` })
       ns.state.setOtlpEndpoint(`http://127.0.0.1:${port}/v1/traces`)
       ns.state.setOtlpProtocol('http/protobuf')
-      ns.state.setOtlpHeaders(['authorization', 'Bearer test-token'])
+      // Two header pairs plus a trailing unpaired element (odd length): both
+      // pairs are applied and the stray 'ignored-no-pair' is dropped.
+      ns.state.setOtlpHeaders(['authorization', 'Bearer test-token', 'x-custom', 'cval', 'ignored-no-pair'])
       const span = ns.createSpan()
       span.name = 'otlp-span'
       span.service = 'test-service'
@@ -904,6 +908,7 @@ describe('pipeline', () => {
         assert.ok(captured, 'OTLP endpoint received a POST')
         assert.match(captured.ct || '', /protobuf/)
         assert.strictEqual(captured.auth, 'Bearer test-token')
+        assert.strictEqual(captured.custom, 'cval')
       } finally {
         server.closeAllConnections?.()
         server.close()

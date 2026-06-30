@@ -302,6 +302,7 @@ impl WasmSpanState {
 
     /// Route trace export through libdatadog's OTLP HTTP exporter to `url`
     /// instead of the Datadog agent. Must be called before the first send.
+    /// Takes precedence over `setUseV05` (OTLP bypasses the agent entirely).
     #[wasm_bindgen(js_name = "setOtlpEndpoint")]
     pub fn set_otlp_endpoint(&self, url: String) {
         *self.otlp_endpoint.borrow_mut() = Some(url);
@@ -320,9 +321,13 @@ impl WasmSpanState {
     }
 
     /// Set extra HTTP headers for OTLP export as a flat `[key, value, ...]`
-    /// array. Only takes effect with an OTLP endpoint set, before the first send.
+    /// array (the host flattens its key/value map). Only takes effect with an
+    /// OTLP endpoint set, before the first send. A trailing unpaired element on
+    /// an odd-length array is ignored. Each call replaces any previously set headers.
     #[wasm_bindgen(js_name = "setOtlpHeaders")]
     pub fn set_otlp_headers(&self, kv: Vec<String>) {
+        // chunks_exact drops a trailing unpaired element; the host always passes
+        // complete [key, value] pairs.
         let headers = kv
             .chunks_exact(2)
             .map(|pair| (pair[0].clone(), pair[1].clone()))
