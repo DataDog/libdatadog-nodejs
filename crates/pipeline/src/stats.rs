@@ -20,7 +20,7 @@ use bytes::Bytes;
 use libdd_capabilities::http::HttpClientCapability;
 use libdd_trace_protobuf::pb;
 use libdd_trace_stats::span_concentrator::SpanConcentrator;
-use libdatadog_nodejs_capabilities::DefaultHttpClient;
+use libdatadog_nodejs_capabilities::WasmHttpClient;
 
 use crate::trace_data::WasmTraceData;
 
@@ -59,6 +59,8 @@ impl StatsCollector {
                     "consumer".to_string(),
                 ],
                 Vec::new(),
+                // override_max_entries_per_bucket: None => DEFAULT_MAX_ENTRIES_PER_BUCKET.
+                None,
             ),
             meta,
             agent_url,
@@ -116,7 +118,7 @@ impl StatsCollector {
     /// Send a prepared stats request to the agent. Does **not** borrow the
     /// collector, so trace export (`add_spans`) can proceed during the await.
     pub async fn send_request(req: http::Request<Bytes>) -> Result<(), String> {
-        let client = DefaultHttpClient::new_client();
+        let client = WasmHttpClient::new_client();
         client
             .request(req)
             .await
