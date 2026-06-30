@@ -1010,7 +1010,7 @@ dependencies = [
  "libdd-shared-runtime 1.0.0 (git+https://github.com/DataDog/libdatadog.git?branch=main)",
  "libdd-tinybytes",
  "libdd-trace-normalization",
- "libdd-trace-protobuf 3.0.2",
+ "libdd-trace-protobuf 3.0.2 (git+https://github.com/DataDog/libdatadog.git?branch=main)",
  "libdd-trace-stats",
  "libdd-trace-utils",
  "rmp-serde",
@@ -1054,14 +1054,11 @@ dependencies = [
 
 [[package]]
 name = "libdd-library-config"
-version = "2.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v35.0.0#aa78483fba211c72ca3759c76318895f45e0184b"
+version = "1.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?rev=353134770b312b7ccd2df6afabc253090b948e5f#353134770b312b7ccd2df6afabc253090b948e5f"
 dependencies = [
  "anyhow",
- "libc",
- "libdd-trace-protobuf 1.1.0",
  "memfd",
- "prost",
  "rand",
  "rmp",
  "rmp-serde",
@@ -1071,11 +1068,14 @@ dependencies = [
 
 [[package]]
 name = "libdd-library-config"
-version = "1.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=353134770b312b7ccd2df6afabc253090b948e5f#353134770b312b7ccd2df6afabc253090b948e5f"
+version = "2.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v35.0.0#aa78483fba211c72ca3759c76318895f45e0184b"
 dependencies = [
  "anyhow",
+ "libc",
+ "libdd-trace-protobuf 3.0.2 (git+https://github.com/DataDog/libdatadog.git?tag=v35.0.0)",
  "memfd",
+ "prost",
  "rand",
  "rmp",
  "rmp-serde",
@@ -1169,7 +1169,7 @@ version = "2.0.0"
 source = "git+https://github.com/DataDog/libdatadog.git?branch=main#a38b6304dcd63c91a52a752f2baa04e7d21e374d"
 dependencies = [
  "anyhow",
- "libdd-trace-protobuf 3.0.2",
+ "libdd-trace-protobuf 3.0.2 (git+https://github.com/DataDog/libdatadog.git?branch=main)",
 ]
 
 [[package]]
@@ -1180,7 +1180,7 @@ dependencies = [
  "anyhow",
  "fluent-uri",
  "libdd-common 5.0.0",
- "libdd-trace-protobuf 3.0.2",
+ "libdd-trace-protobuf 3.0.2 (git+https://github.com/DataDog/libdatadog.git?branch=main)",
  "libdd-trace-utils",
  "log",
  "percent-encoding",
@@ -1224,7 +1224,7 @@ dependencies = [
  "libdd-ddsketch 1.0.1 (git+https://github.com/DataDog/libdatadog.git?branch=main)",
  "libdd-shared-runtime 1.0.0 (git+https://github.com/DataDog/libdatadog.git?branch=main)",
  "libdd-trace-obfuscation",
- "libdd-trace-protobuf 3.0.2",
+ "libdd-trace-protobuf 3.0.2 (git+https://github.com/DataDog/libdatadog.git?branch=main)",
  "libdd-trace-utils",
  "rmp-serde",
  "serde",
@@ -1253,7 +1253,7 @@ dependencies = [
  "libdd-common 5.0.0",
  "libdd-tinybytes",
  "libdd-trace-normalization",
- "libdd-trace-protobuf 3.0.2",
+ "libdd-trace-protobuf 3.0.2 (git+https://github.com/DataDog/libdatadog.git?branch=main)",
  "prost",
  "rand",
  "rmp",
@@ -1289,7 +1289,7 @@ version = "0.2.0"
 dependencies = [
  "anyhow",
  "getrandom 0.2.17",
- "libdd-library-config 1.0.0 (git+https://github.com/DataDog/libdatadog.git?rev=353134770b312b7ccd2df6afabc253090b948e5f)",
+ "libdd-library-config 1.0.0",
  "serde",
  "serde-wasm-bindgen",
  "wasm-bindgen",
@@ -1742,7 +1742,7 @@ dependencies = [
  "libdd-capabilities 2.0.0 (git+https://github.com/DataDog/libdatadog.git?branch=main)",
  "libdd-data-pipeline",
  "libdd-shared-runtime 1.0.0 (git+https://github.com/DataDog/libdatadog.git?branch=main)",
- "libdd-trace-protobuf 3.0.2",
+ "libdd-trace-protobuf 3.0.2 (git+https://github.com/DataDog/libdatadog.git?branch=main)",
  "libdd-trace-stats",
  "libdd-trace-utils",
  "rmp-serde",
@@ -1802,7 +1802,7 @@ name = "process-discovery"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "libdd-library-config 1.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v29.0.0)",
+ "libdd-library-config 2.0.0",
  "napi",
  "napi-derive",
 ]

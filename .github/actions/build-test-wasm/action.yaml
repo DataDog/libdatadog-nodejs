@@ -22,7 +22,15 @@ runs:
           wasm-pack build --target nodejs ./crates/${{ inputs.crate }} --out-dir ../../prebuilds/${{ inputs.crate }}
         shell: bash
       - name: Test WASM
-        run: node test-wasm.js ${{ inputs.crate }}
+        # The pipeline crate's tests are top-level node:test suites that need
+        # --test-force-exit (the wasm exporter keeps the event loop alive after
+        # a flush); the other wasm crates use plain test/wasm/<crate>/ scripts.
+        run: |
+          if [ "${{ inputs.crate }}" = "pipeline" ]; then
+            node --test --test-force-exit test/pipeline.js
+          else
+            node test-wasm.js ${{ inputs.crate }}
+          fi
         shell: bash
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

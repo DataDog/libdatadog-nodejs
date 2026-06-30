@@ -2,12 +2,17 @@
 
 const { describe, it, before, beforeEach } = require('node:test')
 const assert = require('node:assert')
-const crypto = require('crypto')
+const crypto = require('node:crypto')
 
 const pipeline = require('..').maybeLoad('pipeline')
-const { WasmSpanState } = pipeline
-const OpCode = pipeline.getOpCodes()
-const wasmMemory = pipeline.getWasmMemory()
+// The pipeline binding is wasm-only and is absent in the native
+// (action-prebuildify) test matrix, where `maybeLoad` returns undefined. Skip
+// the suite there instead of crashing on the destructure below; the pipeline
+// wasm is built and these tests run for real in the `build-test-wasm` job.
+const skip = pipeline === undefined
+const { WasmSpanState } = pipeline ?? {}
+const OpCode = pipeline ? pipeline.getOpCodes() : {}
+const wasmMemory = pipeline ? pipeline.getWasmMemory() : undefined
 
 function getRandomBytes (byteCount) {
   return new Uint8Array(crypto.randomBytes(byteCount))
@@ -15,8 +20,8 @@ function getRandomBytes (byteCount) {
 
 function bytesToBigInt (bytes) {
   let val = 0n
-  for (let i = 0; i < bytes.length; i++) {
-    val = (val << 8n) | BigInt(bytes[i])
+  for (const byte of bytes) {
+    val = (val << 8n) | BigInt(byte)
   }
   return val
 }
@@ -38,7 +43,7 @@ class Span {
     // Trace-level attributes live on a Segment (a local trace chunk). JS owns
     // segment_id allocation and shares it across spans in the same trace.
     this.segmentId = nativeSpans.allocSegment(this.traceId)
-    this._startTime = BigInt(Date.now()) * 1000000n
+    this._startTime = BigInt(Date.now()) * 1_000_000n
 
     this.nativeSpans.queueOp(OpCode.Create, this.spanId, ['u128', this.traceId], ['u64n', this.segmentId], ['u64', this.parentId])
     this.nativeSpans.queueOp(OpCode.SetStart, this.spanId, ['i64', this._startTime])
@@ -54,8 +59,8 @@ class Span {
   }
 
   getTag (key) {
-    return this.nativeSpans.state.getMetaAttr(this.spanIdBig, key) ??
-           this.nativeSpans.state.getMetricAttr(this.spanIdBig, key)
+    return this.nativeSpans.state.getMetaAttr(this.spanIdBig, key)
+      ?? this.nativeSpans.state.getMetricAttr(this.spanIdBig, key)
   }
 
   setTraceTag (key, value) {
@@ -68,8 +73,8 @@ class Span {
   }
 
   getTraceTag (key) {
-    return this.nativeSpans.state.getTraceMetaAttr(this.segmentId, key) ??
-           this.nativeSpans.state.getTraceMetricAttr(this.segmentId, key)
+    return this.nativeSpans.state.getTraceMetaAttr(this.segmentId, key)
+      ?? this.nativeSpans.state.getTraceMetricAttr(this.segmentId, key)
   }
 
   setTraceOrigin (origin) {
@@ -95,7 +100,7 @@ class Span {
       this.spanIdBig,
       name,
       BigInt(timeUnixNano),
-      encodeSpanEventAttrs(attributes)
+      encodeSpanEventAttrs(attributes),
     )
     return this
   }
@@ -105,7 +110,7 @@ class Span {
   }
 
   finish () {
-    this.duration = BigInt(Date.now()) * 1000000n - this._startTime
+    this.duration = BigInt(Date.now()) * 1_000_000n - this._startTime
     return this
   }
 }
@@ -118,20 +123,20 @@ const spanAccessors = {
   type: ['getType', 'SetType', null],
   error: ['getError', 'SetError', 'i32'],
   start: ['getStart', null, null],
-  duration: ['getDuration', 'SetDuration', 'i64']
+  duration: ['getDuration', 'SetDuration', 'i64'],
 }
 
-Object.entries(spanAccessors).forEach(([prop, [getter, setter, valueType]]) => {
+for (const [prop, [getter, setter, valueType]] of Object.entries(spanAccessors)) {
   Object.defineProperty(Span.prototype, prop, {
     get () {
       return this.nativeSpans.state[getter](this.spanIdBig)
     },
     set (val) {
       val = valueType ? [valueType, val] : val
-      this.nativeSpans.queueOp(OpCode[setter], this.spanId, val);
-    }
+      this.nativeSpans.queueOp(OpCode[setter], this.spanId, val)
+    },
   })
-})
+}
 
 const CHANGE_QUEUE_SIZE = 64 * 1024
 const STRING_TABLE_INPUT_SIZE = 10 * 1024
@@ -161,7 +166,7 @@ class NativeSpansInterface {
       options.hostname || 'test-host',
       options.env || 'test-env',
       options.appVersion || '1.0.0',
-      options.runtimeId || '00000000-0000-0000-0000-000000000000'
+      options.runtimeId || '00000000-0000-0000-0000-000000000000',
     )
 
     // Get pointers into WASM memory for direct buffer access
@@ -249,38 +254,46 @@ class NativeSpansInterface {
       } else {
         const [typ, num] = arg
         switch (typ) {
-          case 'u64':
+          case 'u64': {
             this._writeBytesLE(num, this.cqbIndex)
             this.cqbIndex += 8
             break
-          case 'u64n':
+          }
+          case 'u64n': {
             view.setBigUint64(this.cqbIndex, BigInt(num), true)
             this.cqbIndex += 8
             break
-          case 'u32n': // raw, pre-resolved string-table id
+          }
+          case 'u32n': { // raw, pre-resolved string-table id
             view.setUint32(this.cqbIndex, num, true)
             this.cqbIndex += 4
             break
-          case 'u128':
+          }
+          case 'u128': {
             this._writeBytesLE(num[0], this.cqbIndex)
             this.cqbIndex += 8
             this._writeBytesLE(num[1], this.cqbIndex)
             this.cqbIndex += 8
             break
-          case 'i64':
+          }
+          case 'i64': {
             view.setBigInt64(this.cqbIndex, num, true)
             this.cqbIndex += 8
             break
-          case 'i32':
+          }
+          case 'i32': {
             view.setInt32(this.cqbIndex, num, true)
             this.cqbIndex += 4
             break
-          case 'f64':
+          }
+          case 'f64': {
             view.setFloat64(this.cqbIndex, num, true)
             this.cqbIndex += 8
             break
-          default:
+          }
+          default: {
             throw new Error('unsupported number type: ' + typ)
+          }
         }
       }
     }
@@ -318,10 +331,25 @@ class NativeSpansInterface {
 function encodeSpanEventAttrs (attributes) {
   const enc = new TextEncoder()
   const chunks = []
-  const u32 = (n) => { const b = Buffer.alloc(4); b.writeUInt32LE(n >>> 0, 0); return b }
-  const i64 = (n) => { const b = Buffer.alloc(8); b.writeBigInt64LE(BigInt(n), 0); return b }
-  const f64 = (n) => { const b = Buffer.alloc(8); b.writeDoubleLE(n, 0); return b }
-  const str = (s) => { const sb = Buffer.from(enc.encode(s)); return Buffer.concat([u32(sb.length), sb]) }
+  const u32 = (n) => {
+    const b = Buffer.alloc(4)
+    b.writeUInt32LE(n >>> 0, 0)
+    return b
+  }
+  const i64 = (n) => {
+    const b = Buffer.alloc(8)
+    b.writeBigInt64LE(BigInt(n), 0)
+    return b
+  }
+  const f64 = (n) => {
+    const b = Buffer.alloc(8)
+    b.writeDoubleLE(n, 0)
+    return b
+  }
+  const str = (s) => {
+    const sb = Buffer.from(enc.encode(s))
+    return Buffer.concat([u32(sb.length), sb])
+  }
   // Returns `[tag][value]` — used both for single values and array items.
   const scalar = (v) => {
     if (typeof v === 'string') return Buffer.concat([Buffer.from([0]), str(v)])
@@ -345,7 +373,7 @@ function encodeSpanEventAttrs (attributes) {
   return new Uint8Array(Buffer.concat(chunks))
 }
 
-describe('pipeline', () => {
+describe('pipeline', { skip }, () => {
   let nativeSpans
 
   before(() => {
@@ -370,7 +398,7 @@ describe('pipeline', () => {
         'Create', 'SetMetaAttr', 'SetMetricAttr', 'SetServiceName',
         'SetResourceName', 'SetError', 'SetStart', 'SetDuration',
         'SetType', 'SetName', 'SetTraceMetaAttr', 'SetTraceMetricsAttr',
-        'SetTraceOrigin'
+        'SetTraceOrigin',
       ]
       for (const opCode of expectedOpCodes) {
         assert.strictEqual(typeof OpCode[opCode], 'number')
@@ -424,10 +452,10 @@ describe('pipeline', () => {
     it('should set and get numeric tags', () => {
       const span = nativeSpans.createSpan()
       span.setTag('http.status_code', 200)
-      span.setTag('custom.metric', 3.14159)
+      span.setTag('custom.metric', 3.141_59)
 
       assert.strictEqual(span.getTag('http.status_code'), 200)
-      assert.strictEqual(span.getTag('custom.metric'), 3.14159)
+      assert.strictEqual(span.getTag('custom.metric'), 3.141_59)
     })
 
     it('should set and get error state', () => {
@@ -443,7 +471,7 @@ describe('pipeline', () => {
   describe('meta_struct', () => {
     it('round-trips raw bytes by key', () => {
       const span = nativeSpans.createSpan()
-      const value = new Uint8Array([0x82, 0xa1, 0x61, 0x01, 0xa1, 0x62, 0x02])
+      const value = new Uint8Array([0x82, 0xA1, 0x61, 0x01, 0xA1, 0x62, 0x02])
       span.setMetaStruct('appsec', value)
 
       assert.deepStrictEqual(span.getMetaStruct('appsec'), value)
@@ -466,12 +494,12 @@ describe('pipeline', () => {
   describe('span_events', () => {
     it('appends an event with no attributes', () => {
       const span = nativeSpans.createSpan()
-      span.addSpanEvent('exception', 1727211691770716000n)
+      span.addSpanEvent('exception', 1_727_211_691_770_716_000n)
 
       const events = span.getSpanEvents()
       assert.strictEqual(events.length, 1)
       assert.strictEqual(events[0].name, 'exception')
-      assert.strictEqual(events[0].time_unix_nano, 1727211691770716000)
+      assert.strictEqual(events[0].time_unix_nano, 1_727_211_691_770_716_000)
       // Empty attributes are skipped by libdatadog's serializer.
       assert.strictEqual(events[0].attributes, undefined)
     })
@@ -482,7 +510,7 @@ describe('pipeline', () => {
         s: 'hello',
         b: true,
         i: 42,
-        d: 3.5
+        d: 3.5,
       })
 
       const [event] = span.getSpanEvents()
@@ -502,11 +530,11 @@ describe('pipeline', () => {
       const [event] = span.getSpanEvents()
       assert.deepStrictEqual(event.attributes.tags, {
         type: 4,
-        array_value: { values: [{ type: 0, string_value: 'a' }, { type: 0, string_value: 'b' }] }
+        array_value: { values: [{ type: 0, string_value: 'a' }, { type: 0, string_value: 'b' }] },
       })
       assert.deepStrictEqual(event.attributes.nums, {
         type: 4,
-        array_value: { values: [{ type: 2, int_value: 1 }, { type: 2, int_value: 2 }, { type: 2, int_value: 3 }] }
+        array_value: { values: [{ type: 2, int_value: 1 }, { type: 2, int_value: 2 }, { type: 2, int_value: 3 }] },
       })
     })
 
@@ -533,7 +561,7 @@ describe('pipeline', () => {
       const bad = new Uint8Array([5, 0, 0, 0])
       assert.throws(
         () => span.nativeSpans.state.addSpanEvent(span.spanIdBig, 'evt', 1n, bad),
-        /truncated span-event attribute buffer/
+        /truncated span-event attribute buffer/,
       )
     })
 
@@ -545,7 +573,7 @@ describe('pipeline', () => {
       const bad = new Uint8Array([0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00])
       assert.throws(
         () => span.nativeSpans.state.addSpanEvent(span.spanIdBig, 'evt', 1n, bad),
-        /truncated span-event attribute buffer/
+        /truncated span-event attribute buffer/,
       )
     })
   })
@@ -563,7 +591,7 @@ describe('pipeline', () => {
     })
 
     it('should set and get duration', () => {
-      const duration = 1000000n
+      const duration = 1_000_000n
       const span = nativeSpans.createSpan()
       span.duration = duration
       // getDuration returns i64 nanoseconds as a BigInt (no f64 truncation).
@@ -628,10 +656,10 @@ describe('pipeline', () => {
       // Convention: span-level getters throw on an unknown span_id, while
       // trace-level getters return null for an unknown segment. All span
       // getters share the get_span error path, so assert each one throws.
-      const bogus = 0xdeadbeefn
+      const bogus = 0xDE_AD_BE_EFn
       for (const getter of [
         'getName', 'getServiceName', 'getResourceName',
-        'getType', 'getError', 'getStart', 'getDuration'
+        'getType', 'getError', 'getStart', 'getDuration',
       ]) {
         assert.throws(() => nativeSpans.state[getter](bogus), `${getter} should throw`)
       }
@@ -687,11 +715,12 @@ describe('pipeline', () => {
       const ptr = nativeSpans.state.string_table_input_ptr()
       const view = new DataView(wasmMemory.buffer, ptr)
       const bytes = new Uint8Array(wasmMemory.buffer, ptr)
-      const entries = [[60001, 'bulk-key'], [60002, 'bulk-val']]
+      const entries = [[60_001, 'bulk-key'], [60_002, 'bulk-val']]
       let off = 0
       for (const [key, str] of entries) {
-        view.setUint32(off, key, true); off += 4
-        for (let i = 0; i < str.length; i++) bytes[off++] = str.charCodeAt(i)
+        view.setUint32(off, key, true)
+        off += 4
+        for (let i = 0; i < str.length; i++) bytes[off++] = str.codePointAt(i)
         bytes[off++] = 0
       }
       nativeSpans.state.stringTableInsertMany(entries.length)
@@ -699,7 +728,7 @@ describe('pipeline', () => {
       // Reference the pre-inserted ids directly (raw u32, not via getStringId)
       // in a SetMetaAttr op; at flush they must resolve to the bulk strings.
       const span = nativeSpans.createSpan()
-      nativeSpans.queueOp(OpCode.SetMetaAttr, span.spanId, ['u32n', 60001], ['u32n', 60002])
+      nativeSpans.queueOp(OpCode.SetMetaAttr, span.spanId, ['u32n', 60_001], ['u32n', 60_002])
       assert.strictEqual(span.getTag('bulk-key'), 'bulk-val')
     })
 
@@ -708,8 +737,8 @@ describe('pipeline', () => {
       const len = nativeSpans.state.string_table_input_len()
       const view = new DataView(wasmMemory.buffer, ptr)
       const bytes = new Uint8Array(wasmMemory.buffer, ptr, len)
-      bytes.fill(0xff) // no NUL terminator anywhere in the buffer
-      view.setUint32(0, 70001, true)
+      bytes.fill(0xFF) // no NUL terminator anywhere in the buffer
+      view.setUint32(0, 70_001, true)
       // from_bytes_until_nul finds no terminator -> error surfaced as a throw,
       // not an out-of-bounds read.
       assert.throws(() => nativeSpans.state.stringTableInsertMany(1))
@@ -724,7 +753,7 @@ describe('pipeline', () => {
       // One valid entry consuming almost the whole buffer, so claiming a count
       // of 2 makes the second u32 key read run past the end -> bounded error,
       // not an out-of-bounds panic.
-      view.setUint32(0, 71000, true)
+      view.setUint32(0, 71_000, true)
       for (let i = 4; i < len - 1; i++) bytes[i] = 0x61 // 'a'
       bytes[len - 1] = 0 // NUL terminator at the very end
       assert.throws(() => nativeSpans.state.stringTableInsertMany(2), /exceeds the entries/)
@@ -767,7 +796,7 @@ describe('pipeline', () => {
       span.service = 'test-service'
       span.resource = 'test-resource'
       span.type = 'web'
-      span.duration = 1000000n
+      span.duration = 1_000_000n
 
       try {
         const result = await ns.flushSpans(span)
@@ -806,7 +835,7 @@ describe('pipeline', () => {
       span.service = 'test-service'
       span.resource = 'test-resource'
       span.type = 'web'
-      span.duration = 1000000n
+      span.duration = 1_000_000n
       try {
         await ns.flushSpans(span)
         return seen.find(r => r.method === 'POST')
@@ -842,7 +871,7 @@ describe('pipeline', () => {
             method: req.method,
             url: req.url,
             ct: req.headers['content-type'],
-            len: Buffer.concat(chunks).length
+            len: Buffer.concat(chunks).length,
           })
           res.writeHead(200, { 'content-type': 'application/json' })
           res.end('{}')
@@ -857,7 +886,7 @@ describe('pipeline', () => {
       span.service = 'test-service'
       span.resource = 'test-resource'
       span.type = 'web'
-      span.duration = 1000000n
+      span.duration = 1_000_000n
       try {
         await ns.flushSpans(span)
         const req = seen.find(r => r.method === 'POST')
@@ -882,7 +911,7 @@ describe('pipeline', () => {
             captured = {
               ct: req.headers['content-type'],
               auth: req.headers.authorization,
-              custom: req.headers['x-custom']
+              custom: req.headers['x-custom'],
             }
           }
           res.writeHead(200, { 'content-type': 'application/json' })
@@ -902,7 +931,7 @@ describe('pipeline', () => {
       span.service = 'test-service'
       span.resource = 'test-resource'
       span.type = 'web'
-      span.duration = 1000000n
+      span.duration = 1_000_000n
       try {
         await ns.flushSpans(span)
         assert.ok(captured, 'OTLP endpoint received a POST')
@@ -975,7 +1004,10 @@ describe('pipeline', () => {
       const http = require('node:http')
       const server = http.createServer((req, res) => {
         req.resume()
-        req.on('end', () => { res.writeHead(200, { 'content-type': 'application/json' }); res.end('{}') })
+        req.on('end', () => {
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end('{}')
+        })
       })
       await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
       const { port } = server.address()
@@ -991,14 +1023,14 @@ describe('pipeline', () => {
         // the second instead of aliasing the exporter (UB).
         const settled = await Promise.allSettled([
           ns.state.sendPreparedChunk(),
-          ns.state.sendPreparedChunk()
+          ns.state.sendPreparedChunk(),
         ])
         const reasons = settled
           .filter(s => s.status === 'rejected')
           .map(s => String(s.reason))
         assert.ok(
           reasons.some(r => /already in flight/.test(r)),
-          'one overlapping call rejected as already-in-flight'
+          'one overlapping call rejected as already-in-flight',
         )
       } finally {
         server.closeAllConnections?.()
