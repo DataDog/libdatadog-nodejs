@@ -9,7 +9,14 @@ function isDetachedBufferError (err) {
 }
 
 module.exports.sleep = function (ms) {
-  return new Promise(resolve => setTimeout(resolve, ms))
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms)
+    // The exporter races this sleep against each request as a timeout guard (and
+    // reuses it for retry backoff). An in-flight request refs the event loop on
+    // its own, so an abandoned timeout timer (e.g. the 5-minute request-timeout
+    // guard after a fast success) must not keep the host process alive.
+    timer.unref?.()
+  })
 }
 
 module.exports.setStorage = function (new_storage) {

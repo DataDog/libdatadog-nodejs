@@ -14,8 +14,17 @@ run_test() {
   # exporter's runtime machinery after a flush). For the long-lived real
   # consumer that is expected; for the test runner we force a clean exit once
   # all tests have finished. Only applies to files that use node:test.
+  #
+  # `--test-force-exit` exists on Node >= 20.14/22 but Node 18 rejects it as an
+  # unknown option. The wasm transport unref's its timeout/backoff timers so the
+  # process still exits cleanly without the flag; probe for support and degrade
+  # gracefully on Node 18.
   if grep -q "node:test" "$1"; then
-    node --test-force-exit "$1"
+    if node --test-force-exit --eval '' >/dev/null 2>&1; then
+      node --test-force-exit "$1"
+    else
+      node "$1"
+    fi
   else
     node "$1"
   fi
