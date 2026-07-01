@@ -16,6 +16,6 @@ path = "src/bin/receiver.rs"
 anyhow = "1"
 libdd-crashtracker = { git = "https://github.com/DataDog/libdatadog.git", tag = "v35.0.0"  }
 napi = { version = "2", features = ["serde-json"] }
-napi-derive = { version = "2", default-features = false }
+napi-derive = { version = "3", default-features = false }
 rustls = { version = "*", default-features = false, features = ["aws-lc-rs"] }
 serde_json = "1"
