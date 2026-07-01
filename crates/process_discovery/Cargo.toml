@@ -8,7 +8,11 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 anyhow = "1"
-libdd-library-config = { git = "https://github.com/DataDog/libdatadog.git", tag = "v35.0.0", features = ["otel-thread-ctx"] }
+# Pointed at the merge commit that introduced ThreadLocalMetadata (caller-supplied
+# schema version + extra process-context attributes). Swap back to a tagged release
+# once one that includes 7cdeb7896e92d1ba38bde495934e112dac2eda25 is published.
+libdd-library-config = { git = "https://github.com/DataDog/libdatadog.git", rev = "7cdeb7896e92d1ba38bde495934e112dac2eda25", features = ["otel-thread-ctx"] }
+libdd-trace-protobuf = { git = "https://github.com/DataDog/libdatadog.git", rev = "7cdeb7896e92d1ba38bde495934e112dac2eda25" }
 
 napi = { version = "2" }
 napi-derive = { version = "2", default-features = false }
