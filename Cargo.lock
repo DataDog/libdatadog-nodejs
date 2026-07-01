@@ -812,7 +812,7 @@ dependencies = [
 [[package]]
 name = "libdd-library-config"
 version = "2.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v35.0.0#aa78483fba211c72ca3759c76318895f45e0184b"
+source = "git+https://github.com/DataDog/libdatadog.git?rev=7cdeb7896e92d1ba38bde495934e112dac2eda25#7cdeb7896e92d1ba38bde495934e112dac2eda25"
 dependencies = [
  "anyhow",
  "libc",
@@ -884,7 +884,7 @@ dependencies = [
 [[package]]
 name = "libdd-trace-protobuf"
 version = "3.0.2"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v35.0.0#aa78483fba211c72ca3759c76318895f45e0184b"
+source = "git+https://github.com/DataDog/libdatadog.git?rev=7cdeb7896e92d1ba38bde495934e112dac2eda25#7cdeb7896e92d1ba38bde495934e112dac2eda25"
 dependencies = [
  "prost",
  "serde",
@@ -1402,6 +1402,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "libdd-library-config",
+ "libdd-trace-protobuf",
  "napi",
  "napi-derive",
 ]
