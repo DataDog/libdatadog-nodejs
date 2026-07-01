@@ -19,6 +19,9 @@ use wasm_bindgen_futures::JsFuture;
 use libdd_capabilities::http::{HttpClientCapability, HttpError};
 use libdd_capabilities::maybe_send::MaybeSend;
 
+// A `static` requires `Sync`, and `LazyLock<JsValue>: Sync` needs `JsValue:
+// Sync` — which holds only because on wasm32 (single-threaded) wasm-bindgen
+// implements `Send`/`Sync` for `JsValue`. This crate is wasm32-only, so it's sound.
 static WASM_MEMORY: LazyLock<JsValue> = LazyLock::new(wasm_bindgen::memory);
 
 #[wasm_bindgen(module = "/src/http_transport.js")]
@@ -132,9 +135,9 @@ impl HttpClientCapability for WasmHttpClient {
     }
 }
 
-/// Parse response headers from a JS object `{ "header-name": "value", ... }`.
-///
-/// Node.js `res.headers` returns lowercased header names with string values.
+/// Parse response headers from Node's flat `[name, value, name, value, ...]`
+/// array (`res.rawHeaders`): even indices are (lowercased) header names, odd
+/// indices their string values.
 fn parse_response_headers(header_js: Array<JsString>) -> Result<HeaderMap, HttpError> {
     let len = header_js.length() as usize;
     let mut headers = HeaderMap::with_capacity(len / 2);

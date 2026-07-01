@@ -123,28 +123,6 @@ impl StatsCollector {
             .map_err(|e| format!("stats send error: {e:?}"))?;
         Ok(())
     }
-
-    /// Flush aggregated stats and send to the agent.
-    ///
-    /// Returns `Ok(true)` if stats were sent, `Ok(false)` if there was nothing
-    /// to send, or `Err` on transport failure. Convenience wrapper around
-    /// `prepare_request` + `send_request`; callers that flush concurrently with
-    /// trace export should use those two directly so the collector isn't held
-    /// across the await (see `flushStats`).
-    pub async fn flush(&mut self, force: bool) -> Result<bool, String> {
-        match self.prepare_request(force)? {
-            Some(req) => {
-                Self::send_request(req).await?;
-                Ok(true)
-            }
-            None => Ok(false),
-        }
-    }
-
-    /// Update the agent URL (e.g. after reconfiguration).
-    pub fn set_agent_url(&mut self, url: String) {
-        self.agent_url = url;
-    }
 }
 
 /// Encode flushed stats buckets into a `ClientStatsPayload` for msgpack

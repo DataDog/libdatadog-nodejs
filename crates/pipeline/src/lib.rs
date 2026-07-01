@@ -405,7 +405,7 @@ impl WasmSpanState {
         let mut span_ids = Vec::with_capacity(count as usize);
         while count > 0 {
             let span_id: u64 = get_num(chunk, &mut index)
-                .ok_or_else(|| JsValue::from_str("sendPreparedChunk: span id index out of bounds"))?;
+                .ok_or_else(|| JsValue::from_str("prepareChunk: span id index out of bounds"))?;
             span_ids.push(span_id);
             count -= 1;
         }
