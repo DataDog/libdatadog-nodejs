@@ -15,8 +15,8 @@ impl NapiAnonymousFileHandle {}
 /// Additional OTel process-context attribute the threadlocal writer wants to
 /// publish alongside the key map (e.g. language-runtime layout constants). Set
 /// exactly one of `string_value` / `int_value` — the other variants of OTel's
-/// `AnyValue` (bool, double, bytes, array, kvlist) are not yet exposed. An
-/// entry with neither field set is silently dropped.
+/// `AnyValue` (bool, double, bytes, array, kvlist) are not yet exposed.
+/// Passing both set or neither set is rejected as invalid input.
 #[derive(Clone)]
 #[napi(object)]
 pub struct ExtraAttribute {
@@ -66,27 +66,44 @@ pub struct TracerMetadata {
     pub threadlocal_metadata: Option<ThreadLocalMetadata>,
 }
 
-fn convert_extra_attribute(ea: &ExtraAttribute) -> Option<(String, any_value::Value)> {
-    let value = if let Some(s) = &ea.string_value {
-        any_value::Value::StringValue(s.clone())
-    } else if let Some(i) = ea.int_value {
-        any_value::Value::IntValue(i)
-    } else {
-        return None;
+fn convert_extra_attribute(ea: &ExtraAttribute) -> napi::Result<(String, any_value::Value)> {
+    let value = match (&ea.string_value, ea.int_value) {
+        (Some(s), None) => any_value::Value::StringValue(s.clone()),
+        (None, Some(i)) => any_value::Value::IntValue(i),
+        (Some(_), Some(_)) => {
+            return Err(Error::new(
+                Status::InvalidArg,
+                format!(
+                    "ExtraAttribute {:?}: exactly one of stringValue / intValue must be set, both are",
+                    ea.key,
+                ),
+            ));
+        }
+        (None, None) => {
+            return Err(Error::new(
+                Status::InvalidArg,
+                format!(
+                    "ExtraAttribute {:?}: exactly one of stringValue / intValue must be set, neither is",
+                    ea.key,
+                ),
+            ));
+        }
     };
-    Some((ea.key.clone(), value))
+    Ok((ea.key.clone(), value))
 }
 
-fn convert_threadlocal_metadata(tlm: &ThreadLocalMetadata) -> tracer_metadata::ThreadLocalMetadata {
-    tracer_metadata::ThreadLocalMetadata {
+fn convert_threadlocal_metadata(
+    tlm: &ThreadLocalMetadata,
+) -> napi::Result<tracer_metadata::ThreadLocalMetadata> {
+    Ok(tracer_metadata::ThreadLocalMetadata {
         attribute_keys: tlm.attribute_keys.clone(),
         schema_version: tlm.schema_version.clone(),
         extra_attributes: tlm
             .extra_attributes
             .iter()
-            .filter_map(convert_extra_attribute)
-            .collect(),
-    }
+            .map(convert_extra_attribute)
+            .collect::<napi::Result<_>>()?,
+    })
 }
 
 #[napi]
@@ -102,7 +119,11 @@ pub fn store_metadata(data: &TracerMetadata) -> napi::Result<NapiAnonymousFileHa
         service_version: data.service_version.clone(),
         process_tags: data.process_tags.clone(),
         container_id: data.container_id.clone(),
-        threadlocal_metadata: data.threadlocal_metadata.as_ref().map(convert_threadlocal_metadata),
+        threadlocal_metadata: data
+            .threadlocal_metadata
+            .as_ref()
+            .map(convert_threadlocal_metadata)
+            .transpose()?,
     });
 
     match res {
