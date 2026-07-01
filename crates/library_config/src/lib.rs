@@ -2,7 +2,7 @@ use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 pub struct JsConfigurator {
-    configurator: Box<datadog_library_config::Configurator>,
+    configurator: Box<libdd_library_config::Configurator>,
     envp: Vec<String>,
     args: Vec<String>,
 }
@@ -49,7 +49,7 @@ impl JsConfigurator {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         JsConfigurator {
-            configurator: Box::new(datadog_library_config::Configurator::new(false)), // No debug log as WASM can't write to stdout
+            configurator: Box::new(libdd_library_config::Configurator::new(false)), // No debug log as WASM can't write to stdout
             envp: Vec::new(),
             args: Vec::new(),
         }
@@ -70,13 +70,13 @@ impl JsConfigurator {
     #[wasm_bindgen]
     pub fn get_config_local_path(&self, target: String) -> Result<String, JsValue> {
         let target_enum = match target.as_str() {
-            "linux" => datadog_library_config::Target::Linux,
-            "win32" => datadog_library_config::Target::Windows,
-            "darwin" => datadog_library_config::Target::Macos,
+            "linux" => libdd_library_config::Target::Linux,
+            "win32" => libdd_library_config::Target::Windows,
+            "darwin" => libdd_library_config::Target::Macos,
             _ => return Err(JsValue::from_str("Unsupported target")),
         };
         Ok(
-            datadog_library_config::Configurator::local_stable_configuration_path(target_enum)
+            libdd_library_config::Configurator::local_stable_configuration_path(target_enum)
                 .to_string(),
         )
     }
@@ -84,13 +84,13 @@ impl JsConfigurator {
     #[wasm_bindgen]
     pub fn get_config_managed_path(&self, target: String) -> Result<String, JsValue> {
         let target_enum = match target.as_str() {
-            "linux" => datadog_library_config::Target::Linux,
-            "win32" => datadog_library_config::Target::Windows,
-            "darwin" => datadog_library_config::Target::Macos,
+            "linux" => libdd_library_config::Target::Linux,
+            "win32" => libdd_library_config::Target::Windows,
+            "darwin" => libdd_library_config::Target::Macos,
             _ => return Err(JsValue::from_str("Unsupported target")),
         };
         Ok(
-            datadog_library_config::Configurator::fleet_stable_configuration_path(target_enum)
+            libdd_library_config::Configurator::fleet_stable_configuration_path(target_enum)
                 .to_string(),
         )
     }
@@ -108,7 +108,7 @@ impl JsConfigurator {
         let res_config = self.configurator.get_config_from_bytes(
             config_string_local.as_bytes(),
             config_string_managed.as_bytes(),
-            datadog_library_config::ProcessInfo {
+            libdd_library_config::ProcessInfo {
                 envp: envp,
                 args: args,
                 language: b"nodejs".to_vec(),

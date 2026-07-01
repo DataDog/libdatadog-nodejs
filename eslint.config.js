@@ -67,6 +67,27 @@ module.exports = [
     },
   },
   {
+    // Test files use the `node:test` runner (describe/it/before/...). eslint-plugin-n
+    // flags these as "experimental" for the >=18 floor, but they are available on
+    // every Node version the test matrix runs (18.20+). Test harnesses also pass
+    // `null` to mirror the real inputs the wasm bindings receive.
+    files: ['test/**/*.js'],
+    rules: {
+      'n/no-unsupported-features/node-builtins': 'off',
+      'unicorn/no-null': 'off',
+      // Test helpers are commonly scoped inside their describe block.
+      'unicorn/consistent-function-scoping': 'off',
+    },
+  },
+  {
+    // Loaded by Rust via `wasm_bindgen(module = ".../http_transport.js")`, so the
+    // snake_case filename must match the Rust module path.
+    files: ['**/http_transport.js'],
+    rules: {
+      'unicorn/filename-case': 'off',
+    },
+  },
+  {
     ignores: ['build/', 'target/', 'prebuilds/'],
   },
 ]
