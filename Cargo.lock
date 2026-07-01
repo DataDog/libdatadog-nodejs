@@ -255,6 +255,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "convert_case"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "affbf0190ed2caf063e3def54ff444b449371d55c58e513a95ab98eca50adb49"
+dependencies = [
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "core-foundation"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -304,7 +313,7 @@ dependencies = [
  "anyhow",
  "libdd-crashtracker",
  "napi",
- "napi-derive",
+ "napi-derive 3.5.8",
  "rustls",
  "serde_json",
 ]
@@ -1390,7 +1399,7 @@ checksum = "55740c4ae1d8696773c78fdafd5d0e5fe9bc9f1b071c7ba493ba5c413a9184f3"
 dependencies = [
  "bitflags",
  "ctor",
- "napi-derive",
+ "napi-derive 2.16.13",
  "napi-sys",
  "once_cell",
  "serde",
@@ -1404,8 +1413,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7cbe2585d8ac223f7d34f13701434b9d5f4eb9c332cccce8dee57ea18ab8ab0c"
 dependencies = [
  "cfg-if",
- "convert_case",
- "napi-derive-backend",
+ "convert_case 0.6.0",
+ "napi-derive-backend 1.0.75",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "napi-derive"
+version = "3.5.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6730ee4e7b335eac6d7cf10fc2525d92743bd4713a13cb2e6667f0e97322d7c3"
+dependencies = [
+ "convert_case 0.11.0",
+ "napi-derive-backend 5.1.0",
  "proc-macro2",
  "quote",
  "syn",
@@ -1417,8 +1439,20 @@ version = "1.0.75"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1639aaa9eeb76e91c6ae66da8ce3e89e921cd3885e99ec85f4abacae72fc91bf"
 dependencies = [
- "convert_case",
+ "convert_case 0.6.0",
  "once_cell",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "napi-derive-backend"
+version = "5.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db5ccc18b1b16d1049dcbd3e1a21fdfbf3ce720b8944979c5e1a76d4e30d9f9f"
+dependencies = [
+ "convert_case 0.11.0",
  "proc-macro2",
  "quote",
  "syn",
@@ -1804,7 +1838,7 @@ dependencies = [
  "anyhow",
  "libdd-library-config 2.0.0",
  "napi",
- "napi-derive",
+ "napi-derive 3.5.8",
 ]
 
 [[package]]
