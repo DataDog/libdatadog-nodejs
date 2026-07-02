@@ -1,0 +1,40 @@
+[package]
+name = "pipeline"
+version = "0.1.0"
+edition = "2021"
+description = "Wasm binding for pipeline span management and trace export"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1"
+libdatadog-nodejs-capabilities = { path = "../capabilities" }
+libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", tag = "v37.0.0" }
+libdd-data-pipeline = { git = "https://github.com/DataDog/libdatadog.git", tag = "v37.0.0", default-features = false }
+libdd-trace-utils = { git = "https://github.com/DataDog/libdatadog.git", tag = "v37.0.0", default-features = false, features = ["change-buffer"] }
+libdd-trace-stats = { git = "https://github.com/DataDog/libdatadog.git", tag = "v37.0.0", default-features = false }
+libdd-trace-protobuf = { git = "https://github.com/DataDog/libdatadog.git", tag = "v37.0.0", default-features = false }
+libdd-shared-runtime = { git = "https://github.com/DataDog/libdatadog.git", tag = "v37.0.0", default-features = false }
+rmp-serde = "1"
+bytes = "1"
+http = "1"
+console_error_panic_hook = "0.1"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
+uuid = { version = "1", features = ["js"] }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+# The pipeline wasm uses post-MVP features (bulk-memory for change-buffer
+# copies, sign-extension, etc.) that the wasm-opt bundled with wasm-pack does
+# not enable by default. Pass --all-features so wasm-opt validation passes
+# (the smaller wasm crates don't hit this, so it's set per-crate here).
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O', '--all-features']
