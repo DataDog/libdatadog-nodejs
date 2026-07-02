@@ -248,6 +248,7 @@ impl WasmSpanState {
             .set_env(env)
             .set_hostname(hostname)
             .set_app_version(app_version)
+            .set_runtime_id(runtime_id)
             .enable_agent_rates_payload_version();
 
         let mut change_queue = vec![0u8; change_queue_size as usize];
