@@ -373,6 +373,16 @@ function encodeSpanEventAttrs (attributes) {
   return new Uint8Array(Buffer.concat(chunks))
 }
 
+// Read just the length of the outer msgpack array (the v0.4 trace payload is an
+// array of trace chunks). Enough to assert how many separate traces were sent.
+function msgpackOuterArrayLen (buf) {
+  const b = buf[0]
+  if (b >= 0x90 && b <= 0x9F) return b & 0x0F // fixarray
+  if (b === 0xDC) return buf.readUInt16BE(1) // array16
+  if (b === 0xDD) return buf.readUInt32BE(1) // array32
+  throw new Error('payload is not a msgpack array: 0x' + b.toString(16))
+}
+
 describe('pipeline', { skip }, () => {
   let nativeSpans
 
@@ -803,6 +813,62 @@ describe('pipeline', { skip }, () => {
         assert(result, 'exporter returned an agent response')
         assert(payloads.length > 0, 'agent received a trace payload')
         assert(payloads[0].length > 0, 'trace payload is non-empty')
+      } finally {
+        server.closeAllConnections?.()
+        server.close()
+      }
+    })
+
+    it('accumulates one chunk per trace into a single multi-trace request', async () => {
+      // prepareChunk stages one chunk per call; a single sendPreparedChunk sends
+      // them all as one request. Before accumulation, a second prepareChunk
+      // overwrote the first, so only one trace shipped per request. Here two
+      // spans in two DISTINCT traces must arrive as two separate trace chunks.
+      const http = require('node:http')
+      const payloads = []
+      const server = http.createServer((req, res) => {
+        const chunks = []
+        req.on('data', c => chunks.push(c))
+        req.on('end', () => {
+          payloads.push({ url: req.url, body: Buffer.concat(chunks) })
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end('{}')
+        })
+      })
+      await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+      const { port } = server.address()
+      const ns = new NativeSpansInterface({ agentUrl: `http://127.0.0.1:${port}` })
+
+      const mk = (name) => {
+        const s = ns.createSpan() // distinct random trace id per span
+        s.name = name
+        s.service = 'svc'
+        s.resource = 'res'
+        s.type = 'web'
+        s.duration = 1_000_000n
+        return s
+      }
+      const a = mk('trace-a')
+      const b = mk('trace-b')
+
+      // Prepare one chunk per trace (span id written LE), then send once.
+      const prepareOne = (span) => {
+        const buf = Buffer.alloc(8)
+        for (let i = 0; i < 8; i++) buf[i] = span.spanId[7 - i]
+        return ns.state.prepareChunk(1, true, buf)
+      }
+
+      try {
+        assert.strictEqual(prepareOne(a), true, 'first chunk staged')
+        assert.strictEqual(prepareOne(b), true, 'second chunk staged')
+        const result = await ns.state.sendPreparedChunk()
+        assert(result, 'agent responded')
+        const post = payloads.find(p => p.url.includes('/v0.4/traces'))
+        assert.ok(post, 'received a v0.4 POST')
+        assert.strictEqual(
+          msgpackOuterArrayLen(post.body), 2,
+          'payload carries two separate trace chunks, not one lumped chunk',
+        )
       } finally {
         server.closeAllConnections?.()
         server.close()
