@@ -169,7 +169,11 @@ pub struct WasmSpanState {
     builder: UnsafeCell<Option<TraceExporterBuilder<LocalRuntime>>>,
     cbs: RefCell<ChangeBufferState<WasmTraceData>>,
     stats_collector: RefCell<Option<stats::StatsCollector>>,
-    prepared_spans: RefCell<Option<Vec<libdd_trace_utils::span::v04::Span<WasmTraceData>>>>,
+    /// Chunks staged by `prepareChunk`, one per trace (segment), sent together by
+    /// `sendPreparedChunk` as a single multi-trace request. The exporter groups a
+    /// flush batch by trace and calls `prepareChunk` once per trace so each chunk
+    /// carries exactly one segment's spans with correct per-trace tags.
+    prepared_spans: RefCell<Vec<Vec<libdd_trace_utils::span::v04::Span<WasmTraceData>>>>,
     /// Re-entrancy guard for `sendPreparedChunk`. wasm-bindgen async exports
     /// can be invoked again from JS before the prior future resolves; without
     /// this, two calls would each take `&mut` out of `exporter`/`builder` and
@@ -291,7 +295,7 @@ impl WasmSpanState {
             builder: UnsafeCell::new(Some(builder)),
             cbs: RefCell::new(change_buffer_state),
             stats_collector: RefCell::new(stats_collector),
-            prepared_spans: RefCell::new(None),
+            prepared_spans: RefCell::new(Vec::new()),
             sending: Cell::new(false),
             use_v05: Cell::new(false),
             otlp_endpoint: RefCell::new(None),
@@ -389,11 +393,8 @@ impl WasmSpanState {
             ));
         }
         if len == 0 {
-            // Nothing to send: drop any previously prepared-but-unsent chunk so
-            // a caller that ignores this `false` cannot later resend a stale one.
-            if let Some(old_spans) = self.prepared_spans.borrow_mut().take() {
-                self.cbs.borrow_mut().recycle_spans(old_spans);
-            }
+            // Nothing to prepare for this trace; leave any chunks already staged
+            // for other traces in this same flush untouched.
             return Ok(false);
         }
 
@@ -420,16 +421,14 @@ impl WasmSpanState {
             collector.add_spans(&spans_vec);
         }
 
-        // Recycle any previously prepared spans that were never sent (e.g.
-        // if the prior send was skipped by JS back-pressure). Reusing the
-        // pre-allocated HashMaps avoids allocator fragmentation in WASM.
-        if let Some(old_spans) = self.prepared_spans.borrow_mut().take() {
-            self.cbs.borrow_mut().recycle_spans(old_spans);
-        }
-
-        // Store prepared spans for the subsequent sendPreparedChunk call
+        // Stage this trace's chunk for the subsequent sendPreparedChunk call.
+        // Multiple prepareChunk calls (one per trace) accumulate here and are
+        // sent together as one multi-trace request. An empty result (e.g. every
+        // span already extracted) is not staged.
         let has_spans = !spans_vec.is_empty();
-        *self.prepared_spans.borrow_mut() = Some(spans_vec);
+        if has_spans {
+            self.prepared_spans.borrow_mut().push(spans_vec);
+        }
         Ok(has_spans)
     }
 
@@ -449,11 +448,10 @@ impl WasmSpanState {
         self.sending.set(true);
         let _in_flight = InFlightGuard(&self.sending);
 
-        let spans_vec = self
-            .prepared_spans
-            .borrow_mut()
-            .take()
-            .ok_or_else(|| JsValue::from_str("no prepared chunk to send"))?;
+        let chunks = std::mem::take(&mut *self.prepared_spans.borrow_mut());
+        if chunks.is_empty() {
+            return Err(JsValue::from_str("no prepared chunk to send"));
+        }
 
         // SAFETY: WASM is single-threaded and the `sending` guard above
         // guarantees no overlapping invocation, so this is the only live
@@ -510,7 +508,7 @@ impl WasmSpanState {
             None => return Err(build_failure_error("native exporter unavailable")),
         };
         let resp = exporter
-            .send_trace_chunks_async(vec![spans_vec])
+            .send_trace_chunks_async(chunks)
             .await;
         let response_str = resp.map(|resp| match resp {
             AgentResponse::Unchanged => "unchanged".to_string(),
