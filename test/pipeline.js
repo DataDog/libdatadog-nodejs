@@ -167,6 +167,7 @@ class NativeSpansInterface {
       options.env || 'test-env',
       options.appVersion || '1.0.0',
       options.runtimeId || '00000000-0000-0000-0000-000000000000',
+      options.clientComputedStats ?? false,
     )
 
     // Get pointers into WASM memory for direct buffer access
@@ -1013,6 +1014,61 @@ describe('pipeline', { skip }, () => {
     it('rejects unsupported OTLP protocols (e.g. grpc)', () => {
       const ns = new NativeSpansInterface({ agentUrl: 'http://127.0.0.1:8126' })
       assert.throws(() => ns.state.setOtlpProtocol('grpc'), /setOtlpProtocol|not supported/)
+    })
+  })
+
+  describe('client-computed-stats header', () => {
+    async function captureTraceHeader (nsOptions) {
+      const http = require('node:http')
+      let header
+      let sawTraces = false
+      const server = http.createServer((req, res) => {
+        req.on('data', () => {})
+        req.on('end', () => {
+          if (req.url === '/v0.4/traces') {
+            sawTraces = true
+            header = req.headers['datadog-client-computed-stats']
+          }
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end('{}')
+        })
+      })
+      await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+      const { port } = server.address()
+      const ns = new NativeSpansInterface({ agentUrl: `http://127.0.0.1:${port}`, ...nsOptions })
+      const span = ns.createSpan()
+      span.name = 'span'
+      span.service = 'test-service'
+      span.resource = 'test-resource'
+      span.type = 'web'
+      span.duration = 1_000_000n
+      try {
+        await ns.flushSpans(span)
+        return { header, sawTraces }
+      } finally {
+        server.closeAllConnections?.()
+        server.close()
+      }
+    }
+
+    it('sends Datadog-Client-Computed-Stats: true when enabled', async () => {
+      const { header, sawTraces } = await captureTraceHeader({ clientComputedStats: true })
+      assert.ok(sawTraces, 'expected a POST to /v0.4/traces')
+      assert.strictEqual(header, 'true')
+    })
+
+    it('omits the header when both flags are disabled', async () => {
+      const { header, sawTraces } = await captureTraceHeader({ clientComputedStats: false, statsEnabled: false })
+      assert.ok(sawTraces, 'expected a POST to /v0.4/traces')
+      assert.strictEqual(header, undefined)
+    })
+
+    it('sends the header when stats are enabled (client-side stats imply it)', async () => {
+      // Enabling client-side stats without clientComputedStats must still send
+      // the header, otherwise the agent double-counts APM stats.
+      const { header, sawTraces } = await captureTraceHeader({ statsEnabled: true, clientComputedStats: false })
+      assert.ok(sawTraces, 'expected a POST to /v0.4/traces')
+      assert.strictEqual(header, 'true')
     })
   })
 
