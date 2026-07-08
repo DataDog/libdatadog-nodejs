@@ -236,6 +236,7 @@ impl WasmSpanState {
         env: &str,
         app_version: &str,
         runtime_id: &str,
+        client_computed_stats: bool,
     ) -> Result<WasmSpanState, JsValue> {
         let mut builder = TraceExporterBuilder::<LocalRuntime>::new();
         builder
@@ -254,6 +255,19 @@ impl WasmSpanState {
             .set_app_version(app_version)
             .set_runtime_id(runtime_id)
             .enable_agent_rates_payload_version();
+
+        // Advertise `Datadog-Client-Computed-Stats` so the agent skips its own
+        // APM stats/sampling for these traces. This is required in two cases:
+        //  - `stats_enabled`: we build a StatsCollector and send client-side
+        //    stats, so the agent MUST NOT also compute them (double counting);
+        //  - `client_computed_stats`: set independently for APM-standalone
+        //    (apmTracingEnabled=false), where the agent should skip APM stats
+        //    even though we don't compute them client-side.
+        // Enabling stats therefore always implies the header, so OR the flags
+        // rather than relying on the caller to keep them in sync.
+        if client_computed_stats || stats_enabled {
+            builder.set_client_computed_stats();
+        }
 
         let mut change_queue = vec![0u8; change_queue_size as usize];
         let change_buffer = unsafe {
