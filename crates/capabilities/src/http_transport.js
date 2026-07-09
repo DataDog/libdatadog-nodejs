@@ -1,7 +1,105 @@
 const http = require('node:http')
 const https = require('node:https')
+const fs = require('node:fs')
 
 let storage = f => f()
+
+// libdatadog's automatic container-id / entity-id detection (libdd-common's
+// entity_id module) is gated `#[cfg(unix)]` and therefore inert on the
+// `wasm32-unknown-unknown` target we build for, and `DD_EXTERNAL_ENV` is also
+// unreachable from wasm. Node, however, can read `/proc` and `process.env`, so
+// we detect the same values here and add them as the standard Datadog exporter
+// headers (`datadog-container-id`, `datadog-entity-id`, `datadog-external-env`)
+// — the headers native libdatadog adds via `Endpoint::set_standard_headers`.
+//
+// The detection mirrors dd-trace-js's `exporters/common/docker.js` (the proven
+// legacy-exporter path) and libdd-common's `compute_entity_id`
+// (`ci-<container_id>` else `in-<cgroup_inode>`).
+
+// The second alternative is the PCF / Garden regexp; no suffix ($) to avoid
+// matching pod UIDs. See
+// https://github.com/DataDog/datadog-agent/blob/7.40.x/pkg/util/cgroups/reader.go#L50
+const uuidSource = String.raw`[0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{12}|[0-9a-f]{8}(?:-[0-9a-f]{4}){4}$`
+const containerSource = '[0-9a-f]{64}'
+const taskSource = String.raw`[0-9a-f]{32}-\d+`
+const lineReg = /^(\d+):([^:]*):(.+)$/m
+const entityReg = new RegExp(String.raw`.*(${uuidSource}|${containerSource}|${taskSource})(?:\.scope)?$`, 'm')
+
+// Detect the entity headers. Parameterized for unit testing; production callers
+// use the cached `getEntityHeaders()` with the real cgroup paths / environment.
+function detectEntityHeaders (opts = {}) {
+  const cgroupPath = opts.cgroupPath ?? '/proc/self/cgroup'
+  const cgroupMount = opts.cgroupMount ?? '/sys/fs/cgroup'
+  const externalEnv = 'externalEnv' in opts ? opts.externalEnv : process.env.DD_EXTERNAL_ENV
+
+  const headers = {}
+
+  let cgroup = ''
+  let containerId
+  try {
+    cgroup = fs.readFileSync(cgroupPath, 'utf8').trim()
+    containerId = cgroup.match(entityReg)?.[1]
+  } catch { /* not in a cgroup, or not Linux */ }
+
+  let inode = 0
+  const inodePath = cgroup.match(lineReg)?.[3]
+  if (inodePath) {
+    const strippedPath = inodePath.replaceAll(/^\/|\/$/g, '')
+    try {
+      inode = fs.statSync(`${cgroupMount}/${strippedPath}`).ino
+    } catch { /* mount not present */ }
+  }
+
+  // `ci-<container_id>` when a container id is found, else `in-<cgroup_inode>`
+  // — matching libdd-common's `compute_entity_id`.
+  const entityId = containerId ? `ci-${containerId}` : (inode ? `in-${inode}` : undefined)
+
+  if (containerId) headers['datadog-container-id'] = containerId
+  if (entityId) headers['datadog-entity-id'] = entityId
+  // Only emit external-env if it is a clean header value (visible ASCII + space/
+  // tab). This rejects CR/LF (header-injection / request-smuggling vector) and
+  // non-latin1 that the latin1-encoded head rewrite couldn't represent — native
+  // libdatadog likewise rejects invalid bytes via the http crate's HeaderValue.
+  if (externalEnv && /^[\t\u0020-\u007E]*$/.test(externalEnv)) {
+    headers['datadog-external-env'] = externalEnv
+  }
+
+  return headers
+}
+
+let cachedEntityHeaders
+function getEntityHeaders () {
+  if (cachedEntityHeaders === undefined) {
+    cachedEntityHeaders = detectEntityHeaders()
+  }
+  return cachedEntityHeaders
+}
+
+// Rewrite the Rust-rendered HTTP/1.1 request head (a `\r\n`-delimited byte
+// buffer terminated by a blank line) to carry the detected entity headers.
+// Any pre-existing line for a name we set is dropped first, so libdatadog's
+// empty `datadog-container-id` is replaced rather than duplicated. Header
+// names/values are ASCII, so latin1 is a lossless round-trip.
+function applyEntityHeaders (headView, entity = getEntityHeaders()) {
+  const names = Object.keys(entity)
+  if (names.length === 0) return Buffer.from(headView)
+
+  const head = Buffer.from(headView).toString('latin1')
+  const term = head.indexOf('\r\n\r\n')
+  if (term === -1) return Buffer.from(headView) // malformed; leave untouched
+
+  const drop = new Set(names)
+  const lines = head.slice(0, term).split('\r\n')
+  const kept = lines.filter((line, i) => {
+    if (i === 0) return true // request line
+    const colon = line.indexOf(':')
+    const name = (colon === -1 ? line : line.slice(0, colon)).trim().toLowerCase()
+    return !drop.has(name)
+  })
+  for (const name of names) kept.push(`${name}: ${entity[name]}`)
+
+  return Buffer.from(`${kept.join('\r\n')}\r\n\r\n`, 'latin1')
+}
 
 // A retried write can race a wasm-memory detach; treat that as a transient error.
 function isDetachedBufferError (err) {
@@ -36,6 +134,13 @@ let responseHeaderObserver
 
 module.exports.setResponseHeaderObserver = function (new_observer) {
   responseHeaderObserver = new_observer
+}
+
+// Exposed for unit tests.
+module.exports.detectEntityHeaders = detectEntityHeaders
+module.exports.applyEntityHeaders = applyEntityHeaders
+module.exports._resetEntityHeadersCache = () => {
+  cachedEntityHeaders = undefined
 }
 
 module.exports.httpRequest = function (host, port, isHttps, socketPath, head_ptr, head_len, body_ptr, body_len, wasm_memory) {
@@ -92,7 +197,7 @@ module.exports.httpRequest = function (host, port, isHttps, socketPath, head_ptr
         // makes write/end skip _implicitHeader and _send prepends our bytes.
 
         try {
-          req._header = Buffer.from(headView)
+          req._header = applyEntityHeaders(headView)
           req.write(bodyView)
           req.end()
         } catch (error) {

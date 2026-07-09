@@ -171,3 +171,171 @@ describe('http_transport unix socket', { skip: process.platform === 'win32' }, (
     assert.strictEqual(Buffer.from(body).toString('utf8'), RESPONSE_BODY)
   })
 })
+
+// Entity-header injection: container-id / entity-id / external-env detection
+// (Node reads /proc + env; libdatadog's own detection is inert on wasm) and the
+// rewrite of the Rust-rendered request head that carries them.
+const { detectEntityHeaders, applyEntityHeaders } = transport
+
+const DOCKER_CGROUP = '12:memory:/docker/3726184226f5d3147c25fdeab5b60097e378e8a720503a5e19ecfdf29f869860'
+const DOCKER_ID = '3726184226f5d3147c25fdeab5b60097e378e8a720503a5e19ecfdf29f869860'
+
+function writeTmpCgroup (contents) {
+  const p = path.join(os.tmpdir(), `ldn-cgroup-${process.pid}-${Math.random().toString(36).slice(2)}`)
+  fs.writeFileSync(p, contents)
+  return p
+}
+
+function headBytes (lines) {
+  return Buffer.from(lines.join('\r\n') + '\r\n\r\n', 'latin1')
+}
+
+describe('http_transport entity headers', () => {
+  describe('detectEntityHeaders', () => {
+    it('extracts a docker container-id and derives ci-<id> entity-id', () => {
+      const cgroupPath = writeTmpCgroup(DOCKER_CGROUP)
+      try {
+        const h = detectEntityHeaders({ cgroupPath, cgroupMount: '/nonexistent', externalEnv: undefined })
+        assert.strictEqual(h['datadog-container-id'], DOCKER_ID)
+        assert.strictEqual(h['datadog-entity-id'], `ci-${DOCKER_ID}`)
+        assert.strictEqual('datadog-external-env' in h, false)
+      } finally {
+        fs.rmSync(cgroupPath, { force: true })
+      }
+    })
+
+    it('falls back to in-<inode> entity-id when no container-id is present', () => {
+      const cgroupPath = writeTmpCgroup('0::/')
+      try {
+        const h = detectEntityHeaders({ cgroupPath, cgroupMount: os.tmpdir(), externalEnv: undefined })
+        assert.strictEqual('datadog-container-id' in h, false)
+        assert.match(h['datadog-entity-id'], /^in-\d+$/)
+      } finally {
+        fs.rmSync(cgroupPath, { force: true })
+      }
+    })
+
+    it('emits datadog-external-env from the provided value', () => {
+      const h = detectEntityHeaders({ cgroupPath: '/nonexistent', cgroupMount: '/nonexistent', externalEnv: 'it-false,cn-svc,pu-x' })
+      assert.strictEqual(h['datadog-external-env'], 'it-false,cn-svc,pu-x')
+    })
+
+    it('emits nothing without cgroup, mount, or external-env', () => {
+      const h = detectEntityHeaders({ cgroupPath: '/nonexistent', cgroupMount: '/nonexistent', externalEnv: undefined })
+      assert.deepStrictEqual(h, {})
+    })
+
+    it('rejects an external-env containing CR/LF (header-injection guard)', () => {
+      const h = detectEntityHeaders({
+        cgroupPath: '/nonexistent',
+        cgroupMount: '/nonexistent',
+        externalEnv: 'ok\r\nx-evil: 1',
+      })
+      assert.strictEqual('datadog-external-env' in h, false)
+    })
+  })
+
+  describe('applyEntityHeaders (head rewrite)', () => {
+    const entity = {
+      'datadog-container-id': DOCKER_ID,
+      'datadog-entity-id': `ci-${DOCKER_ID}`,
+      'datadog-external-env': 'it-false,cn-svc,pu-x',
+    }
+
+    it('appends entity headers and preserves the request line + framing headers', () => {
+      const head = headBytes([
+        'POST /v0.4/traces HTTP/1.1',
+        'Host: localhost:8126',
+        'Content-Length: 42',
+        'datadog-meta-lang: nodejs',
+      ])
+      const out = applyEntityHeaders(head, entity).toString('latin1')
+      const lines = out.split('\r\n')
+      assert.strictEqual(lines[0], 'POST /v0.4/traces HTTP/1.1')
+      assert.ok(lines.includes('Host: localhost:8126'))
+      assert.ok(lines.includes('Content-Length: 42'))
+      assert.ok(lines.includes('datadog-meta-lang: nodejs'))
+      assert.ok(lines.includes(`datadog-container-id: ${DOCKER_ID}`))
+      assert.ok(lines.includes(`datadog-entity-id: ci-${DOCKER_ID}`))
+      assert.ok(lines.includes('datadog-external-env: it-false,cn-svc,pu-x'))
+      assert.ok(out.endsWith('\r\n\r\n'))
+    })
+
+    it('replaces libdatadog\'s empty datadog-container-id instead of duplicating it', () => {
+      const head = headBytes([
+        'POST /v0.4/traces HTTP/1.1',
+        'Host: localhost',
+        'Content-Length: 0',
+        'datadog-container-id: ',
+      ])
+      const out = applyEntityHeaders(head, entity).toString('latin1')
+      const count = out.split('\r\n').filter(l => l.toLowerCase().startsWith('datadog-container-id:')).length
+      assert.strictEqual(count, 1)
+      assert.ok(out.includes(`datadog-container-id: ${DOCKER_ID}`))
+    })
+
+    it('returns the head unchanged when no entity headers are detected', () => {
+      const head = headBytes(['POST / HTTP/1.1', 'Host: x', 'Content-Length: 0'])
+      const out = applyEntityHeaders(head, {})
+      assert.deepStrictEqual(out, Buffer.from(head))
+    })
+
+    it('leaves a malformed head (no terminator) untouched', () => {
+      const bad = Buffer.from('POST / HTTP/1.1\r\nHost: x', 'latin1')
+      const out = applyEntityHeaders(bad, entity)
+      assert.deepStrictEqual(out, Buffer.from(bad))
+    })
+  })
+
+  describe('httpRequest end-to-end (real transport)', () => {
+    let server
+    let port
+    let received
+    const prevExternalEnv = process.env.DD_EXTERNAL_ENV
+
+    before(async () => {
+      // Set the env then clear the memoized detection so this request re-reads
+      // it (earlier tests may have already populated the cache).
+      process.env.DD_EXTERNAL_ENV = 'it-false,cn-e2e,pu-1'
+      transport._resetEntityHeadersCache()
+      server = http.createServer((req, res) => {
+        received = req.headers
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end('{}')
+      })
+      await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+      port = server.address().port
+    })
+
+    after(() => new Promise(resolve => server.close(() => {
+      if (prevExternalEnv === undefined) delete process.env.DD_EXTERNAL_ENV
+      else process.env.DD_EXTERNAL_ENV = prevExternalEnv
+      transport._resetEntityHeadersCache()
+      resolve()
+    })))
+
+    it('sends the detected entity headers on the wire (via the Rust-rendered head)', async () => {
+      const body = Buffer.from('[]', 'latin1')
+      const head = Buffer.from(
+        `POST /v0.4/traces HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\nContent-Length: ${body.length}\r\n`
+        + 'datadog-meta-lang: nodejs\r\ndatadog-container-id: \r\n\r\n',
+        'latin1',
+      )
+      const mem = new ArrayBuffer(head.length + body.length)
+      const view = new Uint8Array(mem)
+      view.set(head, 0)
+      view.set(body, head.length)
+
+      const [status] = await transport.httpRequest(
+        '127.0.0.1', port, false, '', 0, head.length, head.length, body.length, { buffer: mem },
+      )
+      assert.strictEqual(status, 200)
+      assert.strictEqual(received['datadog-meta-lang'], 'nodejs')
+      assert.strictEqual(received['datadog-external-env'], 'it-false,cn-e2e,pu-1')
+      const detected = detectEntityHeaders()
+      if (detected['datadog-container-id']) {
+        assert.strictEqual(received['datadog-container-id'], detected['datadog-container-id'])
+      }
+    })
+  })
+})
