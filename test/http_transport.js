@@ -130,6 +130,35 @@ describe('http_transport response header observer', () => {
   })
 })
 
+// The transport must NOT require instrumentable builtins (node:http/https/fs) at
+// module load: it is loaded during the tracer's own init, before user code, so
+// an eager require makes dd-trace wrap the builtin in place and leaks
+// instrumentation into a user app that imports it afterwards (breaks the
+// dd-trace-js init/guardrail expectations). They must be required lazily, inside
+// the functions that use them.
+describe('http_transport lazy builtin requires', () => {
+  it('does not require node:http/https/fs at module load', () => {
+    const Module = require('node:module')
+    const modPath = require.resolve('../crates/capabilities/src/http_transport')
+    const orig = Module.prototype.require
+    const seen = []
+    Module.prototype.require = function (id) {
+      seen.push(id)
+      return orig.apply(this, arguments)
+    }
+    try {
+      delete require.cache[modPath]
+      require(modPath)
+    } finally {
+      Module.prototype.require = orig
+      delete require.cache[modPath]
+    }
+    for (const builtin of ['node:http', 'node:https', 'node:fs', 'http', 'https', 'fs']) {
+      assert.ok(!seen.includes(builtin), `${builtin} must not be required at module load`)
+    }
+  })
+})
+
 // Unix-domain-socket transport: a non-empty socketPath must route the request
 // over the socket instead of TCP. Skipped on Windows (no AF_UNIX path here).
 describe('http_transport unix socket', { skip: process.platform === 'win32' }, () => {
