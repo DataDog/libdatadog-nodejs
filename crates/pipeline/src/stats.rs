@@ -18,6 +18,7 @@ fn now() -> SystemTime {
 
 use bytes::Bytes;
 use libdd_capabilities::http::HttpClientCapability;
+use libdd_common::parse_uri;
 use libdd_trace_protobuf::pb;
 use libdd_trace_stats::span_concentrator::SpanConcentrator;
 use libdatadog_nodejs_capabilities::WasmHttpClient;
@@ -96,19 +97,26 @@ impl StatsCollector {
         let body = rmp_serde::encode::to_vec_named(&payload)
             .map_err(|e| format!("stats msgpack encode error: {e}"))?;
 
-        // `agent_url` typically ends in `/` (Node's `URL.toString()` normalizes a
-        // bare authority that way), so a naive concat yields `//v0.6/stats`. The
-        // agent records the raw request path, so the double slash makes the
-        // test-agent (and stats tooling) miss the request entirely. Trim the
-        // trailing slash so the path is exactly `/v0.6/stats`.
-        let stats_url = format!(
-            "{}{}",
-            self.agent_url.trim_end_matches('/'),
-            STATS_ENDPOINT_PATH
-        );
-        let uri: http::Uri = stats_url
-            .parse()
-            .map_err(|e| format!("invalid stats URL: {e}"))?;
+        // Build the base agent URI exactly like the trace exporter does, via
+        // libdatadog's `parse_uri`. For a `unix://` / `windows:` agent URL that
+        // hex-encodes the socket path into the URI *authority* (there is no
+        // standard URL form for socket paths), which the WASM HTTP client's
+        // `decode_socket_path` reverses to route over the socket. A raw parse
+        // instead leaves the socket path in the URI *path* with an empty/invalid
+        // authority, so the stats request never reaches the socket — client stats
+        // silently never arrive over UDS (dd-trace-js #9139, uds-express4).
+        let base = parse_uri(&self.agent_url).map_err(|e| format!("invalid agent URL: {e}"))?;
+        // Append `/v0.6/stats` to the base path while preserving the (hex)
+        // authority, mirroring libdd-data-pipeline's `add_path`. For `unix://`
+        // the base path is "/" and the authority holds the hex socket path; for
+        // TCP it's `http://host:port/`. Trim a trailing slash so the path is
+        // exactly `/v0.6/stats` (a double slash makes the agent miss the request).
+        let base_path = base.path().strip_suffix('/').unwrap_or_else(|| base.path());
+        let new_path_and_query = format!("{base_path}{STATS_ENDPOINT_PATH}");
+        let mut parts = base.into_parts();
+        parts.path_and_query =
+            Some(new_path_and_query.parse().map_err(|e| format!("invalid stats path: {e}"))?);
+        let uri = http::Uri::from_parts(parts).map_err(|e| format!("invalid stats URL: {e}"))?;
 
         let req = http::Request::builder()
             .method(http::Method::PUT)

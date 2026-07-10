@@ -1125,6 +1125,63 @@ describe('pipeline', { skip }, () => {
       const ns = new NativeSpansInterface({ statsEnabled: false })
       assert.strictEqual(await ns.state.flushStats(true), false)
     })
+
+    it('flushes stats to /v0.6/stats over a Unix domain socket', { skip: process.platform === 'win32' }, async () => {
+      // A `unix://` agent URL must route /v0.6/stats over the socket, like
+      // traces do. parse_uri hex-encodes the socket path into the URI authority
+      // (which the transport's decode_socket_path reverses); a raw parse would
+      // leave the path in the URI path and never reach the socket.
+      const http = require('node:http')
+      const os = require('node:os')
+      const fs = require('node:fs')
+      const nodePath = require('node:path')
+      // Keep the path short — AF_UNIX paths are capped (~104 bytes on macOS).
+      const sockPath = nodePath.join(os.tmpdir(), `dd-st-${process.pid}.sock`)
+      try {
+        fs.unlinkSync(sockPath)
+      } catch {
+        // not present
+      }
+      const seen = []
+      const server = http.createServer((req, res) => {
+        const chunks = []
+        req.on('data', c => chunks.push(c))
+        req.on('end', () => {
+          seen.push({ method: req.method, url: req.url, len: Buffer.concat(chunks).length })
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end('{}')
+        })
+      })
+      await new Promise((resolve, reject) => {
+        server.once('error', reject)
+        server.listen(sockPath, resolve)
+      })
+
+      const ns = new NativeSpansInterface({ agentUrl: `unix://${sockPath}`, statsEnabled: true })
+      const span = ns.createSpan()
+      span.name = 'stats-span'
+      span.service = 'stats-svc'
+      span.resource = '/stats'
+      span.type = 'web'
+      span.duration = 5_000_000n
+
+      try {
+        await ns.flushSpans(span)
+        const sent = await ns.state.flushStats(true)
+        assert.strictEqual(sent, true, 'flushStats reported a send over the socket')
+        const statsReq = seen.find(r => r.url === '/v0.6/stats')
+        assert.ok(statsReq, 'agent received a /v0.6/stats request over the socket')
+        assert.ok(statsReq.len > 0, 'stats payload is non-empty')
+      } finally {
+        server.closeAllConnections?.()
+        server.close()
+        try {
+          fs.unlinkSync(sockPath)
+        } catch {
+          // already gone
+        }
+      }
+    })
   })
 
   describe('send re-entrancy', () => {

@@ -107,6 +107,28 @@ function applyEntityHeaders (headView, entity = getEntityHeaders()) {
   return Buffer.from(`${kept.join('\r\n')}\r\n\r\n`, 'latin1')
 }
 
+// Parse the Rust-rendered (+ entity-merged) HTTP/1.1 request head into Node
+// request options `{ method, path, headers }`. We pass these to
+// `http.request(...)` rather than injecting the raw head via the Node-internal
+// `req._header`: that internal is undocumented and Bun's `node:http` ignores it,
+// so under Bun the request went out as `POST /` with no headers and the agent
+// dropped it. Header names/values are ASCII (latin1 round-trips losslessly).
+function parseRequestHead (headBuf) {
+  const head = Buffer.from(headBuf).toString('latin1')
+  const term = head.indexOf('\r\n\r\n')
+  const lines = (term === -1 ? head : head.slice(0, term)).split('\r\n')
+  // Request line: `METHOD request-target HTTP/1.1` (no spaces in the target).
+  const [method, path] = lines[0].split(' ')
+  const headers = {}
+  for (let i = 1; i < lines.length; i++) {
+    const colon = lines[i].indexOf(':')
+    if (colon === -1) continue
+    const name = lines[i].slice(0, colon).trim()
+    if (name) headers[name] = lines[i].slice(colon + 1).trim()
+  }
+  return { method, path, headers }
+}
+
 // A retried write can race a wasm-memory detach; treat that as a transient error.
 function isDetachedBufferError (err) {
   return err instanceof TypeError && /detached/i.test(err.message)
@@ -173,11 +195,15 @@ module.exports.httpRequest = function (host, port, isHttps, socketPath, head_ptr
         const headView = new Uint8Array(wasm_memory.buffer, head_ptr, head_len)
         const bodyView = new Uint8Array(wasm_memory.buffer, body_ptr, body_len)
 
-        // host/port (or socketPath) drive connection selection; method/path/
-        // headers are placeholders because we replace the rendered head below.
+        // The Rust side already rendered the full HTTP/1.1 request head (real
+        // method, `/v0.4/traces` path, Content-Type/Length, datadog-meta-*);
+        // applyEntityHeaders merges in the detected entity headers. Parse it into
+        // request options so the connection uses the correct method/path/headers
+        // on both Node and Bun (host/port or socketPath drive the connection).
+        const { method, path, headers } = parseRequestHead(applyEntityHeaders(headView))
         const requestOptions = useSocket
-          ? { socketPath, method: 'POST', path: '/' }
-          : { host, port, method: 'POST', path: '/' }
+          ? { socketPath, method, path, headers }
+          : { host, port, method, path, headers }
         const req = transport.request(requestOptions, (res) => {
           const chunks = []
           res.on('data', chunk => chunks.push(chunk))
@@ -207,12 +233,10 @@ module.exports.httpRequest = function (host, port, isHttps, socketPath, head_ptr
         })
         req.on('error', reject)
 
-        // Bypass Node's headers: the Rust side has already produced the full
-        // request head in HTTP/1.1 wire format. Setting _header before write()
-        // makes write/end skip _implicitHeader and _send prepends our bytes.
-
+        // The request head (method/path/headers) was supplied via requestOptions
+        // above; just write the body. (No `req._header` injection — that Node
+        // internal is not honored by Bun.)
         try {
-          req._header = applyEntityHeaders(headView)
           req.write(bodyView)
           req.end()
         } catch (error) {
