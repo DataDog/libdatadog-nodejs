@@ -1,6 +1,11 @@
-const http = require('node:http')
-const https = require('node:https')
-const fs = require('node:fs')
+// NOTE: `node:http`, `node:https` and `node:fs` are deliberately NOT required at
+// module load. This transport is loaded during the tracer's own init (before
+// user code runs), and requiring an instrumented builtin here makes dd-trace
+// wrap it in place immediately — so a user app that imports `http` afterwards
+// (e.g. an ESM app under `--require`) sees the wrapped builtin and gets
+// instrumented when it should not (breaks the init/guardrail expectations). The
+// JS agent exporter requires these lazily (at first send) for the same reason;
+// mirror that by requiring them inside the functions that use them below.
 
 let storage = f => f()
 
@@ -28,6 +33,7 @@ const entityReg = new RegExp(String.raw`.*(${uuidSource}|${containerSource}|${ta
 // Detect the entity headers. Parameterized for unit testing; production callers
 // use the cached `getEntityHeaders()` with the real cgroup paths / environment.
 function detectEntityHeaders (opts = {}) {
+  const fs = require('node:fs')
   const cgroupPath = opts.cgroupPath ?? '/proc/self/cgroup'
   const cgroupMount = opts.cgroupMount ?? '/sys/fs/cgroup'
   const externalEnv = 'externalEnv' in opts ? opts.externalEnv : process.env.DD_EXTERNAL_ENV
@@ -147,6 +153,15 @@ module.exports.httpRequest = function (host, port, isHttps, socketPath, head_ptr
   // A non-empty socketPath routes over a Unix domain socket (or Windows named
   // pipe) instead of TCP. Sockets are always plaintext HTTP/1.1, so https is
   // ignored in that mode.
+  const http = require('node:http')
+  const https = require('node:https')
+  // libdatadog derives `host` from the agent URI, which keeps the brackets for
+  // an IPv6 literal (e.g. `[::1]`). Node's `http.request` treats the `host`
+  // option as a hostname to resolve, so `[::1]` fails with ENOTFOUND. Strip the
+  // brackets so the IPv6 address is used directly (Node accepts `::1`).
+  if (typeof host === 'string' && host.length > 1 && host[0] === '[' && host.at(-1) === ']') {
+    host = host.slice(1, -1)
+  }
   const useSocket = typeof socketPath === 'string' && socketPath.length > 0
   const transport = useSocket ? http : (isHttps ? https : http)
 

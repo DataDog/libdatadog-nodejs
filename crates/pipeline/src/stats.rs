@@ -96,7 +96,16 @@ impl StatsCollector {
         let body = rmp_serde::encode::to_vec_named(&payload)
             .map_err(|e| format!("stats msgpack encode error: {e}"))?;
 
-        let stats_url = format!("{}{}", self.agent_url, STATS_ENDPOINT_PATH);
+        // `agent_url` typically ends in `/` (Node's `URL.toString()` normalizes a
+        // bare authority that way), so a naive concat yields `//v0.6/stats`. The
+        // agent records the raw request path, so the double slash makes the
+        // test-agent (and stats tooling) miss the request entirely. Trim the
+        // trailing slash so the path is exactly `/v0.6/stats`.
+        let stats_url = format!(
+            "{}{}",
+            self.agent_url.trim_end_matches('/'),
+            STATS_ENDPOINT_PATH
+        );
         let uri: http::Uri = stats_url
             .parse()
             .map_err(|e| format!("invalid stats URL: {e}"))?;
