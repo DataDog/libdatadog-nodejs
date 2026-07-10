@@ -155,6 +155,13 @@ module.exports.httpRequest = function (host, port, isHttps, socketPath, head_ptr
   // ignored in that mode.
   const http = require('node:http')
   const https = require('node:https')
+  // libdatadog derives `host` from the agent URI, which keeps the brackets for
+  // an IPv6 literal (e.g. `[::1]`). Node's `http.request` treats the `host`
+  // option as a hostname to resolve, so `[::1]` fails with ENOTFOUND. Strip the
+  // brackets so the IPv6 address is used directly (Node accepts `::1`).
+  if (typeof host === 'string' && host.length > 1 && host[0] === '[' && host.at(-1) === ']') {
+    host = host.slice(1, -1)
+  }
   const useSocket = typeof socketPath === 'string' && socketPath.length > 0
   const transport = useSocket ? http : (isHttps ? https : http)
 
