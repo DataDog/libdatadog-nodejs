@@ -130,6 +130,76 @@ describe('http_transport response header observer', () => {
   })
 })
 
+// libdatadog derives the request host from the agent URI, which keeps the
+// brackets for an IPv6 literal (`[::1]`). Node's http.request treats `host` as a
+// name to resolve, so `[::1]` fails with ENOTFOUND; the transport must strip the
+// brackets. Verified by connecting to an IPv6 loopback server with a bracketed
+// host. Skipped where IPv6 loopback isn't available.
+describe('http_transport IPv6 host', () => {
+  let server
+  let port
+  let ipv6Available = true
+
+  before(async () => {
+    server = http.createServer((req, res) => {
+      req.on('data', () => {})
+      req.on('end', () => res.end(RESPONSE_BODY))
+    })
+    try {
+      await new Promise((resolve, reject) => {
+        server.once('error', reject)
+        server.listen(0, '::1', resolve)
+      })
+      port = server.address().port
+    } catch {
+      ipv6Available = false
+    }
+  })
+
+  after(() => new Promise(resolve => (server ? server.close(resolve) : resolve())))
+
+  it('strips brackets from an IPv6 host so http.request can connect', async function () {
+    if (!ipv6Available) return this.skip?.()
+    const head = Buffer.from(
+      `POST /v0.4/traces HTTP/1.1\r\nHost: [::1]:${port}\r\n`
+      + 'Content-Length: 0\r\nConnection: close\r\n\r\n',
+      'utf8',
+    )
+    // Bracketed IPv6 host, exactly as libdatadog passes it from the agent URI.
+    const [status] = await transport.httpRequest('[::1]', port, false, '', 0, head.length, 0, 0, fakeWasmMemory(head))
+    assert.strictEqual(status, 200)
+  })
+})
+
+// The transport must NOT require instrumentable builtins (node:http/https/fs) at
+// module load: it is loaded during the tracer's own init, before user code, so
+// an eager require makes dd-trace wrap the builtin in place and leaks
+// instrumentation into a user app that imports it afterwards (breaks the
+// dd-trace-js init/guardrail expectations). They must be required lazily, inside
+// the functions that use them.
+describe('http_transport lazy builtin requires', () => {
+  it('does not require node:http/https/fs at module load', () => {
+    const Module = require('node:module')
+    const modPath = require.resolve('../crates/capabilities/src/http_transport')
+    const orig = Module.prototype.require
+    const seen = []
+    Module.prototype.require = function (id) {
+      seen.push(id)
+      return Reflect.apply(orig, this, arguments)
+    }
+    try {
+      delete require.cache[modPath]
+      require(modPath)
+    } finally {
+      Module.prototype.require = orig
+      delete require.cache[modPath]
+    }
+    for (const builtin of ['node:http', 'node:https', 'node:fs', 'http', 'https', 'fs']) {
+      assert.ok(!seen.includes(builtin), `${builtin} must not be required at module load`)
+    }
+  })
+})
+
 // Unix-domain-socket transport: a non-empty socketPath must route the request
 // over the socket instead of TCP. Skipped on Windows (no AF_UNIX path here).
 describe('http_transport unix socket', { skip: process.platform === 'win32' }, () => {

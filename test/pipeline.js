@@ -814,6 +814,12 @@ describe('pipeline', { skip }, () => {
         assert(result, 'exporter returned an agent response')
         assert(payloads.length > 0, 'agent received a trace payload')
         assert(payloads[0].length > 0, 'trace payload is non-empty')
+        // process_span stamps the `language` meta at flush. For the Node tracer
+        // it must be "javascript" (matching the JS pipeline), NOT the `nodejs`
+        // header/tracer-lang. The v0.4 span payload has no other nodejs/javascript
+        // string, so a byte check unambiguously distinguishes the two.
+        assert(payloads[0].includes(Buffer.from('javascript')), 'span meta carries language=javascript')
+        assert(!payloads[0].includes(Buffer.from('nodejs')), 'span meta must not carry language=nodejs')
       } finally {
         server.closeAllConnections?.()
         server.close()

@@ -280,7 +280,12 @@ impl WasmSpanState {
         let change_buffer_state = ChangeBufferState::new(
             change_buffer,
             tracer_service.into(),
-            lang.into(),
+            // The change buffer stamps this onto every span's `language` meta tag.
+            // For the Node.js tracer that must be "javascript" (matching the JS
+            // pipeline's span_format), NOT the `Datadog-Meta-Lang: nodejs` header
+            // value (`lang`) that identifies the tracer library to the agent. The
+            // two legitimately differ for Node, so we can't reuse `lang` here.
+            "javascript".into(),
             pid,
         );
 
