@@ -1073,7 +1073,7 @@ source = "git+https://github.com/DataDog/libdatadog.git?rev=7cdeb7896e92d1ba38bd
 dependencies = [
  "anyhow",
  "libc",
- "libdd-trace-protobuf 3.0.2 (git+https://github.com/DataDog/libdatadog.git?tag=v35.0.0)",
+ "libdd-trace-protobuf 3.0.2 (git+https://github.com/DataDog/libdatadog.git?rev=7cdeb7896e92d1ba38bde495934e112dac2eda25)",
  "memfd",
  "prost",
  "rand",
@@ -1191,7 +1191,7 @@ dependencies = [
 [[package]]
 name = "libdd-trace-protobuf"
 version = "3.0.2"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=7cdeb7896e92d1ba38bde495934e112dac2eda25#7cdeb7896e92d1ba38bde495934e112dac2eda25"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v37.0.0#86b7f5700d3db4e58076794b5e8073a40d780083"
 dependencies = [
  "prost",
  "serde",
@@ -1201,7 +1201,7 @@ dependencies = [
 [[package]]
 name = "libdd-trace-protobuf"
 version = "3.0.2"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v37.0.0#86b7f5700d3db4e58076794b5e8073a40d780083"
+source = "git+https://github.com/DataDog/libdatadog.git?rev=7cdeb7896e92d1ba38bde495934e112dac2eda25#7cdeb7896e92d1ba38bde495934e112dac2eda25"
 dependencies = [
  "prost",
  "serde",
@@ -1740,6 +1740,7 @@ dependencies = [
  "js-sys",
  "libdatadog-nodejs-capabilities",
  "libdd-capabilities 2.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v37.0.0)",
+ "libdd-common 5.0.0",
  "libdd-data-pipeline",
  "libdd-shared-runtime 1.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v37.0.0)",
  "libdd-trace-protobuf 3.0.2 (git+https://github.com/DataDog/libdatadog.git?tag=v37.0.0)",
@@ -1803,7 +1804,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "libdd-library-config 2.0.0",
- "libdd-trace-protobuf",
+ "libdd-trace-protobuf 3.0.2 (git+https://github.com/DataDog/libdatadog.git?rev=7cdeb7896e92d1ba38bde495934e112dac2eda25)",
  "napi",
  "napi-derive",
 ]
