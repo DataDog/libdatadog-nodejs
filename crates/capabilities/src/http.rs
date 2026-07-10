@@ -193,8 +193,10 @@ fn hex_decode(s: &str) -> Option<Vec<u8>> {
 /// Serialize the full HTTP/1.1 request head (request line + Host + Content-Length
 /// + user headers + terminating CRLF) into a contiguous byte buffer.
 ///
-/// The buffer is handed to JS by pointer; JS assigns it to
-/// `req._header`, bypassing Node's `_storeHeader` serialization.
+/// The buffer is handed to JS by pointer; JS parses it (`parseRequestHead` in
+/// http_transport.js) into method/path/headers for `http.request(...)`. (It used
+/// to be assigned to the Node internal `req._header`, but Bun's node:http
+/// ignores that, so the head is parsed into request options instead.)
 ///
 /// `is_socket` requests (unix socket / named pipe) omit the `:port` suffix on
 /// the Host header — there is no TCP port for a socket transport.
