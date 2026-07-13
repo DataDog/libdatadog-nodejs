@@ -16,6 +16,8 @@ bytes = "1.4"
 futures-core = "0.3"
 anyhow = "1"
 libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", tag = "v37.0.0" }
+# FIXME: remove
+libdd-common = { path = "../../../libdatadog/libdd-common", default-features = false }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

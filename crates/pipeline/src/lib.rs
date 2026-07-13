@@ -31,6 +31,9 @@ use utils::*;
 #[wasm_bindgen(start)]
 fn init() {
     console_error_panic_hook::set_once();
+    // Seed libdd-common's entity-header store from Node before any HTTP send.
+    // See libdatadog_nodejs_capabilities::entity for details.
+    libdatadog_nodejs_capabilities::entity::init_from_js();
 }
 
 // --- span event attribute decoding ---

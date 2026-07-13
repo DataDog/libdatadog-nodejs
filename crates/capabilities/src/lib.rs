@@ -15,6 +15,7 @@ use std::time::Duration;
 use libdd_capabilities::http::HttpError;
 use libdd_capabilities::{HttpClientCapability, LogWriterCapability, MaybeSend, SleepCapability};
 
+pub mod entity;
 pub mod http;
 pub mod sleep;
 

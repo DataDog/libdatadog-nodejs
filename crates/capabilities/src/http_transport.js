@@ -9,102 +9,53 @@
 
 let storage = f => f()
 
-// libdatadog's automatic container-id / entity-id detection (libdd-common's
-// entity_id module) is gated `#[cfg(unix)]` and therefore inert on the
-// `wasm32-unknown-unknown` target we build for, and `DD_EXTERNAL_ENV` is also
-// unreachable from wasm. Node, however, can read `/proc` and `process.env`, so
-// we detect the same values here and add them as the standard Datadog exporter
-// headers (`datadog-container-id`, `datadog-entity-id`, `datadog-external-env`)
-// — the headers native libdatadog adds via `Endpoint::set_standard_headers`.
-//
-// The detection mirrors dd-trace-js's `exporters/common/docker.js` (the proven
-// legacy-exporter path) and libdd-common's `compute_entity_id`
-// (`ci-<container_id>` else `in-<cgroup_inode>`).
+// libdatadog's automatic container-id / entity-id / external-env detection
+// (libdd-common's `entity_id` module) is gated `#[cfg(unix)]` and inert on the
+// `wasm32-unknown-unknown` target we build for, and `process.env` is also
+// unreachable from wasm. Node reads `/proc/self/cgroup`, stats the cgroup
+// mount subpath for an inode, and reads `DD_EXTERNAL_ENV`, then hands the raw
+// values to Rust via `getEntityInputs`. libdatadog does the regex, `ci-`/`in-`
+// composition, external-env validation and header rendering — see
+// `libdd-common/src/entity_id/parse.rs`.
 
-// The second alternative is the PCF / Garden regexp; no suffix ($) to avoid
-// matching pod UIDs. See
-// https://github.com/DataDog/datadog-agent/blob/7.40.x/pkg/util/cgroups/reader.go#L50
-const uuidSource = String.raw`[0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{12}|[0-9a-f]{8}(?:-[0-9a-f]{4}){4}$`
-const containerSource = '[0-9a-f]{64}'
-const taskSource = String.raw`[0-9a-f]{32}-\d+`
+// Cgroup line format `<hierarchy_id>:<controllers>:<path>`. We just need the
+// path (group 3) to derive the inode-lookup subpath under `/sys/fs/cgroup`.
+// `m` flag matches the first line that fits; we do not attempt controller
+// preference (memory-first) because libdd-common's unix path handles that and
+// this is only used in the wasm sandbox, where callers accept a best-effort
+// inode.
 const lineReg = /^(\d+):([^:]*):(.+)$/m
-const entityReg = new RegExp(String.raw`.*(${uuidSource}|${containerSource}|${taskSource})(?:\.scope)?$`, 'm')
 
-// Detect the entity headers. Parameterized for unit testing; production callers
-// use the cached `getEntityHeaders()` with the real cgroup paths / environment.
-function detectEntityHeaders (opts = {}) {
+// Path arguments are parameterized for unit testing; production callers use
+// the defaults, which resolve to Linux's /proc + cgroup mount.
+function collectEntityInputs (opts = {}) {
   const fs = require('node:fs')
   const cgroupPath = opts.cgroupPath ?? '/proc/self/cgroup'
   const cgroupMount = opts.cgroupMount ?? '/sys/fs/cgroup'
   const externalEnv = 'externalEnv' in opts ? opts.externalEnv : process.env.DD_EXTERNAL_ENV
 
-  const headers = {}
-
-  let cgroup = ''
-  let containerId
+  let cgroupContent, cgroupInode
   try {
-    cgroup = fs.readFileSync(cgroupPath, 'utf8').trim()
-    containerId = cgroup.match(entityReg)?.[1]
-  } catch { /* not in a cgroup, or not Linux */ }
+    cgroupContent = fs.readFileSync(cgroupPath, 'utf8').trim()
+  } catch { /* not linux / not in a cgroup */ }
 
-  let inode = 0
-  const inodePath = cgroup.match(lineReg)?.[3]
+  const inodePath = cgroupContent && cgroupContent.match(lineReg)?.[3]
   if (inodePath) {
-    const strippedPath = inodePath.replaceAll(/^\/|\/$/g, '')
+    const stripped = inodePath.replaceAll(/^\/|\/$/g, '')
     try {
-      inode = fs.statSync(`${cgroupMount}/${strippedPath}`).ino
+      cgroupInode = fs.statSync(`${cgroupMount}/${stripped}`).ino
     } catch { /* mount not present */ }
   }
 
-  // `ci-<container_id>` when a container id is found, else `in-<cgroup_inode>`
-  // — matching libdd-common's `compute_entity_id`.
-  const entityId = containerId ? `ci-${containerId}` : (inode ? `in-${inode}` : undefined)
-
-  if (containerId) headers['datadog-container-id'] = containerId
-  if (entityId) headers['datadog-entity-id'] = entityId
-  // Only emit external-env if it is a clean header value (visible ASCII + space/
-  // tab). This rejects CR/LF (header-injection / request-smuggling vector) and
-  // non-latin1 that the latin1-encoded head rewrite couldn't represent — native
-  // libdatadog likewise rejects invalid bytes via the http crate's HeaderValue.
-  if (externalEnv && /^[\t\u0020-\u007E]*$/.test(externalEnv)) {
-    headers['datadog-external-env'] = externalEnv
-  }
-
-  return headers
+  return { cgroupContent, cgroupInode, externalEnv }
 }
 
-let cachedEntityHeaders
-function getEntityHeaders () {
-  if (cachedEntityHeaders === undefined) {
-    cachedEntityHeaders = detectEntityHeaders()
+let cachedEntityInputs
+module.exports.getEntityInputs = function () {
+  if (cachedEntityInputs === undefined) {
+    cachedEntityInputs = collectEntityInputs()
   }
-  return cachedEntityHeaders
-}
-
-// Rewrite the Rust-rendered HTTP/1.1 request head (a `\r\n`-delimited byte
-// buffer terminated by a blank line) to carry the detected entity headers.
-// Any pre-existing line for a name we set is dropped first, so libdatadog's
-// empty `datadog-container-id` is replaced rather than duplicated. Header
-// names/values are ASCII, so latin1 is a lossless round-trip.
-function applyEntityHeaders (headView, entity = getEntityHeaders()) {
-  const names = Object.keys(entity)
-  if (names.length === 0) return Buffer.from(headView)
-
-  const head = Buffer.from(headView).toString('latin1')
-  const term = head.indexOf('\r\n\r\n')
-  if (term === -1) return Buffer.from(headView) // malformed; leave untouched
-
-  const drop = new Set(names)
-  const lines = head.slice(0, term).split('\r\n')
-  const kept = lines.filter((line, i) => {
-    if (i === 0) return true // request line
-    const colon = line.indexOf(':')
-    const name = (colon === -1 ? line : line.slice(0, colon)).trim().toLowerCase()
-    return !drop.has(name)
-  })
-  for (const name of names) kept.push(`${name}: ${entity[name]}`)
-
-  return Buffer.from(`${kept.join('\r\n')}\r\n\r\n`, 'latin1')
+  return cachedEntityInputs
 }
 
 // Parse the Rust-rendered (+ entity-merged) HTTP/1.1 request head into Node
@@ -165,10 +116,9 @@ module.exports.setResponseHeaderObserver = function (new_observer) {
 }
 
 // Exposed for unit tests.
-module.exports.detectEntityHeaders = detectEntityHeaders
-module.exports.applyEntityHeaders = applyEntityHeaders
-module.exports._resetEntityHeadersCache = () => {
-  cachedEntityHeaders = undefined
+module.exports.collectEntityInputs = collectEntityInputs
+module.exports._resetEntityInputsCache = () => {
+  cachedEntityInputs = undefined
 }
 
 module.exports.httpRequest = function (host, port, isHttps, socketPath, head_ptr, head_len, body_ptr, body_len, wasm_memory) {
