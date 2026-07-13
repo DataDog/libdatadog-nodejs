@@ -146,11 +146,11 @@ module.exports.httpRequest = function (host, port, isHttps, socketPath, head_ptr
         const bodyView = new Uint8Array(wasm_memory.buffer, body_ptr, body_len)
 
         // The Rust side already rendered the full HTTP/1.1 request head (real
-        // method, `/v0.4/traces` path, Content-Type/Length, datadog-meta-*);
-        // applyEntityHeaders merges in the detected entity headers. Parse it into
+        // method, `/v0.4/traces` path, Content-Type/Length, datadog-meta-*,
+        // plus entity headers seeded via `getEntityInputs`). Parse it into
         // request options so the connection uses the correct method/path/headers
         // on both Node and Bun (host/port or socketPath drive the connection).
-        const { method, path, headers } = parseRequestHead(applyEntityHeaders(headView))
+        const { method, path, headers } = parseRequestHead(headView)
         const requestOptions = useSocket
           ? { socketPath, method, path, headers }
           : { host, port, method, path, headers }

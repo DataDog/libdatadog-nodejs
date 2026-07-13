@@ -14,15 +14,3 @@ lto = true
 opt-level = "z"
 panic = "abort"
 strip = true
-
-# FIXME: remove
-[patch."https://github.com/DataDog/libdatadog.git"]
-libdd-common = { path = "../libdatadog/libdd-common" }
-libdd-capabilities = { path = "../libdatadog/libdd-capabilities" }
-libdd-crashtracker = { path = "../libdatadog/libdd-crashtracker" }
-libdd-data-pipeline = { path = "../libdatadog/libdd-data-pipeline" }
-libdd-trace-utils = { path = "../libdatadog/libdd-trace-utils" }
-libdd-trace-stats = { path = "../libdatadog/libdd-trace-stats" }
-libdd-trace-protobuf = { path = "../libdatadog/libdd-trace-protobuf" }
-libdd-shared-runtime = { path = "../libdatadog/libdd-shared-runtime" }
-libdd-library-config = { path = "../libdatadog/libdd-library-config" }

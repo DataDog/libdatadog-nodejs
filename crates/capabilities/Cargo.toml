@@ -15,9 +15,8 @@ http = "1"
 bytes = "1.4"
 futures-core = "0.3"
 anyhow = "1"
-libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", tag = "v37.0.0" }
-# FIXME: remove
-libdd-common = { path = "../../../libdatadog/libdd-common", default-features = false }
+libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", branch = "jwiriath/APMSP-3780-inject-proc-env-stuff" }
+libdd-common = { git = "https://github.com/DataDog/libdatadog.git", branch = "jwiriath/APMSP-3780-inject-proc-env-stuff", default-features = false }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

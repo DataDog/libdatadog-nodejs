@@ -60,6 +60,7 @@ impl StatsCollector {
                     "consumer".to_string(),
                 ],
                 Vec::new(),
+                None,
             ),
             meta,
             agent_url,
@@ -86,7 +87,7 @@ impl StatsCollector {
     /// release the collector *before* the async send — leaving it available for
     /// `add_spans` while the stats request is in flight.
     pub fn prepare_request(&mut self, force: bool) -> Result<Option<http::Request<Bytes>>, String> {
-        let buckets = self.concentrator.flush(now(), force);
+        let (buckets, _) = self.concentrator.flush(now(), force);
         if buckets.is_empty() {
             return Ok(None);
         }
