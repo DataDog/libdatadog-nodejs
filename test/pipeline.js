@@ -1147,7 +1147,7 @@ describe('pipeline', { skip }, () => {
       let batch = []
 
       try {
-        for (let i = 0; i < 7100; i++) {
+        for (let i = 0; i < 15_000; i++) {
           const span = ns.createSpan()
           span.name = 'stats-span'
           span.service = 'stats-svc'
