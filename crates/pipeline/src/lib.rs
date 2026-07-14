@@ -245,6 +245,7 @@ impl WasmSpanState {
             .set_language(lang)
             .set_language_version(lang_version)
             .set_language_interpreter(lang_interpreter)
+            .set_otlp_instrumentation_scope("dd-trace-js", tracer_version)
             // Populate the payload-level TracerMetadata (service/env/hostname/
             // app_version) the agent receives. These values are already passed
             // in for the stats collector; without these calls the trace

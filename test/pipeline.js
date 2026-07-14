@@ -945,6 +945,7 @@ describe('pipeline', { skip }, () => {
             url: req.url,
             ct: req.headers['content-type'],
             len: Buffer.concat(chunks).length,
+            body: Buffer.concat(chunks).toString(),
           })
           res.writeHead(200, { 'content-type': 'application/json' })
           res.end('{}')
@@ -952,7 +953,10 @@ describe('pipeline', { skip }, () => {
       })
       await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
       const { port } = server.address()
-      const ns = new NativeSpansInterface({ agentUrl: `http://127.0.0.1:${port}` })
+      const ns = new NativeSpansInterface({
+        agentUrl: `http://127.0.0.1:${port}`,
+        tracerVersion: '7.0.0-pre',
+      })
       ns.state.setOtlpEndpoint(`http://127.0.0.1:${port}/v1/traces`)
       const span = ns.createSpan()
       span.name = 'otlp-span'
@@ -968,6 +972,9 @@ describe('pipeline', { skip }, () => {
         // No setOtlpProtocol call — pins the default wire protocol (http/json).
         assert.match(req.ct || '', /json/)
         assert.ok(req.len > 0, 'OTLP body is non-empty')
+        const body = JSON.parse(req.body)
+        assert.strictEqual(body.resourceSpans[0].scopeSpans[0].scope.name, 'dd-trace-js')
+        assert.strictEqual(body.resourceSpans[0].scopeSpans[0].scope.version, '7.0.0-pre')
       } finally {
         server.closeAllConnections?.()
         server.close()
