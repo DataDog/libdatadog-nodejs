@@ -17,11 +17,11 @@ fn now() -> SystemTime {
 }
 
 use bytes::Bytes;
+use libdatadog_nodejs_capabilities::WasmHttpClient;
 use libdd_capabilities::http::HttpClientCapability;
 use libdd_common::parse_uri;
 use libdd_trace_protobuf::pb;
 use libdd_trace_stats::span_concentrator::SpanConcentrator;
-use libdatadog_nodejs_capabilities::WasmHttpClient;
 
 use crate::trace_data::WasmTraceData;
 
@@ -60,6 +60,7 @@ impl StatsCollector {
                     "consumer".to_string(),
                 ],
                 Vec::new(),
+                None,
             ),
             meta,
             agent_url,
@@ -86,12 +87,19 @@ impl StatsCollector {
     /// release the collector *before* the async send — leaving it available for
     /// `add_spans` while the stats request is in flight.
     pub fn prepare_request(&mut self, force: bool) -> Result<Option<http::Request<Bytes>>, String> {
-        let buckets = self.concentrator.flush(now(), force);
-        if buckets.is_empty() {
+        let mut flush = self.concentrator.flush(now(), force);
+        if !flush.obfuscated_buckets.is_empty() {
+            return Err(
+                "stats flush produced obfuscated buckets without obfuscation header support"
+                    .to_string(),
+            );
+        }
+        if flush.unobfuscated_buckets.is_empty() {
             return Ok(None);
         }
 
         self.sequence += 1;
+        let buckets = std::mem::take(&mut flush.unobfuscated_buckets);
         let payload = encode_stats_payload(&buckets, &self.meta, self.sequence);
 
         let body = rmp_serde::encode::to_vec_named(&payload)
@@ -114,8 +122,11 @@ impl StatsCollector {
         let base_path = base.path().strip_suffix('/').unwrap_or_else(|| base.path());
         let new_path_and_query = format!("{base_path}{STATS_ENDPOINT_PATH}");
         let mut parts = base.into_parts();
-        parts.path_and_query =
-            Some(new_path_and_query.parse().map_err(|e| format!("invalid stats path: {e}"))?);
+        parts.path_and_query = Some(
+            new_path_and_query
+                .parse()
+                .map_err(|e| format!("invalid stats path: {e}"))?,
+        );
         let uri = http::Uri::from_parts(parts).map_err(|e| format!("invalid stats URL: {e}"))?;
 
         let req = http::Request::builder()
