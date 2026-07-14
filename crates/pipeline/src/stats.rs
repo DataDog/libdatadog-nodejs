@@ -38,6 +38,12 @@ pub struct StatsMeta {
     pub service: String,
 }
 
+/// Stats data prepared by a synchronous concentrator flush.
+pub struct PreparedStatsFlush {
+    pub request: Option<http::Request<Bytes>>,
+    pub collapsed_spans: u64,
+}
+
 /// Manages stats aggregation and flushing.
 pub struct StatsCollector {
     concentrator: SpanConcentrator,
@@ -78,24 +84,34 @@ impl StatsCollector {
         }
     }
 
-    /// Drain aggregated stats into a ready-to-send request, **synchronously**.
+    /// Drain aggregated stats into a ready-to-send request plus flush metadata,
+    /// **synchronously**.
     ///
-    /// Returns `Ok(None)` when there is nothing to flush. The concentrator is
-    /// drained and the sequence advanced as part of this call, so the returned
-    /// request must be sent (see `send_request`). Kept synchronous and separate
-    /// from the send so a caller can build the request under a brief borrow and
-    /// release the collector *before* the async send — leaving it available for
-    /// `add_spans` while the stats request is in flight.
-    pub fn prepare_request(&mut self, force: bool) -> Result<Option<http::Request<Bytes>>, String> {
+    /// Returns `request: None` when there is no stats payload to send. The
+    /// concentrator is drained and the sequence advanced as part of this call,
+    /// so a returned request must be sent (see `send_request`). Kept
+    /// synchronous and separate from the send so a caller can build the request
+    /// under a brief borrow and release the collector *before* the async send —
+    /// leaving it available for `add_spans` while the stats request is in
+    /// flight.
+    pub fn prepare_request(&mut self, force: bool) -> Result<PreparedStatsFlush, String> {
         let mut flush = self.concentrator.flush(now(), force);
+        let collapsed_spans = flush.collapsed_spans;
         if !flush.obfuscated_buckets.is_empty() {
+            // TODO: stats obfuscation is currently disabled. Obfuscated stats
+            // require the datadog-obfuscation-version header, which
+            // prepare_request doesn't emit yet. Add that header before enabling
+            // stats-obfuscation.
             return Err(
                 "stats flush produced obfuscated buckets without obfuscation header support"
                     .to_string(),
             );
         }
         if flush.unobfuscated_buckets.is_empty() {
-            return Ok(None);
+            return Ok(PreparedStatsFlush {
+                request: None,
+                collapsed_spans,
+            });
         }
 
         self.sequence += 1;
@@ -138,7 +154,10 @@ impl StatsCollector {
             .body(Bytes::from(body))
             .map_err(|e| format!("failed to build stats request: {e}"))?;
 
-        Ok(Some(req))
+        Ok(PreparedStatsFlush {
+            request: Some(req),
+            collapsed_spans,
+        })
     }
 
     /// Send a prepared stats request to the agent. Does **not** borrow the
