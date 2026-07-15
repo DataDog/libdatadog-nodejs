@@ -945,6 +945,7 @@ describe('pipeline', { skip }, () => {
             url: req.url,
             ct: req.headers['content-type'],
             len: Buffer.concat(chunks).length,
+            body: Buffer.concat(chunks).toString(),
           })
           res.writeHead(200, { 'content-type': 'application/json' })
           res.end('{}')
@@ -952,7 +953,10 @@ describe('pipeline', { skip }, () => {
       })
       await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
       const { port } = server.address()
-      const ns = new NativeSpansInterface({ agentUrl: `http://127.0.0.1:${port}` })
+      const ns = new NativeSpansInterface({
+        agentUrl: `http://127.0.0.1:${port}`,
+        tracerVersion: '7.0.0-pre',
+      })
       ns.state.setOtlpEndpoint(`http://127.0.0.1:${port}/v1/traces`)
       const span = ns.createSpan()
       span.name = 'otlp-span'
@@ -968,6 +972,9 @@ describe('pipeline', { skip }, () => {
         // No setOtlpProtocol call — pins the default wire protocol (http/json).
         assert.match(req.ct || '', /json/)
         assert.ok(req.len > 0, 'OTLP body is non-empty')
+        const body = JSON.parse(req.body)
+        assert.strictEqual(body.resourceSpans[0].scopeSpans[0].scope.name, 'dd-trace-js')
+        assert.strictEqual(body.resourceSpans[0].scopeSpans[0].scope.version, '7.0.0-pre')
       } finally {
         server.closeAllConnections?.()
         server.close()
@@ -1106,24 +1113,72 @@ describe('pipeline', { skip }, () => {
 
       try {
         await ns.flushSpans(span)
-        const sent = await ns.state.flushStats(true)
-        assert.strictEqual(sent, true, 'flushStats reported a send')
+        const result = await ns.state.flushStats(true)
+        assert.deepStrictEqual(result, { sent: true, collapsedSpans: 0 }, 'flushStats reported a send')
         const statsReq = seen.find(r => r.url === '/v0.6/stats')
         assert.ok(statsReq, 'agent received a /v0.6/stats request')
         assert.strictEqual(statsReq.method, 'PUT')
         assert.ok(statsReq.len > 0, 'stats payload is non-empty')
 
         // Nothing new aggregated -> a second forced flush is a no-op.
-        assert.strictEqual(await ns.state.flushStats(true), false, 'second flush has nothing to send')
+        assert.deepStrictEqual(await ns.state.flushStats(true), { sent: false, collapsedSpans: 0 }, 'second flush has nothing to send')
       } finally {
         server.closeAllConnections?.()
         server.close()
       }
     })
 
-    it('flushStats returns false when stats are disabled', async () => {
+    it('returns collapsed span count when stats cardinality overflows', async () => {
+      const http = require('node:http')
+      const seen = []
+      const server = http.createServer((req, res) => {
+        const chunks = []
+        req.on('data', c => chunks.push(c))
+        req.on('end', () => {
+          seen.push({ method: req.method, url: req.url, len: Buffer.concat(chunks).length })
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end('{}')
+        })
+      })
+      await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+      const { port } = server.address()
+
+      const ns = new NativeSpansInterface({ agentUrl: `http://127.0.0.1:${port}`, statsEnabled: true })
+      let batch = []
+
+      try {
+        for (let i = 0; i < 15_000; i++) {
+          const span = ns.createSpan()
+          span.name = 'stats-span'
+          span.service = 'stats-svc'
+          span.resource = `/stats/${i}`
+          span.type = 'web'
+          span.setTag('span.kind', 'server')
+          span.duration = 5_000_000n
+          ns.flushChangeQueue()
+          batch.push(span)
+          if (batch.length === 500) {
+            await ns.flushSpans(...batch)
+            batch = []
+          }
+        }
+        if (batch.length > 0) {
+          await ns.flushSpans(...batch)
+        }
+
+        const result = await ns.state.flushStats(true)
+        assert.strictEqual(result.sent, true)
+        assert.ok(result.collapsedSpans > 0, 'stats cardinality overflow reported collapsed spans')
+        assert.ok(seen.some(r => r.url === '/v0.6/stats'), 'agent received a /v0.6/stats request')
+      } finally {
+        server.closeAllConnections?.()
+        server.close()
+      }
+    })
+
+    it('flushStats reports no send when stats are disabled', async () => {
       const ns = new NativeSpansInterface({ statsEnabled: false })
-      assert.strictEqual(await ns.state.flushStats(true), false)
+      assert.deepStrictEqual(await ns.state.flushStats(true), { sent: false, collapsedSpans: 0 })
     })
 
     it('flushes stats to /v0.6/stats over a Unix domain socket', { skip: process.platform === 'win32' }, async () => {
@@ -1167,8 +1222,12 @@ describe('pipeline', { skip }, () => {
 
       try {
         await ns.flushSpans(span)
-        const sent = await ns.state.flushStats(true)
-        assert.strictEqual(sent, true, 'flushStats reported a send over the socket')
+        const result = await ns.state.flushStats(true)
+        assert.deepStrictEqual(
+          result,
+          { sent: true, collapsedSpans: 0 },
+          'flushStats reported a send over the socket',
+        )
         const statsReq = seen.find(r => r.url === '/v0.6/stats')
         assert.ok(statsReq, 'agent received a /v0.6/stats request over the socket')
         assert.ok(statsReq.len > 0, 'stats payload is non-empty')
