@@ -96,14 +96,16 @@ fn se_read_scalar(
         1 => Ok(AttributeArrayValue::Boolean(se_read_u8(buf, idx)? != 0)),
         2 => {
             se_need(buf, *idx, 8)?;
-            let n = get_num(buf, idx)
-                .ok_or_else(|| JsValue::from_str("addSpanEvent: truncated span-event attribute buffer"))?;
+            let n = get_num(buf, idx).ok_or_else(|| {
+                JsValue::from_str("addSpanEvent: truncated span-event attribute buffer")
+            })?;
             Ok(AttributeArrayValue::Integer(n))
         }
         3 => {
             se_need(buf, *idx, 8)?;
-            let n = get_num(buf, idx)
-                .ok_or_else(|| JsValue::from_str("addSpanEvent: truncated span-event attribute buffer"))?;
+            let n = get_num(buf, idx).ok_or_else(|| {
+                JsValue::from_str("addSpanEvent: truncated span-event attribute buffer")
+            })?;
             Ok(AttributeArrayValue::Double(n))
         }
         _ => Err(JsValue::from_str(
@@ -218,6 +220,21 @@ impl Drop for InFlightGuard<'_> {
     }
 }
 
+fn stats_flush_result(sent: bool, collapsed_spans: u64) -> Result<JsValue, JsValue> {
+    let result = js_sys::Object::new();
+    js_sys::Reflect::set(
+        &result,
+        &JsValue::from_str("sent"),
+        &JsValue::from_bool(sent),
+    )?;
+    js_sys::Reflect::set(
+        &result,
+        &JsValue::from_str("collapsedSpans"),
+        &JsValue::from_f64(collapsed_spans as f64),
+    )?;
+    Ok(result.into())
+}
+
 #[wasm_bindgen]
 impl WasmSpanState {
     #[wasm_bindgen(constructor)]
@@ -245,6 +262,7 @@ impl WasmSpanState {
             .set_language(lang)
             .set_language_version(lang_version)
             .set_language_interpreter(lang_interpreter)
+            .set_otlp_instrumentation_scope("dd-trace-js", tracer_version)
             // Populate the payload-level TracerMetadata (service/env/hostname/
             // app_version) the agent receives. These values are already passed
             // in for the stats collector; without these calls the trace
@@ -417,7 +435,8 @@ impl WasmSpanState {
             return Ok(false);
         }
 
-        self.cbs.borrow_mut()
+        self.cbs
+            .borrow_mut()
             .flush_change_buffer()
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
@@ -432,7 +451,8 @@ impl WasmSpanState {
         }
 
         let spans_vec = self
-            .cbs.borrow_mut()
+            .cbs
+            .borrow_mut()
             .flush_chunk(&span_ids, first_is_local_root)
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
@@ -526,9 +546,7 @@ impl WasmSpanState {
             // Unreachable: the block above either set `Some` or returned early.
             None => return Err(build_failure_error("native exporter unavailable")),
         };
-        let resp = exporter
-            .send_trace_chunks_async(chunks)
-            .await;
+        let resp = exporter.send_trace_chunks_async(chunks).await;
         let response_str = resp.map(|resp| match resp {
             AgentResponse::Unchanged => "unchanged".to_string(),
             AgentResponse::Changed { body } => body,
@@ -542,9 +560,11 @@ impl WasmSpanState {
     /// Flush aggregated stats to the agent's /v0.6/stats endpoint.
     ///
     /// Should be called periodically (e.g. every 10s) from JS, and with
-    /// `force=true` on shutdown.
+    /// `force=true` on shutdown. Returns `{ sent, collapsedSpans }` so JS can
+    /// emit the same collapsed-span health metric as libdd-trace-stats's native
+    /// exporter.
     #[wasm_bindgen(js_name = "flushStats")]
-    pub async fn flush_stats(&self, force: bool) -> Result<bool, JsValue> {
+    pub async fn flush_stats(&self, force: bool) -> Result<JsValue, JsValue> {
         // Build the stats request under a brief *synchronous* borrow, then drop
         // the borrow BEFORE the async send. The collector therefore stays in
         // `stats_collector`, so a concurrent `prepareChunk` during the in-flight
@@ -552,24 +572,26 @@ impl WasmSpanState {
         // the collector out for the whole await would silently drop them from
         // client-side stats.) No borrow is held across the await, so there is
         // no double-borrow hazard from overlapping calls.
-        let req = {
+        let prepared = {
             let mut guard = self.stats_collector.borrow_mut();
             match guard.as_mut() {
                 Some(collector) => collector
                     .prepare_request(force)
                     .map_err(|e| JsValue::from_str(&e))?,
-                None => return Ok(false),
+                None => return stats_flush_result(false, 0),
             }
         };
-        match req {
+        let sent = match prepared.request {
             Some(req) => {
                 stats::StatsCollector::send_request(req)
                     .await
                     .map_err(|e| JsValue::from_str(&e))?;
-                Ok(true)
+                true
             }
-            None => Ok(false),
-        }
+            None => false,
+        };
+
+        stats_flush_result(sent, prepared.collapsed_spans)
     }
 
     /// Flush the queued change-buffer operations. On success always returns
@@ -577,7 +599,8 @@ impl WasmSpanState {
     /// flush methods); failures surface as a thrown error.
     #[wasm_bindgen(js_name = "flushChangeQueue")]
     pub fn flush_change_queue(&self) -> Result<bool, JsValue> {
-        self.cbs.borrow_mut()
+        self.cbs
+            .borrow_mut()
             .flush_change_buffer()
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         Ok(true)
@@ -605,7 +628,8 @@ impl WasmSpanState {
 
     #[wasm_bindgen(js_name = "stringTableInsertOne")]
     pub fn string_table_insert_one(&self, key: u32, val: &str) {
-        self.cbs.borrow_mut()
+        self.cbs
+            .borrow_mut()
             .string_table_insert_one(key, val.into());
     }
 
@@ -622,7 +646,9 @@ impl WasmSpanState {
             // the encoded entries must error, not index out of bounds. get_num
             // does the (overflow-safe) bounds check and returns None past the end.
             let key: u32 = get_num(buf, &mut index).ok_or_else(|| {
-                JsValue::from_str("stringTableInsertMany: count exceeds the entries in the input buffer")
+                JsValue::from_str(
+                    "stringTableInsertMany: count exceeds the entries in the input buffer",
+                )
             })?;
             let str_slice = &buf[index..];
             // Bound the NUL scan to the input slice so a non-terminated string
@@ -654,7 +680,9 @@ impl WasmSpanState {
     pub fn get_service_name(&self, span_id: u64) -> Result<String, JsValue> {
         self.flush_change_queue()?;
         let cbs = self.cbs.borrow();
-        let span = cbs.get_span(span_id).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let span = cbs
+            .get_span(span_id)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
         Ok(span.service.to_string())
     }
 
@@ -662,7 +690,9 @@ impl WasmSpanState {
     pub fn get_resource_name(&self, span_id: u64) -> Result<String, JsValue> {
         self.flush_change_queue()?;
         let cbs = self.cbs.borrow();
-        let span = cbs.get_span(span_id).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let span = cbs
+            .get_span(span_id)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
         Ok(span.resource.to_string())
     }
 
@@ -670,10 +700,14 @@ impl WasmSpanState {
     pub fn get_meta_attr(&self, span_id: u64, name: &str) -> Result<JsValue, JsValue> {
         self.flush_change_queue()?;
         let cbs = self.cbs.borrow();
-        let span = cbs.get_span(span_id).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let span = cbs
+            .get_span(span_id)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
         // VecMap::get accepts &str directly (SpanString: Borrow<str>), so no
         // SpanString allocation is needed for the lookup.
-        Ok(span.meta.get(name)
+        Ok(span
+            .meta
+            .get(name)
             .map(|v| JsValue::from_str(v.0.as_ref()))
             .unwrap_or(JsValue::NULL))
     }
@@ -682,8 +716,12 @@ impl WasmSpanState {
     pub fn get_metric_attr(&self, span_id: u64, name: &str) -> Result<JsValue, JsValue> {
         self.flush_change_queue()?;
         let cbs = self.cbs.borrow();
-        let span = cbs.get_span(span_id).map_err(|e| JsValue::from_str(&e.to_string()))?;
-        Ok(span.metrics.get(name)
+        let span = cbs
+            .get_span(span_id)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        Ok(span
+            .metrics
+            .get(name)
             .map(|v| JsValue::from_f64(*v))
             .unwrap_or(JsValue::NULL))
     }
@@ -692,7 +730,9 @@ impl WasmSpanState {
     pub fn get_error(&self, span_id: u64) -> Result<i32, JsValue> {
         self.flush_change_queue()?;
         let cbs = self.cbs.borrow();
-        let span = cbs.get_span(span_id).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let span = cbs
+            .get_span(span_id)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
         Ok(span.error)
     }
 
@@ -703,7 +743,9 @@ impl WasmSpanState {
     pub fn get_start(&self, span_id: u64) -> Result<i64, JsValue> {
         self.flush_change_queue()?;
         let cbs = self.cbs.borrow();
-        let span = cbs.get_span(span_id).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let span = cbs
+            .get_span(span_id)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
         Ok(span.start)
     }
 
@@ -711,7 +753,9 @@ impl WasmSpanState {
     pub fn get_duration(&self, span_id: u64) -> Result<i64, JsValue> {
         self.flush_change_queue()?;
         let cbs = self.cbs.borrow();
-        let span = cbs.get_span(span_id).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let span = cbs
+            .get_span(span_id)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
         Ok(span.duration)
     }
 
@@ -719,7 +763,9 @@ impl WasmSpanState {
     pub fn get_type(&self, span_id: u64) -> Result<String, JsValue> {
         self.flush_change_queue()?;
         let cbs = self.cbs.borrow();
-        let span = cbs.get_span(span_id).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let span = cbs
+            .get_span(span_id)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
         Ok(span.r#type.to_string())
     }
 
@@ -727,7 +773,9 @@ impl WasmSpanState {
     pub fn get_name(&self, span_id: u64) -> Result<String, JsValue> {
         self.flush_change_queue()?;
         let cbs = self.cbs.borrow();
-        let span = cbs.get_span(span_id).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let span = cbs
+            .get_span(span_id)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
         Ok(span.name.to_string())
     }
 
@@ -738,12 +786,7 @@ impl WasmSpanState {
     // ordering is safe (subsequent ops are applied on the next flush and never
     // touch meta_struct).
     #[wasm_bindgen(js_name = "setMetaStruct")]
-    pub fn set_meta_struct(
-        &self,
-        span_id: u64,
-        key: &str,
-        value: &[u8],
-    ) -> Result<(), JsValue> {
+    pub fn set_meta_struct(&self, span_id: u64, key: &str, value: &[u8]) -> Result<(), JsValue> {
         self.flush_change_queue()?;
         let mut cbs = self.cbs.borrow_mut();
         let span = cbs
@@ -758,9 +801,13 @@ impl WasmSpanState {
     pub fn get_meta_struct(&self, span_id: u64, key: &str) -> Result<JsValue, JsValue> {
         self.flush_change_queue()?;
         let cbs = self.cbs.borrow();
-        let span = cbs.get_span(span_id).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let span = cbs
+            .get_span(span_id)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
         // VecMap::get accepts &str directly (SpanString: Borrow<str>).
-        Ok(span.meta_struct.get(key)
+        Ok(span
+            .meta_struct
+            .get(key)
             .map(|v| JsValue::from(js_sys::Uint8Array::from(v.0.as_slice())))
             .unwrap_or(JsValue::NULL))
     }
@@ -816,7 +863,8 @@ impl WasmSpanState {
     pub fn get_trace_meta_attr(&self, segment_id: u64, name: &str) -> Result<JsValue, JsValue> {
         self.flush_change_queue()?;
         let cbs = self.cbs.borrow();
-        Ok(cbs.get_segment(&segment_id)
+        Ok(cbs
+            .get_segment(&segment_id)
             .and_then(|s| s.meta.get(name))
             .map(|v| JsValue::from_str(v.0.as_ref()))
             .unwrap_or(JsValue::NULL))
@@ -826,7 +874,8 @@ impl WasmSpanState {
     pub fn get_trace_metric_attr(&self, segment_id: u64, name: &str) -> Result<JsValue, JsValue> {
         self.flush_change_queue()?;
         let cbs = self.cbs.borrow();
-        Ok(cbs.get_segment(&segment_id)
+        Ok(cbs
+            .get_segment(&segment_id)
             .and_then(|s| s.metrics.get(name))
             .map(|v| JsValue::from_f64(*v))
             .unwrap_or(JsValue::NULL))
@@ -836,7 +885,8 @@ impl WasmSpanState {
     pub fn get_trace_origin(&self, segment_id: u64) -> Result<JsValue, JsValue> {
         self.flush_change_queue()?;
         let cbs = self.cbs.borrow();
-        Ok(cbs.get_segment(&segment_id)
+        Ok(cbs
+            .get_segment(&segment_id)
             .and_then(|s| s.origin.as_ref())
             .map(|v| JsValue::from_str(v.0.as_ref()))
             .unwrap_or(JsValue::NULL))
@@ -870,8 +920,12 @@ pub fn get_op_codes() -> JsValue {
         ("SetTraceOrigin", 12),
     ];
     for (name, val) in entries {
-        js_sys::Reflect::set(&obj, &JsValue::from_str(name), &JsValue::from_f64(*val as f64))
-            .expect("Reflect::set on a freshly created object cannot fail");
+        js_sys::Reflect::set(
+            &obj,
+            &JsValue::from_str(name),
+            &JsValue::from_f64(*val as f64),
+        )
+        .expect("Reflect::set on a freshly created object cannot fail");
     }
     obj.into()
 }
