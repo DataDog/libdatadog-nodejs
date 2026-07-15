@@ -917,7 +917,7 @@ dependencies = [
 [[package]]
 name = "libdd-capabilities"
 version = "2.1.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=8cd68ab922fb7aade0f089ccfc91291d874673af#8cd68ab922fb7aade0f089ccfc91291d874673af"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Ffile-caps#cc69e41b12bbaaaba3d35c5f5b525ba84721b1be"
 dependencies = [
  "anyhow",
  "bytes",
@@ -941,8 +941,9 @@ dependencies = [
 [[package]]
 name = "libdd-capabilities-impl"
 version = "3.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=8cd68ab922fb7aade0f089ccfc91291d874673af#8cd68ab922fb7aade0f089ccfc91291d874673af"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Ffile-caps#cc69e41b12bbaaaba3d35c5f5b525ba84721b1be"
 dependencies = [
+ "anyhow",
  "bytes",
  "http",
  "http-body-util",
@@ -989,7 +990,7 @@ dependencies = [
 [[package]]
 name = "libdd-common"
 version = "5.1.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=8cd68ab922fb7aade0f089ccfc91291d874673af#8cd68ab922fb7aade0f089ccfc91291d874673af"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Ffile-caps#cc69e41b12bbaaaba3d35c5f5b525ba84721b1be"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1052,7 +1053,7 @@ dependencies = [
 [[package]]
 name = "libdd-data-pipeline"
 version = "7.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=8cd68ab922fb7aade0f089ccfc91291d874673af#8cd68ab922fb7aade0f089ccfc91291d874673af"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Ffile-caps#cc69e41b12bbaaaba3d35c5f5b525ba84721b1be"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -1094,7 +1095,7 @@ dependencies = [
 [[package]]
 name = "libdd-ddsketch"
 version = "1.1.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=8cd68ab922fb7aade0f089ccfc91291d874673af#8cd68ab922fb7aade0f089ccfc91291d874673af"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Ffile-caps#cc69e41b12bbaaaba3d35c5f5b525ba84721b1be"
 dependencies = [
  "prost",
 ]
@@ -1102,7 +1103,7 @@ dependencies = [
 [[package]]
 name = "libdd-dogstatsd-client"
 version = "4.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=8cd68ab922fb7aade0f089ccfc91291d874673af#8cd68ab922fb7aade0f089ccfc91291d874673af"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Ffile-caps#cc69e41b12bbaaaba3d35c5f5b525ba84721b1be"
 dependencies = [
  "anyhow",
  "cadence",
@@ -1174,7 +1175,7 @@ dependencies = [
 [[package]]
 name = "libdd-shared-runtime"
 version = "2.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=8cd68ab922fb7aade0f089ccfc91291d874673af#8cd68ab922fb7aade0f089ccfc91291d874673af"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Ffile-caps#cc69e41b12bbaaaba3d35c5f5b525ba84721b1be"
 dependencies = [
  "async-trait",
  "futures",
@@ -1218,7 +1219,7 @@ dependencies = [
 [[package]]
 name = "libdd-tinybytes"
 version = "1.1.1"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=8cd68ab922fb7aade0f089ccfc91291d874673af#8cd68ab922fb7aade0f089ccfc91291d874673af"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Ffile-caps#cc69e41b12bbaaaba3d35c5f5b525ba84721b1be"
 dependencies = [
  "serde",
 ]
@@ -1226,7 +1227,7 @@ dependencies = [
 [[package]]
 name = "libdd-trace-normalization"
 version = "3.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=8cd68ab922fb7aade0f089ccfc91291d874673af#8cd68ab922fb7aade0f089ccfc91291d874673af"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Ffile-caps#cc69e41b12bbaaaba3d35c5f5b525ba84721b1be"
 dependencies = [
  "anyhow",
  "libdd-trace-protobuf 4.0.0",
@@ -1235,7 +1236,7 @@ dependencies = [
 [[package]]
 name = "libdd-trace-obfuscation"
 version = "5.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=8cd68ab922fb7aade0f089ccfc91291d874673af#8cd68ab922fb7aade0f089ccfc91291d874673af"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Ffile-caps#cc69e41b12bbaaaba3d35c5f5b525ba84721b1be"
 dependencies = [
  "anyhow",
  "fluent-uri",
@@ -1261,7 +1262,7 @@ dependencies = [
 [[package]]
 name = "libdd-trace-protobuf"
 version = "4.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=8cd68ab922fb7aade0f089ccfc91291d874673af#8cd68ab922fb7aade0f089ccfc91291d874673af"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Ffile-caps#cc69e41b12bbaaaba3d35c5f5b525ba84721b1be"
 dependencies = [
  "prost",
  "serde",
@@ -1271,7 +1272,7 @@ dependencies = [
 [[package]]
 name = "libdd-trace-stats"
 version = "6.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=8cd68ab922fb7aade0f089ccfc91291d874673af#8cd68ab922fb7aade0f089ccfc91291d874673af"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Ffile-caps#cc69e41b12bbaaaba3d35c5f5b525ba84721b1be"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -1298,7 +1299,7 @@ dependencies = [
 [[package]]
 name = "libdd-trace-utils"
 version = "9.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=8cd68ab922fb7aade0f089ccfc91291d874673af#8cd68ab922fb7aade0f089ccfc91291d874673af"
+source = "git+https://github.com/DataDog/libdatadog.git?branch=jwiriath%2Ffile-caps#cc69e41b12bbaaaba3d35c5f5b525ba84721b1be"
 dependencies = [
  "anyhow",
  "base64",
@@ -1310,6 +1311,7 @@ dependencies = [
  "http-body",
  "http-body-util",
  "indexmap",
+ "itoa",
  "libdd-capabilities 2.1.0",
  "libdd-capabilities-impl 3.0.0",
  "libdd-common 5.1.0",

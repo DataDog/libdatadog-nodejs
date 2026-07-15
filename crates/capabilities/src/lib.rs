@@ -12,12 +12,15 @@
 use std::future::Future;
 use std::time::Duration;
 
+use libdd_capabilities::file::{FileCapability, FileError, FileMetadata};
 use libdd_capabilities::http::HttpError;
 use libdd_capabilities::{HttpClientCapability, LogWriterCapability, MaybeSend, SleepCapability};
 
+pub mod file;
 pub mod http;
 pub mod sleep;
 
+pub use file::WasmFileCapability;
 pub use http::WasmHttpClient;
 pub use sleep::WasmSleepCapability;
 
@@ -33,6 +36,7 @@ pub use sleep::WasmSleepCapability;
 pub struct WasmCapabilities {
     http: WasmHttpClient,
     sleep: WasmSleepCapability,
+    file: WasmFileCapability,
 }
 
 impl Default for WasmCapabilities {
@@ -46,16 +50,14 @@ impl WasmCapabilities {
         Self {
             http: WasmHttpClient::new_client(),
             sleep: WasmSleepCapability,
+            file: WasmFileCapability,
         }
     }
 }
 
 impl HttpClientCapability for WasmCapabilities {
     fn new_client() -> Self {
-        Self {
-            http: WasmHttpClient::new_client(),
-            sleep: WasmSleepCapability,
-        }
+        Self::new()
     }
 
     fn request(
@@ -68,10 +70,7 @@ impl HttpClientCapability for WasmCapabilities {
 
 impl SleepCapability for WasmCapabilities {
     fn new() -> Self {
-        Self {
-            http: WasmHttpClient::new_client(),
-            sleep: WasmSleepCapability,
-        }
+        Self::new()
     }
 
     fn sleep(&self, duration: Duration) -> impl Future<Output = ()> + MaybeSend {
@@ -89,3 +88,36 @@ impl LogWriterCapability for WasmCapabilities {
         Ok(())
     }
 }
+
+impl FileCapability for WasmCapabilities {
+    fn new() -> Self {
+        Self::new()
+    }
+
+    fn read(
+        &self,
+        path: &str,
+    ) -> impl Future<Output = Result<::bytes::Bytes, FileError>> + MaybeSend {
+        self.file.read(path)
+    }
+
+    fn write(
+        &self,
+        path: &str,
+        contents: ::bytes::Bytes,
+    ) -> impl Future<Output = Result<(), FileError>> + MaybeSend {
+        self.file.write(path, contents)
+    }
+
+    fn metadata(
+        &self,
+        path: &str,
+    ) -> impl Future<Output = Result<FileMetadata, FileError>> + MaybeSend {
+        self.file.metadata(path)
+    }
+
+    fn exists(&self, path: &str) -> impl Future<Output = Result<bool, FileError>> + MaybeSend {
+        self.file.exists(path)
+    }
+}
+
