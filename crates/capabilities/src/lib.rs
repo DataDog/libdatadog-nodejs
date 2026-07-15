@@ -12,14 +12,17 @@
 use std::future::Future;
 use std::time::Duration;
 
+use libdd_capabilities::env::{EnvCapability, EnvError};
 use libdd_capabilities::file::{FileCapability, FileError, FileMetadata};
 use libdd_capabilities::http::HttpError;
 use libdd_capabilities::{HttpClientCapability, LogWriterCapability, MaybeSend, SleepCapability};
 
+pub mod env;
 pub mod file;
 pub mod http;
 pub mod sleep;
 
+pub use env::WasmEnvCapability;
 pub use file::WasmFileCapability;
 pub use http::WasmHttpClient;
 pub use sleep::WasmSleepCapability;
@@ -38,6 +41,7 @@ pub struct WasmCapabilities {
     sleep: WasmSleepCapability,
     /// Filesystem access delegated to the Node.js `fs` transport.
     file: WasmFileCapability,
+    env: WasmEnvCapability,
 }
 
 impl Default for WasmCapabilities {
@@ -52,6 +56,7 @@ impl WasmCapabilities {
             http: WasmHttpClient::new_client(),
             sleep: WasmSleepCapability,
             file: WasmFileCapability,
+            env: WasmEnvCapability,
         }
     }
 }
@@ -122,3 +127,20 @@ impl FileCapability for WasmCapabilities {
     }
 }
 
+impl EnvCapability for WasmCapabilities {
+    fn new() -> Self {
+        Self::new()
+    }
+
+    fn get(&self, name: &str) -> Result<Option<String>, EnvError> {
+        self.env.get(name)
+    }
+
+    fn set(&self, name: &str, value: &str) -> Result<(), EnvError> {
+        self.env.set(name, value)
+    }
+
+    fn unset(&self, name: &str) -> Result<(), EnvError> {
+        self.env.unset(name)
+    }
+}
