@@ -5,7 +5,7 @@
 
 use wasm_bindgen::prelude::*;
 
-use libdd_capabilities::env::{EnvCapability, EnvError};
+use libdd_capabilities::env::{validate_name, validate_value, EnvCapability, EnvError};
 
 #[wasm_bindgen(module = "/src/env_transport.js")]
 extern "C" {
@@ -38,12 +38,15 @@ impl EnvCapability for WasmEnvCapability {
     }
 
     unsafe fn set(&self, name: &str, value: &str) -> Result<(), EnvError> {
+        validate_name(name)?;
+        validate_value(value)?;
         // SAFETY: Wasm is single-threaded; no concurrent env access is possible.
         js_env_set(name, value);
         Ok(())
     }
 
     unsafe fn unset(&self, name: &str) -> Result<(), EnvError> {
+        validate_name(name)?;
         // SAFETY: Wasm is single-threaded; no concurrent env access is possible.
         js_env_unset(name);
         Ok(())
