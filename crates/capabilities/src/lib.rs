@@ -136,11 +136,13 @@ impl EnvCapability for WasmCapabilities {
         self.env.get(name)
     }
 
-    fn set(&self, name: &str, value: &str) -> Result<(), EnvError> {
-        self.env.set(name, value)
+    unsafe fn set(&self, name: &str, value: &str) -> Result<(), EnvError> {
+        // SAFETY: forwarded verbatim; Wasm is single-threaded so the precondition is trivially upheld.
+        unsafe { self.env.set(name, value) }
     }
 
-    fn unset(&self, name: &str) -> Result<(), EnvError> {
-        self.env.unset(name)
+    unsafe fn unset(&self, name: &str) -> Result<(), EnvError> {
+        // SAFETY: forwarded verbatim; Wasm is single-threaded so the precondition is trivially upheld.
+        unsafe { self.env.unset(name) }
     }
 }

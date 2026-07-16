@@ -37,12 +37,14 @@ impl EnvCapability for WasmEnvCapability {
         }
     }
 
-    fn set(&self, name: &str, value: &str) -> Result<(), EnvError> {
+    unsafe fn set(&self, name: &str, value: &str) -> Result<(), EnvError> {
+        // SAFETY: Wasm is single-threaded; no concurrent env access is possible.
         js_env_set(name, value);
         Ok(())
     }
 
-    fn unset(&self, name: &str) -> Result<(), EnvError> {
+    unsafe fn unset(&self, name: &str) -> Result<(), EnvError> {
+        // SAFETY: Wasm is single-threaded; no concurrent env access is possible.
         js_env_unset(name);
         Ok(())
     }
