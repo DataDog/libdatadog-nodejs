@@ -239,7 +239,7 @@ class NativeSpansInterface {
       this.cqbCount = 0
     }
 
-    const view = this._cqbView
+    let view = this._cqbView
     // Op header: opcode (u16 LE) + span_id (u64 LE) = 10 bytes. Rust reads the
     // opcode as a u16, then the span_id as a u64.
     view.setUint16(this.cqbIndex, op, true)
@@ -250,6 +250,10 @@ class NativeSpansInterface {
     for (const arg of args) {
       if (typeof arg === 'string') {
         const stringId = this.getStringId(arg)
+        if (this._wasmMemory.buffer !== view.buffer) {
+          this._refreshViews()
+          view = this._cqbView
+        }
         view.setUint32(this.cqbIndex, stringId, true)
         this.cqbIndex += 4
       } else {
@@ -741,6 +745,28 @@ describe('pipeline', { skip }, () => {
       const span = nativeSpans.createSpan()
       nativeSpans.queueOp(OpCode.SetMetaAttr, span.spanId, ['u32n', 60_001], ['u32n', 60_002])
       assert.strictEqual(span.getTag('bulk-key'), 'bulk-val')
+    })
+
+    it('refreshes change-buffer views when string interning grows memory', () => {
+      const span = nativeSpans.createSpan()
+      const getStringId = nativeSpans.getStringId.bind(nativeSpans)
+      let grew = false
+      nativeSpans.getStringId = (str) => {
+        const id = getStringId(str)
+        if (!grew) {
+          grew = true
+          wasmMemory.grow(1)
+        }
+        return id
+      }
+
+      try {
+        span.setTag('grow-key', 'grow-value')
+
+        assert.strictEqual(span.getTag('grow-key'), 'grow-value')
+      } finally {
+        nativeSpans.getStringId = getStringId
+      }
     })
 
     it('rejects a malformed (non-terminated) stringTableInsertMany entry', () => {
