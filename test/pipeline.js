@@ -970,6 +970,7 @@ describe('pipeline', { skip }, () => {
             method: req.method,
             url: req.url,
             ct: req.headers['content-type'],
+            clientComputedStats: req.headers['datadog-client-computed-stats'],
             len: Buffer.concat(chunks).length,
             body: Buffer.concat(chunks).toString(),
           })
@@ -982,6 +983,7 @@ describe('pipeline', { skip }, () => {
       const ns = new NativeSpansInterface({
         agentUrl: `http://127.0.0.1:${port}`,
         tracerVersion: '7.0.0-pre',
+        clientComputedStats: true,
       })
       ns.state.setOtlpEndpoint(`http://127.0.0.1:${port}/v1/traces`)
       const span = ns.createSpan()
@@ -1001,6 +1003,11 @@ describe('pipeline', { skip }, () => {
         const body = JSON.parse(req.body)
         assert.strictEqual(body.resourceSpans[0].scopeSpans[0].scope.name, 'dd-trace-js')
         assert.strictEqual(body.resourceSpans[0].scopeSpans[0].scope.version, '7.0.0-pre')
+        assert.strictEqual(req.clientComputedStats, 'yes')
+        const resourceAttrs = body.resourceSpans[0].resource.attributes
+        assert.ok(resourceAttrs.some((attr) => {
+          return attr.key === '_dd.stats_computed' && attr.value.stringValue === 'true'
+        }), 'OTLP resource should mark client-computed stats')
       } finally {
         server.closeAllConnections?.()
         server.close()

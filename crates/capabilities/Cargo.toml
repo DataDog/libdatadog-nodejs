@@ -17,7 +17,7 @@ futures-core = "0.3"
 anyhow = "1"
 # TODO: Replace this temporary libdatadog PR rev with the official release/tag
 # that contains DataDog/libdatadog#2235, then regenerate Cargo.lock.
-libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", rev = "8cd68ab922fb7aade0f089ccfc91291d874673af" }
+libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", rev = "6356aee4c69b51f27e7e82e43b1797f60b74905a" }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
