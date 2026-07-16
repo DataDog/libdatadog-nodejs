@@ -35,10 +35,10 @@ describe('file_transport', () => {
     const p = path.join(tmp, 'meta.bin')
     fs.writeFileSync(p, '0123456789')
     const m = await fileTransport.metadata(p)
-    assert.strictEqual(m.size, 10)
+    assert.strictEqual(m.size, 10n)
     assert.strictEqual(m.is_file, true)
     assert.strictEqual(m.is_dir, false)
-    assert.ok(m.inode > 0, `expected positive inode, got ${m.inode}`)
+    assert.ok(m.inode > 0n, `expected positive inode, got ${m.inode}`)
   })
 
   it('exists returns true for a present path and false for a missing one', async () => {

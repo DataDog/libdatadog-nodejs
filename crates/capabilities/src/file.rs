@@ -119,28 +119,26 @@ fn map_js_error(err: &JsValue, path: &str) -> FileError {
 }
 
 fn parse_metadata(value: &JsValue, path: &str) -> Result<FileMetadata, FileError> {
-    let size = read_number(value, "size", path)?;
+    let size = read_bigint_u64(value, "size", path)?;
     // Node populates `stat().ino` on every platform, so `inode` is always Some.
-    let inode = Some(read_number(value, "inode", path)? as u64);
+    let inode = Some(read_bigint_u64(value, "inode", path)?);
     let is_file = read_bool(value, "is_file", path)?;
     let is_dir = read_bool(value, "is_dir", path)?;
     Ok(FileMetadata {
-        size: size as u64,
+        size,
         inode,
         is_file,
         is_dir,
     })
 }
 
-fn read_number(value: &JsValue, key: &str, path: &str) -> Result<f64, FileError> {
-    Reflect::get(value, &JsValue::from_str(key))
-        .ok()
-        .and_then(|v| v.as_f64())
-        .ok_or_else(|| {
-            FileError::Io(anyhow::anyhow!(
-                "metadata({path}) is missing numeric field `{key}`"
-            ))
-        })
+fn read_bigint_u64(value: &JsValue, key: &str, path: &str) -> Result<u64, FileError> {
+    let v = Reflect::get(value, &JsValue::from_str(key))
+        .map_err(|_| FileError::Io(anyhow::anyhow!("metadata({path}) missing field `{key}`")))?;
+    let bigint = js_sys::BigInt::try_from(v)
+        .map_err(|_| FileError::Io(anyhow::anyhow!("metadata({path}) field `{key}` is not a BigInt")))?;
+    u64::try_from(bigint)
+        .map_err(|_| FileError::Io(anyhow::anyhow!("metadata({path}) field `{key}` overflows u64")))
 }
 
 fn read_bool(value: &JsValue, key: &str, path: &str) -> Result<bool, FileError> {
