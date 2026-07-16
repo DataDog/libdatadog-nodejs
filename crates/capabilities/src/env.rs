@@ -5,18 +5,12 @@
 
 use wasm_bindgen::prelude::*;
 
-use libdd_capabilities::env::{validate_name, validate_value, EnvCapability, EnvError};
+use libdd_capabilities::env::{EnvCapability, EnvError};
 
 #[wasm_bindgen(module = "/src/env_transport.js")]
 extern "C" {
     #[wasm_bindgen(js_name = "get")]
     fn js_env_get(name: &str) -> JsValue;
-
-    #[wasm_bindgen(js_name = "set")]
-    fn js_env_set(name: &str, value: &str);
-
-    #[wasm_bindgen(js_name = "unset")]
-    fn js_env_unset(name: &str);
 }
 
 #[derive(Debug, Clone)]
@@ -35,20 +29,5 @@ impl EnvCapability for WasmEnvCapability {
         } else {
             Ok(value.as_string())
         }
-    }
-
-    unsafe fn set(&self, name: &str, value: &str) -> Result<(), EnvError> {
-        validate_name(name)?;
-        validate_value(value)?;
-        // SAFETY: Wasm is single-threaded; no concurrent env access is possible.
-        js_env_set(name, value);
-        Ok(())
-    }
-
-    unsafe fn unset(&self, name: &str) -> Result<(), EnvError> {
-        validate_name(name)?;
-        // SAFETY: Wasm is single-threaded; no concurrent env access is possible.
-        js_env_unset(name);
-        Ok(())
     }
 }

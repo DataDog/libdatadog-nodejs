@@ -24,14 +24,8 @@ describe('env_transport', () => {
     assert.strictEqual(envTransport.get(NAME), undefined)
   })
 
-  it('set then get round-trips the value', () => {
-    envTransport.set(NAME, 'value1')
+  it('returns the value when the var is set', () => {
+    process.env[NAME] = 'value1'
     assert.strictEqual(envTransport.get(NAME), 'value1')
-  })
-
-  it('unset then get returns undefined', () => {
-    envTransport.set(NAME, 'value2')
-    envTransport.unset(NAME)
-    assert.strictEqual(envTransport.get(NAME), undefined)
   })
 })
