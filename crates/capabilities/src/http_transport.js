@@ -193,7 +193,12 @@ module.exports.httpRequest = function (host, port, isHttps, socketPath, head_ptr
         // wasm_memory.buffer is replaced each time WebAssembly.Memory grows, so
         // the views must be recreated on every attempt against the current buffer.
         const headView = new Uint8Array(wasm_memory.buffer, head_ptr, head_len)
-        const bodyView = new Uint8Array(wasm_memory.buffer, body_ptr, body_len)
+        // Copy the body into Node-owned memory before giving it to http.request.
+        // `body_ptr/body_len` points into wasm memory; if that memory grows while
+        // Node still has the write queued, the original ArrayBuffer detaches and
+        // ClientRequest can throw asynchronously from `_flushOutput`, outside the
+        // `req.write()` try/catch/retry path.
+        const body = Buffer.from(new Uint8Array(wasm_memory.buffer, body_ptr, body_len))
 
         // The Rust side already rendered the full HTTP/1.1 request head (real
         // method, `/v0.4/traces` path, Content-Type/Length, datadog-meta-*);
@@ -234,10 +239,10 @@ module.exports.httpRequest = function (host, port, isHttps, socketPath, head_ptr
         req.on('error', reject)
 
         // The request head (method/path/headers) was supplied via requestOptions
-        // above; just write the body. (No `req._header` injection — that Node
-        // internal is not honored by Bun.)
+        // above; just write the stable Node-owned body. (No `req._header`
+        // injection — that Node internal is not honored by Bun.)
         try {
-          req.write(bodyView)
+          req.write(body)
           req.end()
         } catch (error) {
           reject(error)
