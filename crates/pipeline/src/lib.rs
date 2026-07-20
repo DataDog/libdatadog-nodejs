@@ -1,7 +1,7 @@
 use libdatadog_nodejs_capabilities::WasmCapabilities;
 use libdd_data_pipeline::trace_exporter::agent_response::AgentResponse;
 use libdd_data_pipeline::trace_exporter::{
-    TraceExporter, TraceExporterBuilder, TraceExporterOutputFormat,
+    TelemetryConfig, TraceExporter, TraceExporterBuilder, TraceExporterOutputFormat,
 };
 use libdd_data_pipeline::OtlpProtocol;
 use libdd_shared_runtime::LocalRuntime;
@@ -204,6 +204,11 @@ pub struct WasmSpanState {
     /// Extra HTTP headers for OTLP export (e.g. collector auth), as key/value
     /// pairs. Only applied when `otlp_endpoint` is set.
     otlp_headers: RefCell<Vec<(String, String)>>,
+    /// When set, the lazily-built exporter has telemetry enabled with this
+    /// config (`heartbeat`/`runtime_id`/`debug_enabled` — see libdatadog's
+    /// `TelemetryConfig`). Only takes effect if set before the first send
+    /// (when the exporter is built).
+    telemetry_config: RefCell<Option<TelemetryConfig>>,
     /// Latched message from a failed lazy `build_async`. Building is one-shot and
     /// a failure is fatal (bad config), so once set every send returns it (as a
     /// distinguishable error) instead of a misleading "builder already consumed",
@@ -338,6 +343,7 @@ impl WasmSpanState {
             otlp_endpoint: RefCell::new(None),
             otlp_protocol: Cell::new(None),
             otlp_headers: RefCell::new(Vec::new()),
+            telemetry_config: RefCell::new(None),
             build_error: RefCell::new(None),
         })
     }
@@ -372,6 +378,29 @@ impl WasmSpanState {
             .map_err(|e| JsValue::from_str(&format!("setOtlpProtocol: {e}")))?;
         self.otlp_protocol.set(Some(parsed));
         Ok(())
+    }
+
+    /// Enable telemetry on the lazily-built trace exporter. Off by default —
+    /// dd-trace-js opts in from JS. `heartbeat_ms` sets the metric-flush cadence
+    /// (0 disables periodic heartbeats and only sends on shutdown), `runtime_id`
+    /// tags telemetry payloads with the tracer's runtime id when provided, and
+    /// `debug_enabled` toggles libdd-telemetry's verbose logging.
+    ///
+    /// Must be called before the first `sendPreparedChunk` — the exporter is
+    /// built lazily on first send and telemetry config is fixed at build time,
+    /// so later calls have no effect.
+    #[wasm_bindgen(js_name = "enableTelemetry")]
+    pub fn enable_telemetry(
+        &self,
+        heartbeat_ms: u64,
+        runtime_id: Option<String>,
+        debug_enabled: bool,
+    ) {
+        *self.telemetry_config.borrow_mut() = Some(TelemetryConfig {
+            heartbeat: heartbeat_ms,
+            runtime_id,
+            debug_enabled,
+        });
     }
 
     /// Set extra HTTP headers for OTLP export as a flat `[key, value, ...]`
@@ -529,6 +558,9 @@ impl WasmSpanState {
                 if !headers.is_empty() {
                     builder.set_otlp_headers(headers.clone());
                 }
+            }
+            if let Some(cfg) = self.telemetry_config.borrow().clone() {
+                builder.enable_telemetry(cfg);
             }
             match builder.build_async::<WasmCapabilities>().await {
                 Ok(built) => *exporter_slot = Some(built),

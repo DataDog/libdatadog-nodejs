@@ -9,11 +9,11 @@
 
 use web_time::{Duration, SystemTime};
 
-/// Wall-clock now() for wasm. `std::time::SystemTime::now()` is unimplemented on
-/// `wasm32-unknown-unknown` (it panics/traps), so derive the time from JS
-/// `Date.now()` (milliseconds since the Unix epoch).
+/// Wall-clock now() for wasm. Delegates to `web_time::SystemTime::now()`,
+/// which routes to JS `Date.now()` on `wasm32-unknown-unknown` (native
+/// `std::time::SystemTime::now()` is unimplemented on that target and traps).
 fn now() -> SystemTime {
-    SystemTime::UNIX_EPOCH + Duration::from_millis(js_sys::Date::now() as u64)
+    SystemTime::now()
 }
 
 use bytes::Bytes;
