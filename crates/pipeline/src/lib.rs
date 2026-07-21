@@ -380,10 +380,10 @@ impl WasmSpanState {
     }
 
     /// Enable telemetry on the lazily-built trace exporter. Off by default —
-    /// dd-trace-js opts in from JS. `heartbeat_ms` sets the metric-flush cadence
-    /// (0 defers to libdatadog's default interval), `runtime_id`
-    /// tags telemetry payloads with the tracer's runtime id when provided, and
-    /// `debug_enabled` toggles libdd-telemetry's verbose logging.
+    /// dd-trace-js opts in from JS. `heartbeat_ms`sets the metric-flush cadence
+    /// (0 defers to libdatadog's default interval), `runtime_id` tags telemetry
+    /// payloads with the tracer's runtime id when provided, and `debug_enabled`
+    /// toggles libdd-telemetry's verbose logging.
     ///
     /// Must be called before the first `sendPreparedChunk`. Later calls have
     /// no effect.
