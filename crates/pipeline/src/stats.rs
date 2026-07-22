@@ -7,7 +7,8 @@
 //! HTTP transport for flushing stats to the Datadog agent's `/v0.6/stats`
 //! endpoint.
 
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
+use web_time::SystemTime;
 
 /// Wall-clock now() for wasm. `std::time::SystemTime::now()` is unimplemented on
 /// `wasm32-unknown-unknown` (it panics/traps), so derive the time from JS
@@ -67,6 +68,7 @@ impl StatsCollector {
                 ],
                 Vec::new(),
                 None,
+                Vec::new(),
             ),
             meta,
             agent_url,
