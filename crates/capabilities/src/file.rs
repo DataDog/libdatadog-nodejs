@@ -134,7 +134,10 @@ fn parse_metadata(value: &JsValue, path: &str) -> Result<FileMetadata, FileError
 
 fn read_bigint_u64(value: &JsValue, key: &str, path: &str) -> Result<u64, FileError> {
     let v = Reflect::get(value, &JsValue::from_str(key))
-        .map_err(|_| FileError::Io(anyhow::anyhow!("metadata({path}) missing field `{key}`")))?;
+        .map_err(|_| FileError::Io(anyhow::anyhow!("metadata({path}) could not read field `{key}`")))?;
+    if v.is_undefined() || v.is_null() {
+        return Err(FileError::Io(anyhow::anyhow!("metadata({path}) missing field `{key}`")));
+    }
     let bigint = js_sys::BigInt::try_from(v)
         .map_err(|_| FileError::Io(anyhow::anyhow!("metadata({path}) field `{key}` is not a BigInt")))?;
     u64::try_from(bigint)

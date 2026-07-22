@@ -16,17 +16,12 @@ module.exports.writeFile = function (path, data) {
 
 module.exports.metadata = function (path) {
   const fs = require('node:fs')
-  try {
-    const s = fs.statSync(path, { bigint: true })
-    return Promise.resolve({
-      size: s.size,
-      inode: s.ino,
-      is_file: s.isFile(),
-      is_dir: s.isDirectory(),
-    })
-  } catch (error) {
-    return Promise.reject(error)
-  }
+  return fs.promises.stat(path, { bigint: true }).then(s => ({
+    size: s.size,
+    inode: s.ino,
+    is_file: s.isFile(),
+    is_dir: s.isDirectory(),
+  }))
 }
 
 module.exports.exists = function (path) {
