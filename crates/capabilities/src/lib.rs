@@ -4,10 +4,9 @@
 //! Wasm capability implementations for libdatadog-nodejs.
 //!
 //! [`WasmCapabilities`] is the bundle struct that implements every capability
-//! trait `TraceExporter` requires (HTTP, sleep, log output) using wasm_bindgen
-//! and JS transports. The wasm binding crate pins this type as the capability
-//! generic for libdatadog's `TraceExporter`, mirroring libdatadog's native
-//! `NativeCapabilities`.
+//! trait `TraceExporter` requires using wasm_bindgen and JS transports. The
+//! wasm binding crate pins this type as the capability generic for libdatadog's
+//! `TraceExporter`, mirroring libdatadog's native `NativeCapabilities`.
 
 use std::future::Future;
 use std::time::Duration;
