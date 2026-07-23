@@ -23,11 +23,6 @@ impl EnvCapability for WasmEnvCapability {
 
     fn get(&self, name: &str) -> Result<Option<String>, EnvError> {
         // Node coerces every process.env value to a string, so NotUnicode is unreachable here.
-        let value = js_env_get(name);
-        if value.is_undefined() || value.is_null() {
-            Ok(None)
-        } else {
-            Ok(value.as_string())
-        }
+        Ok(js_env_get(name).as_string())
     }
 }
