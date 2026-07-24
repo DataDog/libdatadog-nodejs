@@ -1080,11 +1080,6 @@ describe('pipeline', { skip }, () => {
       assert.ok(sawTraces, 'expected a POST to /v0.4/traces')
       assert.strictEqual(header, undefined)
     })
-
-    // When statsEnabled=true, libdatadog stamps the header dynamically only
-    // after the agent /info advertises `client_drop_p0s` + `/v0.6/stats`.
-    // That's inherently race-y in a unit test, so it's covered end-to-end
-    // instead of asserted here.
   })
 
   describe('send re-entrancy', () => {

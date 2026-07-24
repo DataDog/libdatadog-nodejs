@@ -249,9 +249,7 @@ impl WasmSpanState {
             .set_language_version(lang_version)
             .set_language_interpreter(lang_interpreter)
             .set_otlp_instrumentation_scope("dd-trace-js", tracer_version)
-            // Populate the payload-level TracerMetadata (service/env/hostname/
-            // app_version) the agent receives. Without these calls the trace
-            // payload's tracer metadata is sent empty.
+            // Without these setters the payload-level TracerMetadata is empty.
             .set_service(tracer_service)
             .set_env(env)
             .set_hostname(hostname)
@@ -259,15 +257,11 @@ impl WasmSpanState {
             .set_runtime_id(runtime_id)
             .enable_agent_rates_payload_version();
 
-        // Client-side stats. Two disjoint modes:
-        //  - `stats_enabled`: libdatadog runs the concentrator + /v0.6/stats
-        //    worker natively (LocalRuntime::spawn_worker), gates activation on
-        //    the agent's /info (`client_drop_p0s` + `/v0.6/stats`), and stamps
-        //    `Datadog-Client-Computed-Stats` per trace request when stats
-        //    actually run.
-        //  - `client_computed_stats` (without `stats_enabled`): APM-standalone
-        //    (apmTracingEnabled=false). We advertise the header so the agent
-        //    skips its own APM stats, even though we don't compute any here.
+        // `enable_stats` makes libdatadog stamp the client-computed-stats
+        // header itself when stats run, so the two flags are disjoint:
+        // `set_client_computed_stats` is only for APM-standalone
+        // (`apmTracingEnabled=false`), where the header is advertised
+        // without any stats actually being computed.
         if stats_enabled {
             builder.enable_stats(Duration::from_secs(10));
         } else if client_computed_stats {
@@ -560,6 +554,37 @@ impl WasmSpanState {
             .flush_change_buffer()
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         Ok(true)
+    }
+
+    /// Force-flush the current stats bucket and stop the background workers.
+    /// The stats worker only flushes on its bucket interval, so spans
+    /// recorded between the last tick and process exit are lost unless this
+    /// is awaited during tracer shutdown. Consumes the exporter — subsequent
+    /// sends will error.
+    ///
+    /// `timeoutMs` bounds the wait; on timeout returns an error and workers
+    /// may still be finishing. `None` waits indefinitely.
+    #[wasm_bindgen(js_name = "shutdown")]
+    pub async fn shutdown(&self, timeout_ms: Option<u32>) -> Result<(), JsValue> {
+        // `sendPreparedChunk` holds an `&mut` on the exporter across awaits;
+        // taking it out from under an in-flight send would alias.
+        if self.sending.get() {
+            return Err(JsValue::from_str("shutdown: sendPreparedChunk in flight"));
+        }
+        self.sending.set(true);
+        let _in_flight = InFlightGuard(&self.sending);
+
+        // SAFETY: `sending` guard prevents overlapping access; WASM is single-threaded.
+        let exporter_slot = unsafe { &mut *self.exporter.get() };
+        // Idempotent: never-built or already-shut-down state is not an error.
+        let Some(exporter) = exporter_slot.take() else {
+            return Ok(());
+        };
+        let timeout = timeout_ms.map(|ms| Duration::from_millis(u64::from(ms)));
+        exporter
+            .shutdown_async(timeout)
+            .await
+            .map_err(|e| JsValue::from_str(&format!("shutdown: {e:?}")))
     }
 
     /// Set default meta tags applied to every new span.
