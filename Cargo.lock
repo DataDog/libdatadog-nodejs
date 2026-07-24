@@ -2469,27 +2469,21 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 name = "pipeline"
 version = "0.1.0"
 dependencies = [
- "bytes",
  "console_error_panic_hook",
  "getrandom 0.2.17",
- "http 1.5.0",
  "js-sys",
  "libdatadog-nodejs-capabilities",
  "libdd-capabilities 3.0.0 (git+https://github.com/DataDog/libdatadog.git?rev=966f921c226b63a1ba84c2e53e3d0f4625f90c75)",
  "libdd-common 5.2.0 (git+https://github.com/DataDog/libdatadog.git?rev=966f921c226b63a1ba84c2e53e3d0f4625f90c75)",
  "libdd-data-pipeline",
  "libdd-shared-runtime 3.0.0",
- "libdd-trace-protobuf 4.0.1",
- "libdd-trace-stats",
  "libdd-trace-utils 10.1.0",
- "rmp-serde",
  "serde",
  "serde_json",
  "uuid",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
- "web-time",
 ]
 
 [[package]]
