@@ -1,5 +1,7 @@
 'use strict'
 
-module.exports.get = function (name) {
-  return process.env[name]
+const { env } = process
+
+module.exports.get = (name) => {
+  return env[name]
 }
