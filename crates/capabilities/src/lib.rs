@@ -26,16 +26,17 @@ pub use sleep::WasmSleepCapability;
 
 /// Bundle of wasm platform capabilities for libdatadog's `TraceExporter`.
 ///
-/// Mirrors libdatadog's native `NativeCapabilities`: delegates HTTP to
-/// [`WasmHttpClient`] and sleep to [`WasmSleepCapability`]. Log output is a
-/// no-op (see the [`LogWriterCapability`] impl). Per-function bounds stay
+/// Mirrors libdatadog's native `NativeCapabilities`. Per-function bounds stay
 /// minimal in libdatadog (e.g. stats-only code uses [`WasmHttpClient`]
 /// directly), so this bundle is only needed where the full `TraceExporter`
 /// capability set is.
 #[derive(Clone, Debug)]
 pub struct WasmCapabilities {
+    /// Outbound HTTP requests routed through the JS fetch/socket transport.
     http: WasmHttpClient,
+    /// Async sleep backed by `setTimeout` via wasm-bindgen.
     sleep: WasmSleepCapability,
+    /// Filesystem access delegated to the Node.js `fs` transport.
     file: WasmFileCapability,
 }
 

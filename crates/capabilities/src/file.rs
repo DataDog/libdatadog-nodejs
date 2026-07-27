@@ -48,7 +48,7 @@ impl FileCapability for WasmFileCapability {
             let value = JsFuture::from(promise)
                 .await
                 .map_err(|e| map_js_error(&e, &path))?;
-            let array = Uint8Array::new(&value);
+            let array = Uint8Array::unchecked_from_js(value);
             Ok(Bytes::from(array.to_vec()))
         }
     }
