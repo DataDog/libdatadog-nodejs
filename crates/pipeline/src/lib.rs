@@ -205,10 +205,9 @@ pub struct WasmSpanState {
     /// pairs. Only applied when `otlp_endpoint` is set.
     otlp_headers: RefCell<Vec<(String, String)>>,
     /// When set, the lazily-built exporter has telemetry enabled with this
-    /// config (`heartbeat`/`runtime_id`/`debug_enabled` — see libdatadog's
-    /// `TelemetryConfig`). Only takes effect if set before the first send
+    /// config. Only takes effect if set before the first send
     /// (when the exporter is built).
-    telemetry_config: RefCell<Option<TelemetryConfig>>,
+    telemetry_config: Cell<Option<TelemetryConfig>>,
     /// Latched message from a failed lazy `build_async`. Building is one-shot and
     /// a failure is fatal (bad config), so once set every send returns it (as a
     /// distinguishable error) instead of a misleading "builder already consumed",
@@ -343,7 +342,7 @@ impl WasmSpanState {
             otlp_endpoint: RefCell::new(None),
             otlp_protocol: Cell::new(None),
             otlp_headers: RefCell::new(Vec::new()),
-            telemetry_config: RefCell::new(None),
+            telemetry_config: Cell::new(None),
             build_error: RefCell::new(None),
         })
     }
@@ -380,15 +379,17 @@ impl WasmSpanState {
         Ok(())
     }
 
-    /// Enable telemetry on the lazily-built trace exporter. Off by default —
-    /// dd-trace-js opts in from JS. `heartbeat_ms`sets the metric-flush cadence
-    /// (0 defers to libdatadog's default interval), `runtime_id` tags telemetry
-    /// payloads with the tracer's runtime id when provided, and `debug_enabled`
-    /// toggles libdd-telemetry's verbose logging.
+    /// Enable telemetry on the lazily-built trace exporter.
     ///
-    /// Must be called before the first `sendPreparedChunk` — the exporter is
-    /// built lazily on first send and telemetry config is fixed at build time,
-    /// so later calls have no effect.
+    /// Must be called before the first `sendPreparedChunk`. Later calls have
+    /// no effect.
+    ///
+    /// # Arguments
+    ///
+    /// - `heartbeat_ms`: sets the metric-flush cadence. Set to 0 to defer to
+    ///   libdatadog's default interval.
+    /// - `runtime_id`: tags telemetry payloads with the tracer's runtime id when provided
+    /// - `debug_enabled`: toggles libdd-telemetry's verbose logging
     #[wasm_bindgen(js_name = "enableTelemetry")]
     pub fn enable_telemetry(
         &self,
@@ -396,11 +397,11 @@ impl WasmSpanState {
         runtime_id: Option<String>,
         debug_enabled: bool,
     ) {
-        *self.telemetry_config.borrow_mut() = Some(TelemetryConfig {
+        self.telemetry_config.set(Some(TelemetryConfig {
             heartbeat: heartbeat_ms as u64,
             runtime_id,
             debug_enabled,
-        });
+        }));
     }
 
     /// Set extra HTTP headers for OTLP export as a flat `[key, value, ...]`
@@ -559,7 +560,7 @@ impl WasmSpanState {
                     builder.set_otlp_headers(headers.clone());
                 }
             }
-            if let Some(cfg) = self.telemetry_config.borrow().clone() {
+            if let Some(cfg) = self.telemetry_config.take() {
                 builder.enable_telemetry(cfg);
             }
             match builder.build_async::<WasmCapabilities>().await {
