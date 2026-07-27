@@ -197,13 +197,13 @@ pub struct WasmSpanState {
     /// Datadog agent. libdatadog maps its internal traces to OTLP, so no
     /// JS-formatted spans are involved. Like `use_v05`, only takes effect if
     /// set before the first send (when the exporter is built).
-    otlp_endpoint: RefCell<Option<String>>,
+    otlp_endpoint: Cell<Option<String>>,
     /// OTLP wire protocol (`http/json` default, or `http/protobuf`). Only
     /// applied when `otlp_endpoint` is set.
     otlp_protocol: Cell<Option<OtlpProtocol>>,
     /// Extra HTTP headers for OTLP export (e.g. collector auth), as key/value
     /// pairs. Only applied when `otlp_endpoint` is set.
-    otlp_headers: RefCell<Vec<(String, String)>>,
+    otlp_headers: Cell<Vec<(String, String)>>,
     /// When set, the lazily-built exporter has telemetry enabled with this
     /// config. Only takes effect if set before the first send
     /// (when the exporter is built).
@@ -339,9 +339,9 @@ impl WasmSpanState {
             prepared_spans: RefCell::new(Vec::new()),
             sending: Cell::new(false),
             use_v05: Cell::new(false),
-            otlp_endpoint: RefCell::new(None),
+            otlp_endpoint: Cell::new(None),
             otlp_protocol: Cell::new(None),
-            otlp_headers: RefCell::new(Vec::new()),
+            otlp_headers: Cell::new(Vec::new()),
             telemetry_config: Cell::new(None),
             build_error: RefCell::new(None),
         })
@@ -364,7 +364,7 @@ impl WasmSpanState {
     /// Takes precedence over `setUseV05` (OTLP bypasses the agent entirely).
     #[wasm_bindgen(js_name = "setOtlpEndpoint")]
     pub fn set_otlp_endpoint(&self, url: String) {
-        *self.otlp_endpoint.borrow_mut() = Some(url);
+        self.otlp_endpoint.set(Some(url));
     }
 
     /// Select the OTLP wire protocol: `http/json` (default) or `http/protobuf`.
@@ -416,7 +416,7 @@ impl WasmSpanState {
             .chunks_exact(2)
             .map(|pair| (pair[0].clone(), pair[1].clone()))
             .collect();
-        *self.otlp_headers.borrow_mut() = headers;
+        self.otlp_headers.set(headers);
     }
 
     #[wasm_bindgen]
@@ -550,14 +550,14 @@ impl WasmSpanState {
             // When an OTLP endpoint is configured, libdatadog exports traces via
             // OTLP HTTP to that endpoint instead of the Datadog agent (mutually
             // exclusive with the agent v0.4/v0.5 path).
-            if let Some(url) = self.otlp_endpoint.borrow().as_deref() {
-                builder.set_otlp_endpoint(url);
-                if let Some(protocol) = self.otlp_protocol.get() {
+            if let Some(url) = self.otlp_endpoint.take() {
+                builder.set_otlp_endpoint(&url);
+                if let Some(protocol) = self.otlp_protocol.take() {
                     builder.set_otlp_protocol(protocol);
                 }
-                let headers = self.otlp_headers.borrow();
+                let headers = self.otlp_headers.take();
                 if !headers.is_empty() {
-                    builder.set_otlp_headers(headers.clone());
+                    builder.set_otlp_headers(headers);
                 }
             }
             if let Some(cfg) = self.telemetry_config.take() {

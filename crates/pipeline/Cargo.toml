@@ -21,7 +21,6 @@ libdd-trace-utils = { git = "https://github.com/DataDog/libdatadog.git", rev = "
 libdd-trace-stats = { git = "https://github.com/DataDog/libdatadog.git", rev = "3081603d3c74f209be4e3be951f78a1a7469397f", default-features = false }
 libdd-trace-protobuf = { git = "https://github.com/DataDog/libdatadog.git", rev = "3081603d3c74f209be4e3be951f78a1a7469397f", default-features = false }
 libdd-shared-runtime = { git = "https://github.com/DataDog/libdatadog.git", rev = "3081603d3c74f209be4e3be951f78a1a7469397f", default-features = false }
-web-time = "1"
 rmp-serde = "1"
 bytes = "1"
 http = "1"
