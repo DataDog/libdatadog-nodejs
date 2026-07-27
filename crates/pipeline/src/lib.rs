@@ -556,11 +556,9 @@ impl WasmSpanState {
         Ok(true)
     }
 
-    /// Force-flush the current stats bucket and stop the background workers.
-    /// The stats worker only flushes on its bucket interval, so spans
-    /// recorded between the last tick and process exit are lost unless this
-    /// is awaited during tracer shutdown. Consumes the exporter — subsequent
-    /// sends will error.
+    /// Gracefully shut down the exporter and stop the background workers.
+    /// Should be awaited during tracer shutdown to avoid losing in-flight
+    /// data. Consumes the exporter — subsequent sends will error.
     ///
     /// `timeoutMs` bounds the wait; on timeout returns an error and workers
     /// may still be finishing. `None` waits indefinitely.
