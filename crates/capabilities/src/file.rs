@@ -4,7 +4,7 @@
 //! Wasm implementation of [`FileCapability`] backed by Node.js `fs`.
 //!
 //! The JS transport is imported via `wasm_bindgen(module = ...)` from
-//! `file_transport.js`, which ships alongside the wasm output.
+//! `filesystem.js`, which ships alongside the wasm output.
 
 use std::future::Future;
 
@@ -16,7 +16,7 @@ use wasm_bindgen_futures::JsFuture;
 use libdd_capabilities::file::{FileCapability, FileError, FileMetadata};
 use libdd_capabilities::maybe_send::MaybeSend;
 
-#[wasm_bindgen(module = "/src/file_transport.js")]
+#[wasm_bindgen(module = "/src/filesystem.js")]
 extern "C" {
     #[wasm_bindgen(js_name = "readFile", catch)]
     fn js_read_file(path: &str) -> Result<js_sys::Promise, JsValue>;
