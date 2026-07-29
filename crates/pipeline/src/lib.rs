@@ -204,6 +204,9 @@ pub struct WasmSpanState {
     /// Extra HTTP headers for OTLP export (e.g. collector auth), as key/value
     /// pairs. Only applied when `otlp_endpoint` is set.
     otlp_headers: RefCell<Vec<(String, String)>>,
+    /// Direct LLMObs fallback endpoint, API key, and timeout. EVP proxy remains
+    /// the primary route and is derived from the configured Agent URL.
+    llmobs_config: RefCell<Option<(String, String, u32)>>,
     /// Latched message from a failed lazy `build_async`. Building is one-shot and
     /// a failure is fatal (bad config), so once set every send returns it (as a
     /// distinguishable error) instead of a misleading "builder already consumed",
@@ -338,6 +341,7 @@ impl WasmSpanState {
             otlp_endpoint: RefCell::new(None),
             otlp_protocol: Cell::new(None),
             otlp_headers: RefCell::new(Vec::new()),
+            llmobs_config: RefCell::new(None),
             build_error: RefCell::new(None),
         })
     }
@@ -387,6 +391,15 @@ impl WasmSpanState {
             .map(|pair| (pair[0].clone(), pair[1].clone()))
             .collect();
         *self.otlp_headers.borrow_mut() = headers;
+    }
+
+    /// Enable LLMObs routing for `_llmobs` meta-struct entries.
+    ///
+    /// `agentless_endpoint` is the full direct-intake URL used after EVP proxy
+    /// failure. An empty API key leaves EVP available but disables direct fallback.
+    #[wasm_bindgen(js_name = "setLlmObs")]
+    pub fn set_llmobs(&self, agentless_endpoint: String, api_key: String, timeout_ms: u32) {
+        *self.llmobs_config.borrow_mut() = Some((agentless_endpoint, api_key, timeout_ms));
     }
 
     #[wasm_bindgen]
@@ -514,8 +527,15 @@ impl WasmSpanState {
             // v0.5 drops meta_struct/span_events/span_links by design (the v0.5
             // schema has no slots for them); dd-trace-js only enables this after
             // confirming agent `/v0.5/traces` support via `/info`.
-            if self.use_v05.get() {
+            if self.use_v05.get() && self.llmobs_config.borrow().is_none() {
                 builder.set_output_format(TraceExporterOutputFormat::V05);
+            }
+            if let Some((endpoint, api_key, timeout_ms)) = self.llmobs_config.borrow().as_ref() {
+                builder.set_llmobs(
+                    endpoint,
+                    api_key,
+                    Duration::from_millis(u64::from(*timeout_ms)),
+                );
             }
             // When an OTLP endpoint is configured, libdatadog exports traces via
             // OTLP HTTP to that endpoint instead of the Datadog agent (mutually

@@ -888,7 +888,7 @@ describe('pipeline', { skip }, () => {
     // exporter targets /v0.4/traces by default and /v0.5/traces after
     // setUseV05(true). (v0.5 itself drops meta_struct/span_events by design;
     // here we only verify endpoint routing, which is the observable behavior.)
-    async function flushAndCapturePath (useV05) {
+    async function flushAndCapturePath (useV05, llmobsEnabled = false) {
       const http = require('node:http')
       const seen = []
       const server = http.createServer((req, res) => {
@@ -903,6 +903,9 @@ describe('pipeline', { skip }, () => {
       const { port } = server.address()
       const ns = new NativeSpansInterface({ agentUrl: `http://127.0.0.1:${port}` })
       if (useV05) ns.state.setUseV05(true)
+      if (llmobsEnabled) {
+        ns.state.setLlmObs('https://llmobs-intake.datadoghq.com/api/v2/llmobs', 'test-key', 1000)
+      }
       const span = ns.createSpan()
       span.name = 'v05-span'
       span.service = 'test-service'
@@ -928,6 +931,12 @@ describe('pipeline', { skip }, () => {
       const req = await flushAndCapturePath(true)
       assert.ok(req, 'agent received a POST')
       assert.strictEqual(req.url, '/v0.5/traces')
+    })
+
+    it('keeps v0.4 when LLMObs routing is enabled', async () => {
+      const req = await flushAndCapturePath(true, true)
+      assert.ok(req, 'agent received a POST')
+      assert.strictEqual(req.url, '/v0.4/traces')
     })
 
     it('exports via OTLP HTTP after setOtlpEndpoint(url)', async () => {
