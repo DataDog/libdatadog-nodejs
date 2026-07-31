@@ -181,13 +181,19 @@ class NativeSpansInterface {
     this._cqbBytes = new Uint8Array(this._wasmMemory.buffer, this._cqbPtr)
   }
 
-  resetChangeQueue () {
-    this.cqbIndex = 8
-    this.cqbCount = 0
-    // Check if WASM memory was detached/grown
+  // Any Rust call can trigger a WASM memory.grow(), which detaches the
+  // JS-side ArrayBuffer. Callers must invoke this before every read/write to
+  // the shared buffers when a Rust call may have happened since the last check.
+  _ensureViews () {
     if (this._wasmMemory.buffer !== this._cqbView.buffer) {
       this._refreshViews()
     }
+  }
+
+  resetChangeQueue () {
+    this.cqbIndex = 8
+    this.cqbCount = 0
+    this._ensureViews()
     this._cqbView.setUint32(0, 0, true)
     this._cqbView.setUint32(4, 0, true)
   }
@@ -228,10 +234,7 @@ class NativeSpansInterface {
   }
 
   queueOp (op, spanId, ...args) {
-    // Check if WASM memory was detached/grown
-    if (this._wasmMemory.buffer !== this._cqbView.buffer) {
-      this._refreshViews()
-    }
+    this._ensureViews()
 
     // Check if Rust flushed the queue (wrote 0 to count position)
     if (this._cqbView.getUint32(0, true) === 0 && this.cqbCount > 0) {
@@ -239,22 +242,20 @@ class NativeSpansInterface {
       this.cqbCount = 0
     }
 
-    let view = this._cqbView
     // Op header: opcode (u16 LE) + span_id (u64 LE) = 10 bytes. Rust reads the
     // opcode as a u16, then the span_id as a u64.
-    view.setUint16(this.cqbIndex, op, true)
+    this._cqbView.setUint16(this.cqbIndex, op, true)
     this.cqbIndex += 2
     this._writeBytesLE(spanId, this.cqbIndex)
     this.cqbIndex += 8
 
     for (const arg of args) {
       if (typeof arg === 'string') {
+        // getStringId may call into Rust (stringTableInsertOne), which can
+        // grow WASM memory and detach our views. Re-check after the call.
         const stringId = this.getStringId(arg)
-        if (this._wasmMemory.buffer !== view.buffer) {
-          this._refreshViews()
-          view = this._cqbView
-        }
-        view.setUint32(this.cqbIndex, stringId, true)
+        this._ensureViews()
+        this._cqbView.setUint32(this.cqbIndex, stringId, true)
         this.cqbIndex += 4
       } else {
         const [typ, num] = arg
@@ -265,12 +266,12 @@ class NativeSpansInterface {
             break
           }
           case 'u64n': {
-            view.setBigUint64(this.cqbIndex, BigInt(num), true)
+            this._cqbView.setBigUint64(this.cqbIndex, BigInt(num), true)
             this.cqbIndex += 8
             break
           }
           case 'u32n': { // raw, pre-resolved string-table id
-            view.setUint32(this.cqbIndex, num, true)
+            this._cqbView.setUint32(this.cqbIndex, num, true)
             this.cqbIndex += 4
             break
           }
@@ -282,17 +283,17 @@ class NativeSpansInterface {
             break
           }
           case 'i64': {
-            view.setBigInt64(this.cqbIndex, num, true)
+            this._cqbView.setBigInt64(this.cqbIndex, num, true)
             this.cqbIndex += 8
             break
           }
           case 'i32': {
-            view.setInt32(this.cqbIndex, num, true)
+            this._cqbView.setInt32(this.cqbIndex, num, true)
             this.cqbIndex += 4
             break
           }
           case 'f64': {
-            view.setFloat64(this.cqbIndex, num, true)
+            this._cqbView.setFloat64(this.cqbIndex, num, true)
             this.cqbIndex += 8
             break
           }
@@ -304,7 +305,7 @@ class NativeSpansInterface {
     }
 
     this.cqbCount++
-    view.setBigUint64(0, BigInt(this.cqbCount), true)
+    this._cqbView.setBigUint64(0, BigInt(this.cqbCount), true)
   }
 
   createSpan (traceId, parentId) {
