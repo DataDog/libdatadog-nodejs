@@ -17,7 +17,13 @@ libdatadog-nodejs-capabilities = { path = "../capabilities" }
 # TODO: Replace these temporary libdatadog PR revs with the official release/tag
 # that contains DataDog/libdatadog#2235, then regenerate Cargo.lock.
 libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", rev = "8cd68ab922fb7aade0f089ccfc91291d874673af" }
-libdd-common = { git = "https://github.com/DataDog/libdatadog.git", rev = "8cd68ab922fb7aade0f089ccfc91291d874673af", default-features = false }
+# `regex-lite` swaps libdd-common's regex engine for the `regex-lite` crate,
+# dropping the Unicode range tables that dominate this wasm module. Nothing in
+# the wasm build evaluates user-supplied regexes: libdd-trace-obfuscation and
+# libdd-trace-utils::trace_filter both go through `libdd_common::regex_engine`,
+# and `require-regex-full` (which would override this) is only enabled by
+# datadog-ffe, which is not in this dependency graph.
+libdd-common = { git = "https://github.com/DataDog/libdatadog.git", rev = "8cd68ab922fb7aade0f089ccfc91291d874673af", default-features = false, features = ["regex-lite"] }
 libdd-data-pipeline = { git = "https://github.com/DataDog/libdatadog.git", rev = "8cd68ab922fb7aade0f089ccfc91291d874673af", default-features = false }
 libdd-trace-utils = { git = "https://github.com/DataDog/libdatadog.git", rev = "8cd68ab922fb7aade0f089ccfc91291d874673af", default-features = false, features = ["change-buffer"] }
 libdd-trace-stats = { git = "https://github.com/DataDog/libdatadog.git", rev = "8cd68ab922fb7aade0f089ccfc91291d874673af", default-features = false }
