@@ -40,10 +40,29 @@ The project compiles Rust for both native Node.js addons and WebAssembly. Use [r
 
 ## Building
 
-* `yarn build`: Build the default workspaces in debug mode.
+The repository publishes two packages from the same set of crates:
+`@datadog/libdatadog` (the native bindings plus most WASM modules, from the
+repository root) and `@datadog/libdatadog-wasm-pipeline` (the `pipeline` crate,
+from `packages/wasm-pipeline`). `scripts/wasm-crates.js` is the single source of
+truth for which package publishes which crate.
+
+* `yarn build`: Build the default workspaces in debug mode, then the WASM modules.
 * `yarn build-release`: Build the default workspaces in release mode.
 * `yarn build-all`: Build all workspaces in debug mode. This is useful when working on a workspace that is not a default member yet.
+* `yarn build-wasm`: Build every WASM module. To build just one, run `node scripts/build-wasm.js <crate>`.
+
+Native artifacts land in `build/Release/`. WASM modules land in
+`prebuilds/<crate>/`, except the pipeline module, which belongs to its own
+package and lands in `packages/wasm-pipeline/prebuilds/pipeline/`.
 
 ## Run tests
 
-* `yarn test`: Run the JavaScript test suite
+* `yarn test`: Run the native test suite (needs `yarn build`).
+* `yarn test-wasm`: Run the WASM test suites (needs `yarn build-wasm`).
+* `yarn test-wasm <crate>`: Run only one crate's WASM tests, e.g. `yarn test-wasm pipeline`.
+
+## Versioning
+
+The published packages are versioned in lockstep, so `package.json` and
+`packages/wasm-pipeline/package.json` must always declare the same version.
+`node scripts/check-versions.js` enforces this in CI.

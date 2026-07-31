@@ -8,7 +8,6 @@ runs:
   using: 'composite'
   steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
       - name: Setup Node.js
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
       - run: yarn install
@@ -16,24 +15,25 @@ runs:
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
         shell: bash
+      # scripts/wasm-crates.js owns which package each crate is published from,
+      # so the output directory and the artifact name are both derived from it
+      # rather than repeated here.
       - name: Build WASM
+        id: build
         run: |
-          mkdir -p ./prebuilds/${{ inputs.crate }}
-          wasm-pack build --target nodejs ./crates/${{ inputs.crate }} --out-dir ../../prebuilds/${{ inputs.crate }}
+          node scripts/build-wasm.js '${{ inputs.crate }}'
+          echo "prebuilds=$(node scripts/wasm-crates.js --prebuilds-root '${{ inputs.crate }}')" >> "$GITHUB_OUTPUT"
+          echo "artifact=$(node scripts/wasm-crates.js --artifact-name '${{ inputs.crate }}')" >> "$GITHUB_OUTPUT"
         shell: bash
       - name: Test WASM
-        # The pipeline crate's tests are top-level node:test suites that need
-        # --test-force-exit (the wasm exporter keeps the event loop alive after
-        # a flush); the other wasm crates use plain test/wasm/<crate>/ scripts.
-        run: |
-          if [ "${{ inputs.crate }}" = "pipeline" ]; then
-            node --test --test-force-exit test/pipeline.js
-          else
-            node test-wasm.js ${{ inputs.crate }}
-          fi
+        run: bash scripts/test.sh wasm '${{ inputs.crate }}'
         shell: bash
+      # Crates that stay in @datadog/libdatadog are uploaded as `prebuilds-*`,
+      # which action-prebuildify merges into that package's `prebuilds` artifact.
+      # A carved-out crate must not match that pattern or it would be published
+      # by both packages; `wasm-crates.js` is what keeps the two apart.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: prebuilds-wasm-${{ inputs.crate }}
-          if-no-files-found: ignore
-          path: ./prebuilds/*
+          name: ${{ steps.build.outputs.artifact }}
+          if-no-files-found: error
+          path: ${{ steps.build.outputs.prebuilds }}/*

@@ -13,7 +13,7 @@ const os = require('node:os')
 const path = require('node:path')
 const fs = require('node:fs')
 
-const transport = require('../crates/capabilities/src/http_transport')
+const transport = require('../../../crates/capabilities/src/http_transport')
 
 // Distinctive, multi-byte body so the pooled-buffer slicing in httpRequest
 // (the reason for `new Uint8Array(body)` over `body.buffer`) is exercised:
@@ -180,7 +180,7 @@ describe('http_transport IPv6 host', () => {
 describe('http_transport lazy builtin requires', () => {
   it('does not require node:http/https/fs at module load', () => {
     const Module = require('node:module')
-    const modPath = require.resolve('../crates/capabilities/src/http_transport')
+    const modPath = require.resolve('../../../crates/capabilities/src/http_transport')
     const orig = Module.prototype.require
     const seen = []
     Module.prototype.require = function (id) {

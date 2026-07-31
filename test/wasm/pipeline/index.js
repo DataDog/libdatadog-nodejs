@@ -4,15 +4,10 @@ const { describe, it, before, beforeEach } = require('node:test')
 const assert = require('node:assert')
 const crypto = require('node:crypto')
 
-const pipeline = require('..').maybeLoad('pipeline')
-// The pipeline binding is wasm-only and is absent in the native
-// (action-prebuildify) test matrix, where `maybeLoad` returns undefined. Skip
-// the suite there instead of crashing on the destructure below; the pipeline
-// wasm is built and these tests run for real in the `build-test-wasm` job.
-const skip = pipeline === undefined
-const { WasmSpanState } = pipeline ?? {}
-const OpCode = pipeline ? pipeline.getOpCodes() : {}
-const wasmMemory = pipeline ? pipeline.getWasmMemory() : undefined
+const pipeline = require('../../../packages/wasm-pipeline').load('pipeline')
+const { WasmSpanState } = pipeline
+const OpCode = pipeline.getOpCodes()
+const wasmMemory = pipeline.getWasmMemory()
 
 function getRandomBytes (byteCount) {
   return new Uint8Array(crypto.randomBytes(byteCount))
@@ -384,7 +379,7 @@ function msgpackOuterArrayLen (buf) {
   throw new Error('payload is not a msgpack array: 0x' + b.toString(16))
 }
 
-describe('pipeline', { skip }, () => {
+describe('pipeline', () => {
   let nativeSpans
 
   before(() => {

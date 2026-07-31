@@ -1,0 +1,19 @@
+{
+  "name": "@datadog/libdatadog-wasm-pipeline",
+  "version": "0.1.0-pre",
+  "description": "WebAssembly trace pipeline bindings for libdatadog",
+  "main": "index.js",
+  "author": "Datadog Inc. <info@datadoghq.com>",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DataDog/libdatadog-nodejs.git"
+  },
+  "bugs": {
+    "url": "https://github.com/DataDog/libdatadog-nodejs/issues"
+  },
+  "homepage": "https://github.com/DataDog/libdatadog-nodejs#readme",
+  "publishConfig": {
+    "access": "public"
+  }
+}

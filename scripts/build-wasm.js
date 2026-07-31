@@ -12,10 +12,14 @@
 
 const os = require('node:os')
 const childProcess = require('node:child_process')
+const fs = require('node:fs')
+const path = require('node:path')
+
+const { prebuildsDir, WASM_CRATES } = require('./wasm-crates')
 
 const isMacOS = os.platform() === 'darwin'
 const noWasmOpt = isMacOS ? '--no-opt' : ''
-const library = process.argv[2]
+const libraries = process.argv[2] ? [process.argv[2]] : WASM_CRATES
 
 const env = {
   ...process.env,
@@ -44,8 +48,20 @@ if (isMacOS) {
   env.CXX_wasm32_unknown_unknown = `${llvmBinDir}/clang++`
 }
 
-childProcess.execSync(
-  `wasm-pack build ${noWasmOpt} --target nodejs ./crates/${library} --out-dir ../../prebuilds/${library}`, {
-    env,
-  },
-)
+for (const library of libraries) {
+  // wasm-pack resolves `--out-dir` relative to the crate directory.
+  const outDir = path.join(__dirname, '..', prebuildsDir(library))
+  const cratePath = path.join(__dirname, '..', 'crates', library)
+
+  childProcess.execSync(
+    `wasm-pack build ${noWasmOpt} --target nodejs ./crates/${library} --out-dir ${path.relative(cratePath, outDir)}`,
+    {
+      env,
+    },
+  )
+
+  // wasm-pack writes a `.gitignore` containing `*` into its output directory. npm
+  // honours nested ignore files when packing, so leaving it in place would drop
+  // the whole module from the published tarball.
+  fs.rmSync(path.join(outDir, '.gitignore'), { force: true })
+}

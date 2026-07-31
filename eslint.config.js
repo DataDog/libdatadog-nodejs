@@ -44,7 +44,7 @@ module.exports = [
     },
   },
   {
-    files: ['load.js'],
+    files: ['**/load.js'],
     languageOptions: {
       globals: {
         __webpack_require__: 'readonly',
@@ -88,6 +88,6 @@ module.exports = [
     },
   },
   {
-    ignores: ['build/', 'target/', 'prebuilds/'],
+    ignores: ['build/', 'target/', '**/prebuilds/'],
   },
 ]
