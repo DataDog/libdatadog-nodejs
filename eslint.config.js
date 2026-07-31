@@ -80,9 +80,9 @@ module.exports = [
     },
   },
   {
-    // Loaded by Rust via `wasm_bindgen(module = ".../http_transport.js")`, so the
-    // snake_case filename must match the Rust module path.
-    files: ['**/http_transport.js'],
+    // Loaded by Rust via `wasm_bindgen(module = ".../<name>_transport.js")`, so
+    // the snake_case filename must match the Rust module path.
+    files: ['**/*_transport.js'],
     rules: {
       'unicorn/filename-case': 'off',
     },

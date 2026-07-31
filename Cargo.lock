@@ -858,7 +858,7 @@ dependencies = [
 [[package]]
 name = "libdd-capabilities"
 version = "2.1.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=6356aee4c69b51f27e7e82e43b1797f60b74905a#6356aee4c69b51f27e7e82e43b1797f60b74905a"
+source = "git+https://github.com/DataDog/libdatadog.git?rev=3081603d3c74f209be4e3be951f78a1a7469397f#3081603d3c74f209be4e3be951f78a1a7469397f"
 dependencies = [
  "anyhow",
  "bytes",
@@ -882,8 +882,9 @@ dependencies = [
 [[package]]
 name = "libdd-capabilities-impl"
 version = "3.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=6356aee4c69b51f27e7e82e43b1797f60b74905a#6356aee4c69b51f27e7e82e43b1797f60b74905a"
+source = "git+https://github.com/DataDog/libdatadog.git?rev=3081603d3c74f209be4e3be951f78a1a7469397f#3081603d3c74f209be4e3be951f78a1a7469397f"
 dependencies = [
+ "anyhow",
  "bytes",
  "http",
  "http-body-util",
@@ -929,7 +930,7 @@ dependencies = [
 [[package]]
 name = "libdd-common"
 version = "5.1.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=6356aee4c69b51f27e7e82e43b1797f60b74905a#6356aee4c69b51f27e7e82e43b1797f60b74905a"
+source = "git+https://github.com/DataDog/libdatadog.git?rev=3081603d3c74f209be4e3be951f78a1a7469397f#3081603d3c74f209be4e3be951f78a1a7469397f"
 dependencies = [
  "anyhow",
  "bytes",
@@ -992,13 +993,14 @@ dependencies = [
 [[package]]
 name = "libdd-data-pipeline"
 version = "7.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=6356aee4c69b51f27e7e82e43b1797f60b74905a#6356aee4c69b51f27e7e82e43b1797f60b74905a"
+source = "git+https://github.com/DataDog/libdatadog.git?rev=3081603d3c74f209be4e3be951f78a1a7469397f#3081603d3c74f209be4e3be951f78a1a7469397f"
 dependencies = [
  "anyhow",
  "arc-swap",
  "async-trait",
  "bytes",
  "either",
+ "futures",
  "getrandom 0.2.17",
  "http",
  "http-body-util",
@@ -1021,6 +1023,7 @@ dependencies = [
  "tokio-util",
  "tracing",
  "uuid",
+ "web-time",
 ]
 
 [[package]]
@@ -1034,7 +1037,7 @@ dependencies = [
 [[package]]
 name = "libdd-ddsketch"
 version = "1.1.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=6356aee4c69b51f27e7e82e43b1797f60b74905a#6356aee4c69b51f27e7e82e43b1797f60b74905a"
+source = "git+https://github.com/DataDog/libdatadog.git?rev=3081603d3c74f209be4e3be951f78a1a7469397f#3081603d3c74f209be4e3be951f78a1a7469397f"
 dependencies = [
  "prost",
 ]
@@ -1042,7 +1045,7 @@ dependencies = [
 [[package]]
 name = "libdd-dogstatsd-client"
 version = "4.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=6356aee4c69b51f27e7e82e43b1797f60b74905a#6356aee4c69b51f27e7e82e43b1797f60b74905a"
+source = "git+https://github.com/DataDog/libdatadog.git?rev=3081603d3c74f209be4e3be951f78a1a7469397f#3081603d3c74f209be4e3be951f78a1a7469397f"
 dependencies = [
  "anyhow",
  "cadence",
@@ -1114,7 +1117,7 @@ dependencies = [
 [[package]]
 name = "libdd-shared-runtime"
 version = "2.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=6356aee4c69b51f27e7e82e43b1797f60b74905a#6356aee4c69b51f27e7e82e43b1797f60b74905a"
+source = "git+https://github.com/DataDog/libdatadog.git?rev=3081603d3c74f209be4e3be951f78a1a7469397f#3081603d3c74f209be4e3be951f78a1a7469397f"
 dependencies = [
  "async-trait",
  "futures",
@@ -1158,7 +1161,7 @@ dependencies = [
 [[package]]
 name = "libdd-tinybytes"
 version = "1.1.1"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=6356aee4c69b51f27e7e82e43b1797f60b74905a#6356aee4c69b51f27e7e82e43b1797f60b74905a"
+source = "git+https://github.com/DataDog/libdatadog.git?rev=3081603d3c74f209be4e3be951f78a1a7469397f#3081603d3c74f209be4e3be951f78a1a7469397f"
 dependencies = [
  "serde",
 ]
@@ -1166,7 +1169,7 @@ dependencies = [
 [[package]]
 name = "libdd-trace-normalization"
 version = "3.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=6356aee4c69b51f27e7e82e43b1797f60b74905a#6356aee4c69b51f27e7e82e43b1797f60b74905a"
+source = "git+https://github.com/DataDog/libdatadog.git?rev=3081603d3c74f209be4e3be951f78a1a7469397f#3081603d3c74f209be4e3be951f78a1a7469397f"
 dependencies = [
  "anyhow",
  "libdd-trace-protobuf 4.0.0",
@@ -1175,7 +1178,7 @@ dependencies = [
 [[package]]
 name = "libdd-trace-obfuscation"
 version = "5.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=6356aee4c69b51f27e7e82e43b1797f60b74905a#6356aee4c69b51f27e7e82e43b1797f60b74905a"
+source = "git+https://github.com/DataDog/libdatadog.git?rev=3081603d3c74f209be4e3be951f78a1a7469397f#3081603d3c74f209be4e3be951f78a1a7469397f"
 dependencies = [
  "anyhow",
  "fluent-uri",
@@ -1201,7 +1204,7 @@ dependencies = [
 [[package]]
 name = "libdd-trace-protobuf"
 version = "4.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=6356aee4c69b51f27e7e82e43b1797f60b74905a#6356aee4c69b51f27e7e82e43b1797f60b74905a"
+source = "git+https://github.com/DataDog/libdatadog.git?rev=3081603d3c74f209be4e3be951f78a1a7469397f#3081603d3c74f209be4e3be951f78a1a7469397f"
 dependencies = [
  "prost",
  "serde",
@@ -1211,7 +1214,7 @@ dependencies = [
 [[package]]
 name = "libdd-trace-stats"
 version = "6.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=6356aee4c69b51f27e7e82e43b1797f60b74905a#6356aee4c69b51f27e7e82e43b1797f60b74905a"
+source = "git+https://github.com/DataDog/libdatadog.git?rev=3081603d3c74f209be4e3be951f78a1a7469397f#3081603d3c74f209be4e3be951f78a1a7469397f"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -1233,12 +1236,13 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+ "web-time",
 ]
 
 [[package]]
 name = "libdd-trace-utils"
 version = "9.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=6356aee4c69b51f27e7e82e43b1797f60b74905a#6356aee4c69b51f27e7e82e43b1797f60b74905a"
+source = "git+https://github.com/DataDog/libdatadog.git?rev=3081603d3c74f209be4e3be951f78a1a7469397f#3081603d3c74f209be4e3be951f78a1a7469397f"
 dependencies = [
  "anyhow",
  "base64",
@@ -1757,6 +1761,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
+ "web-time",
 ]
 
 [[package]]
@@ -2669,6 +2674,16 @@ dependencies = [
  "hashbrown 0.15.5",
  "indexmap",
  "semver",
+]
+
+[[package]]
+name = "web-time"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a6580f308b1fad9207618087a65c04e7a10bc77e02c8e84e9b00dd4b12fa0bb"
+dependencies = [
+ "js-sys",
+ "wasm-bindgen",
 ]
 
 [[package]]
