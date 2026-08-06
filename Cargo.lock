@@ -1072,7 +1072,7 @@ dependencies = [
  "libdd-shared-runtime",
  "libdd-tinybytes",
  "libdd-trace-normalization",
- "libdd-trace-protobuf 4.0.0",
+ "libdd-trace-protobuf 4.0.0 (git+https://github.com/DataDog/libdatadog.git?rev=3081603d3c74f209be4e3be951f78a1a7469397f)",
  "libdd-trace-stats",
  "libdd-trace-utils",
  "rmp-serde",
@@ -1117,26 +1117,12 @@ dependencies = [
 
 [[package]]
 name = "libdd-library-config"
-version = "1.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=353134770b312b7ccd2df6afabc253090b948e5f#353134770b312b7ccd2df6afabc253090b948e5f"
-dependencies = [
- "anyhow",
- "memfd",
- "rand",
- "rmp",
- "rmp-serde",
- "serde",
- "serde_yaml",
-]
-
-[[package]]
-name = "libdd-library-config"
-version = "2.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=7cdeb7896e92d1ba38bde495934e112dac2eda25#7cdeb7896e92d1ba38bde495934e112dac2eda25"
+version = "3.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?rev=0c6e2a5df2a163d34c4f385353ffc5d7257c72f4#0c6e2a5df2a163d34c4f385353ffc5d7257c72f4"
 dependencies = [
  "anyhow",
  "libc",
- "libdd-trace-protobuf 3.0.2",
+ "libdd-trace-protobuf 4.0.0 (git+https://github.com/DataDog/libdatadog.git?rev=0c6e2a5df2a163d34c4f385353ffc5d7257c72f4)",
  "memfd",
  "prost",
  "rand",
@@ -1232,7 +1218,7 @@ version = "3.0.0"
 source = "git+https://github.com/DataDog/libdatadog.git?rev=3081603d3c74f209be4e3be951f78a1a7469397f#3081603d3c74f209be4e3be951f78a1a7469397f"
 dependencies = [
  "anyhow",
- "libdd-trace-protobuf 4.0.0",
+ "libdd-trace-protobuf 4.0.0 (git+https://github.com/DataDog/libdatadog.git?rev=3081603d3c74f209be4e3be951f78a1a7469397f)",
 ]
 
 [[package]]
@@ -1242,8 +1228,8 @@ source = "git+https://github.com/DataDog/libdatadog.git?rev=3081603d3c74f209be4e
 dependencies = [
  "anyhow",
  "fluent-uri",
- "libdd-common",
- "libdd-trace-protobuf 3.0.2 (git+https://github.com/DataDog/libdatadog.git?tag=v37.0.0)",
+ "libdd-common 5.1.0",
+ "libdd-trace-protobuf 4.0.0 (git+https://github.com/DataDog/libdatadog.git?rev=3081603d3c74f209be4e3be951f78a1a7469397f)",
  "libdd-trace-utils",
  "log",
  "percent-encoding",
@@ -1253,8 +1239,8 @@ dependencies = [
 
 [[package]]
 name = "libdd-trace-protobuf"
-version = "3.0.2"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=7cdeb7896e92d1ba38bde495934e112dac2eda25#7cdeb7896e92d1ba38bde495934e112dac2eda25"
+version = "4.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?rev=0c6e2a5df2a163d34c4f385353ffc5d7257c72f4#0c6e2a5df2a163d34c4f385353ffc5d7257c72f4"
 dependencies = [
  "prost",
  "serde",
@@ -1288,7 +1274,7 @@ dependencies = [
  "libdd-ddsketch",
  "libdd-shared-runtime",
  "libdd-trace-obfuscation",
- "libdd-trace-protobuf 4.0.0",
+ "libdd-trace-protobuf 4.0.0 (git+https://github.com/DataDog/libdatadog.git?rev=3081603d3c74f209be4e3be951f78a1a7469397f)",
  "libdd-trace-utils",
  "rmp-serde",
  "serde",
@@ -1319,7 +1305,7 @@ dependencies = [
  "libdd-common 5.1.0",
  "libdd-tinybytes",
  "libdd-trace-normalization",
- "libdd-trace-protobuf 4.0.0",
+ "libdd-trace-protobuf 4.0.0 (git+https://github.com/DataDog/libdatadog.git?rev=3081603d3c74f209be4e3be951f78a1a7469397f)",
  "prost",
  "rand",
  "rmp",
@@ -1356,7 +1342,7 @@ version = "0.2.0"
 dependencies = [
  "anyhow",
  "getrandom 0.2.17",
- "libdd-library-config 1.0.0",
+ "libdd-library-config",
  "serde",
  "serde-wasm-bindgen",
  "wasm-bindgen",
@@ -1808,8 +1794,8 @@ dependencies = [
  "libdatadog-nodejs-capabilities",
  "libdd-capabilities",
  "libdd-data-pipeline",
- "libdd-shared-runtime",
- "libdd-trace-protobuf 3.0.2 (git+https://github.com/DataDog/libdatadog.git?tag=v37.0.0)",
+ "libdd-shared-runtime 2.0.0",
+ "libdd-trace-protobuf 4.0.0 (git+https://github.com/DataDog/libdatadog.git?rev=3081603d3c74f209be4e3be951f78a1a7469397f)",
  "libdd-trace-stats",
  "libdd-trace-utils",
  "rmp-serde",
@@ -1870,8 +1856,8 @@ name = "process-discovery"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "libdd-library-config 2.0.0",
- "libdd-trace-protobuf 3.0.2",
+ "libdd-library-config",
+ "libdd-trace-protobuf 4.0.0 (git+https://github.com/DataDog/libdatadog.git?rev=0c6e2a5df2a163d34c4f385353ffc5d7257c72f4)",
  "napi",
  "napi-derive",
 ]
