@@ -4,14 +4,14 @@
 'use strict'
 
 // UTF-8 encoding thresholds (max code point + 1 for each byte-length class).
-const ONE_BYTE_MAX = 0x80        // U+0000..U+007F  → 1 byte
-const TWO_BYTE_MAX = 0x800       // U+0080..U+07FF  → 2 bytes
+const ONE_BYTE_MAX = 0x80 // U+0000..U+007F  → 1 byte
+const TWO_BYTE_MAX = 0x8_00 // U+0080..U+07FF  → 2 bytes
 // UTF-16 surrogate ranges. A high+low pair encodes one supplementary code
 // point (U+10000..U+10FFFF) into 4 UTF-8 bytes.
-const HIGH_SURROGATE_MIN = 0xd800
-const HIGH_SURROGATE_MAX = 0xdbff
-const LOW_SURROGATE_MIN = 0xdc00
-const LOW_SURROGATE_MAX = 0xdfff
+const HIGH_SURROGATE_MIN = 0xD8_00
+const HIGH_SURROGATE_MAX = 0xDB_FF
+const LOW_SURROGATE_MIN = 0xDC_00
+const LOW_SURROGATE_MAX = 0xDF_FF
 
 // UTF-8 byte cost of the single code unit at `hay[i]`.
 // A surrogate pair encodes as 4 UTF-8 bytes but spans two code-unit
@@ -19,6 +19,7 @@ const LOW_SURROGATE_MAX = 0xdfff
 // low half) so mid-pair positions get a distinct, monotonic byte offset.
 // Lone surrogates count as 3 bytes (WTF-8 style, matching how Node's UTF-8
 // encoder replaces unpaired surrogates with U+FFFD).
+/* eslint-disable unicorn/prefer-code-point */
 function cuBytes (hay, i, len) {
   const cu = hay.charCodeAt(i)
   if (cu < ONE_BYTE_MAX) return 1

@@ -5,11 +5,11 @@ const assert = require('node:assert')
 
 const regex = require('../crates/capabilities/src/regex')
 
-const utf8Len = (s) => Buffer.byteLength(s, 'utf8')
+const utf8Len = s => Buffer.byteLength(s, 'utf8')
 
 describe('regex', () => {
   it('findFirst — pure ASCII', () => {
-    assert.deepStrictEqual([...regex.findFirst(regex.compile('\\d+'), 'abc123def')], [3, 6])
+    assert.deepStrictEqual([...regex.findFirst(regex.compile(String.raw`\d+`), 'abc123def')], [3, 6])
   })
 
   it('findFirst — no match returns empty', () => {
@@ -53,7 +53,7 @@ describe('regex', () => {
 
   it('findFirst — combining mark does not confuse offsets', () => {
     // "e" + U+0301 (combining acute) = 3 UTF-8 bytes.
-    const hay = 'éxt'
+    const hay = 'e\u0301xt'
     assert.deepStrictEqual([...regex.findFirst(regex.compile('xt'), hay)],
       [3, 5])
   })

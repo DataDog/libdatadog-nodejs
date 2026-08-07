@@ -1154,7 +1154,10 @@ describe('pipeline', { skip }, () => {
       try {
         for (let i = 0; i < 15_000; i++) {
           const span = ns.createSpan()
-          span.name = 'stats-span'
+          // Vary `name` (not per-field-limited); varying only `resource`
+          // hits the per-field resource cap (1024) before the whole-key
+          // limit (7000) and never overflows.
+          span.name = `stats-span-${i}`
           span.service = 'stats-svc'
           span.resource = `/stats/${i}`
           span.type = 'web'
