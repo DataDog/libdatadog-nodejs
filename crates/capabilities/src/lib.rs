@@ -14,16 +14,19 @@ use std::time::Duration;
 use libdd_capabilities::env::{EnvCapability, EnvError};
 use libdd_capabilities::file::{FileCapability, FileError, FileMetadata};
 use libdd_capabilities::http::HttpError;
+use libdd_capabilities::regex::{Captures, Match, RegexCapability, RegexError};
 use libdd_capabilities::{HttpClientCapability, LogWriterCapability, MaybeSend, SleepCapability};
 
 pub mod env;
 pub mod file;
 pub mod http;
+pub mod regex;
 pub mod sleep;
 
 pub use env::WasmEnvCapability;
 pub use file::WasmFileCapability;
 pub use http::WasmHttpClient;
+pub use regex::{WasmRegexCapability, WasmRegexHandle};
 pub use sleep::WasmSleepCapability;
 
 /// Bundle of wasm platform capabilities for libdatadog's `TraceExporter`.
@@ -62,6 +65,10 @@ impl WasmCapabilities {
 
 impl HttpClientCapability for WasmCapabilities {
     fn new_client() -> Self {
+        Self::new()
+    }
+
+    fn new_without_connection_pooling() -> Self {
         Self::new()
     }
 
@@ -133,5 +140,37 @@ impl EnvCapability for WasmCapabilities {
 
     fn get(&self, name: &str) -> Result<Option<String>, EnvError> {
         self.env.get(name)
+    }
+}
+
+impl RegexCapability for WasmCapabilities {
+    type Handle = <WasmRegexCapability as RegexCapability>::Handle;
+
+    fn compile(pattern: &str) -> Result<Self::Handle, RegexError> {
+        WasmRegexCapability::compile(pattern)
+    }
+
+    fn is_match(handle: &Self::Handle, haystack: &str) -> bool {
+        WasmRegexCapability::is_match(handle, haystack)
+    }
+
+    fn find(handle: &Self::Handle, haystack: &str) -> Option<Match> {
+        WasmRegexCapability::find(handle, haystack)
+    }
+
+    fn find_all(handle: &Self::Handle, haystack: &str) -> Vec<Match> {
+        WasmRegexCapability::find_all(handle, haystack)
+    }
+
+    fn captures(handle: &Self::Handle, haystack: &str) -> Option<Captures> {
+        WasmRegexCapability::captures(handle, haystack)
+    }
+
+    fn captures_all(handle: &Self::Handle, haystack: &str) -> Vec<Captures> {
+        WasmRegexCapability::captures_all(handle, haystack)
+    }
+
+    fn pattern(handle: &Self::Handle) -> &str {
+        WasmRegexCapability::pattern(handle)
     }
 }

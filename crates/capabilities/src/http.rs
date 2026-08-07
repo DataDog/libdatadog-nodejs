@@ -59,6 +59,10 @@ impl HttpClientCapability for WasmHttpClient {
         Self
     }
 
+    fn new_without_connection_pooling() -> Self {
+        Self
+    }
+
     #[allow(clippy::manual_async_fn)]
     fn request(
         &self,
