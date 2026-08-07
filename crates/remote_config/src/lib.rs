@@ -5,7 +5,7 @@ use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use libdatadog_nodejs_capabilities::WasmCapabilities;
+use libdatadog_nodejs_capabilities::{HttpClientCapability, WasmCapabilities};
 use libdd_remote_config::fetch::{
     ConfigApplyState, ConfigInvariants, ConfigOptions, SingleChangesFetcher,
 };
@@ -165,7 +165,10 @@ impl RemoteConfigFetcher {
                 products: vec![],
                 capabilities: vec![],
             },
-            WasmCapabilities::new(),
+            // Polling on a fixed interval is exactly the case a pooled connection hurts: the agent's
+            // short idle keep-alive can close it between polls, turning reuse into intermittent
+            // failures.
+            WasmCapabilities::new_without_connection_pooling(),
         )
         .with_client_id(options.client_id);
 

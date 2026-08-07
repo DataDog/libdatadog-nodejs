@@ -56,7 +56,7 @@ describe('http_transport response header observer', () => {
     )
     // head occupies [0, head.length); body is empty (offset 0, length 0).
     // Empty socketPath -> TCP transport.
-    return transport.httpRequest('127.0.0.1', port, false, '', 0, head.length, 0, 0, fakeWasmMemory(head))
+    return transport.httpRequest('127.0.0.1', port, false, '', true, 0, head.length, 0, 0, fakeWasmMemory(head))
   }
 
   it('invokes the observer with the raw response headers', async () => {
@@ -166,7 +166,7 @@ describe('http_transport IPv6 host', () => {
       'utf8',
     )
     // Bracketed IPv6 host, exactly as libdatadog passes it from the agent URI.
-    const [status] = await transport.httpRequest('[::1]', port, false, '', 0, head.length, 0, 0, fakeWasmMemory(head))
+    const [status] = await transport.httpRequest('[::1]', port, false, '', true, 0, head.length, 0, 0, fakeWasmMemory(head))
     assert.strictEqual(status, 200)
   })
 })
@@ -235,10 +235,61 @@ describe('http_transport unix socket', { skip: process.platform === 'win32' }, (
     )
     // host/port empty/0; socketPath drives the connection.
     const [status, , body] = await transport.httpRequest(
-      '', 0, false, socketPath, 0, head.length, 0, 0, fakeWasmMemory(head),
+      '', 0, false, socketPath, true, 0, head.length, 0, 0, fakeWasmMemory(head),
     )
     assert.strictEqual(status, 200)
     assert.strictEqual(Buffer.from(body).toString('utf8'), RESPONSE_BODY)
+  })
+})
+
+describe('http_transport connection pooling', () => {
+  let server
+  let port
+  let sockets
+
+  before(async () => {
+    sockets = new Set()
+    server = http.createServer((req, res) => {
+      sockets.add(req.socket)
+      req.on('data', () => {})
+      req.on('end', () => res.end(RESPONSE_BODY))
+    })
+    server.keepAliveTimeout = 60_000
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+    port = server.address().port
+  })
+
+  after(() => new Promise(resolve => server.close(resolve)))
+
+  // No `Connection: close`, so the connection is reusable and pooling is observable.
+  function keepAliveHead () {
+    return Buffer.from(
+      `POST /v0.4/traces HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\nContent-Length: 0\r\n\r\n`,
+      'utf8',
+    )
+  }
+
+  async function poll (connectionPooling) {
+    sockets.clear()
+    for (let i = 0; i < 3; i++) {
+      const head = keepAliveHead()
+      const [status] = await transport.httpRequest(
+        '127.0.0.1', port, false, '', connectionPooling, 0, head.length, 0, 0, fakeWasmMemory(head),
+      )
+      assert.strictEqual(status, 200)
+    }
+    return sockets.size
+  }
+
+  it('reuses one connection when pooling is on', async () => {
+    // Node's globalAgent has keep-alive on by default since v19.
+    assert.strictEqual(await poll(true), 1)
+  })
+
+  it('opens a fresh connection per request when pooling is off', async () => {
+    // What a caller polling on a fixed interval asks for: the agent's short idle keep-alive can
+    // close a pooled connection between polls, which turns reuse into intermittent failures.
+    assert.strictEqual(await poll(false), 3)
   })
 })
 
@@ -397,7 +448,7 @@ describe('http_transport entity headers', () => {
       view.set(body, head.length)
 
       const [status] = await transport.httpRequest(
-        '127.0.0.1', port, false, '', 0, head.length, head.length, body.length, { buffer: mem },
+        '127.0.0.1', port, false, '', true, 0, head.length, head.length, body.length, { buffer: mem },
       )
       assert.strictEqual(status, 200)
       assert.strictEqual(received['datadog-meta-lang'], 'nodejs')

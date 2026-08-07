@@ -32,6 +32,7 @@ extern "C" {
         port: u16,
         is_https: bool,
         socket_path: &str,
+        connection_pooling: bool,
         head_ptr: *const u8,
         head_len: u32,
         body_ptr: *const u8,
@@ -52,15 +53,21 @@ extern "C" {
 /// [`crate::WasmCapabilities`] alongside the sleep and log-output capabilities
 /// that `TraceExporter` requires.
 #[derive(Debug, Clone)]
-pub struct WasmHttpClient;
+pub struct WasmHttpClient {
+    connection_pooling: bool,
+}
 
 impl HttpClientCapability for WasmHttpClient {
     fn new_client() -> Self {
-        Self
+        Self {
+            connection_pooling: true,
+        }
     }
 
     fn new_without_connection_pooling() -> Self {
-        Self
+        Self {
+            connection_pooling: false,
+        }
     }
 
     #[allow(clippy::manual_async_fn)]
@@ -105,6 +112,7 @@ impl HttpClientCapability for WasmHttpClient {
                 port,
                 is_https,
                 &socket_path,
+                self.connection_pooling,
                 head.as_ptr(),
                 head.len() as u32,
                 body.as_ptr(),
