@@ -15,7 +15,12 @@ const childProcess = require('node:child_process')
 
 const isMacOS = os.platform() === 'darwin'
 const noWasmOpt = isMacOS ? '--no-opt' : ''
-const library = process.argv[2]
+const libraries = [
+  'library_config',
+  'datadog-js-zstd',
+  'pipeline',
+  'sketches',
+]
 
 const env = {
   ...process.env,
@@ -44,8 +49,10 @@ if (isMacOS) {
   env.CXX_wasm32_unknown_unknown = `${llvmBinDir}/clang++`
 }
 
-childProcess.execSync(
-  `wasm-pack build ${noWasmOpt} --target nodejs ./crates/${library} --out-dir ../../prebuilds/${library}`, {
-    env,
-  },
-)
+for (const library of libraries) {
+  childProcess.execSync(
+    `wasm-pack build ${noWasmOpt} --target nodejs ./crates/${library} --out-dir ../../prebuilds/${library}`, {
+      env,
+    },
+  )
+}
