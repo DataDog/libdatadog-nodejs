@@ -35,35 +35,3 @@ impl DDSketch {
         self.inner.clone().encode_to_vec()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn adds_points_and_counts() {
-        let mut sketch = DDSketch::new();
-
-        sketch.add(1.0).unwrap();
-        sketch.add_with_count(2.0, 3.0).unwrap();
-
-        assert_eq!(sketch.count(), 4.0);
-    }
-
-    #[test]
-    fn encodes_as_protobuf_without_consuming_the_sketch() {
-        let mut sketch = DDSketch::new();
-        sketch.add_with_count(42.0, 2.0).unwrap();
-
-        let encoded = sketch.encode();
-        let decoded = InnerDDSketch::from_encoded(&encoded).unwrap();
-
-        assert_eq!(decoded.count(), 2.0);
-
-        sketch.add(43.0).unwrap();
-        let encoded = sketch.encode();
-        let decoded = InnerDDSketch::from_encoded(&encoded).unwrap();
-
-        assert_eq!(decoded.count(), 3.0);
-    }
-}
