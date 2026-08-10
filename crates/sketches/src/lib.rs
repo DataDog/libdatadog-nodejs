@@ -31,8 +31,8 @@ impl DDSketch {
         self.inner.count()
     }
 
-    pub fn encode(self) -> Vec<u8> {
-        self.inner.encode_to_vec()
+    pub fn encode(&self) -> Vec<u8> {
+        self.inner.clone().encode_to_vec()
     }
 }
 
@@ -51,7 +51,7 @@ mod tests {
     }
 
     #[test]
-    fn encodes_as_protobuf() {
+    fn encodes_as_protobuf_without_consuming_the_sketch() {
         let mut sketch = DDSketch::new();
         sketch.add_with_count(42.0, 2.0).unwrap();
 
@@ -59,5 +59,11 @@ mod tests {
         let decoded = InnerDDSketch::from_encoded(&encoded).unwrap();
 
         assert_eq!(decoded.count(), 2.0);
+
+        sketch.add(43.0).unwrap();
+        let encoded = sketch.encode();
+        let decoded = InnerDDSketch::from_encoded(&encoded).unwrap();
+
+        assert_eq!(decoded.count(), 3.0);
     }
 }

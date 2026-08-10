@@ -18,3 +18,12 @@ assert.throws(() => sketch.addWithCount(1, Number.NaN), /count is invalid/)
 const encoded = sketch.encode()
 assert(encoded instanceof Uint8Array)
 assert(encoded.length > 0)
+
+assert.strictEqual(sketch.count(), 4)
+sketch.add(3)
+assert.strictEqual(sketch.count(), 5)
+
+const reencoded = sketch.encode()
+assert(reencoded instanceof Uint8Array)
+assert(reencoded.length > 0)
+assert.strictEqual(sketch.count(), 5)
