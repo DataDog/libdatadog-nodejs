@@ -17,6 +17,18 @@ use libdd_remote_config::{
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
+#[wasm_bindgen(module = "/src/node-webcrypto.js")]
+extern "C" {
+    #[wasm_bindgen(js_name = "ensureWebCrypto")]
+    fn ensure_web_crypto();
+}
+
+#[wasm_bindgen(start)]
+fn init() {
+    console_error_panic_hook::set_once();
+    ensure_web_crypto();
+}
+
 const APPLY_STATE_UNACKNOWLEDGED: u32 = 1;
 const APPLY_STATE_ACKNOWLEDGED: u32 = 2;
 const APPLY_STATE_ERROR: u32 = 3;

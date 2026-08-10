@@ -246,8 +246,16 @@ describe('http_transport connection pooling', () => {
   let server
   let port
   let sockets
+  let previousAgent
 
   before(async () => {
+    // Pin the agent instead of relying on `http.globalAgent`: its keep-alive default only arrived
+    // in Node 19, and even where it is on, reuse is an optimization Node does not guarantee. With
+    // an explicit keep-alive agent capped at one socket, "pooled" is deterministic on every
+    // supported version, and `agent: false` still bypasses it entirely.
+    previousAgent = http.globalAgent
+    http.globalAgent = new http.Agent({ keepAlive: true, maxSockets: 1 })
+
     sockets = new Set()
     server = http.createServer((req, res) => {
       sockets.add(req.socket)
@@ -259,7 +267,11 @@ describe('http_transport connection pooling', () => {
     port = server.address().port
   })
 
-  after(() => new Promise(resolve => server.close(resolve)))
+  after(async () => {
+    http.globalAgent.destroy()
+    http.globalAgent = previousAgent
+    await new Promise(resolve => server.close(resolve))
+  })
 
   // No `Connection: close`, so the connection is reusable and pooling is observable.
   function keepAliveHead () {
@@ -282,7 +294,6 @@ describe('http_transport connection pooling', () => {
   }
 
   it('reuses one connection when pooling is on', async () => {
-    // Node's globalAgent has keep-alive on by default since v19.
     assert.strictEqual(await poll(true), 1)
   })
 

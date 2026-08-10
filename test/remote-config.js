@@ -2,6 +2,7 @@
 
 const assert = require('node:assert')
 const { createHash } = require('node:crypto')
+const { execFileSync } = require('node:child_process')
 const { createServer } = require('node:http')
 const { test } = require('node:test')
 
@@ -196,6 +197,31 @@ test('skips unknown products and capabilities, and rejects bad apply states', as
     assert.throws(() => fetcher.setConfigState(CONFIG_PATH, 42, ''), { message: /Unknown apply state 42/ })
     assert.throws(() => fetcher.setConfigState('nonsense', APPLY_STATE_ACKNOWLEDGED, ''))
   })
+})
+
+test('constructs on a runtime without a WebCrypto global', () => {
+  // libdatadog generates the default client id with a uuid whose wasm shim reads
+  // `globalThis.crypto` and has no Node fallback. Node only exposes that global inside a module
+  // from v20, so without the shim in `src/node_webcrypto.js` every constructor panics and traps the
+  // module -- which is how it presented on Node 18, as total failure followed by a hang.
+  //
+  // A child process, because the shim runs once when the module loads: the global has to be absent
+  // before that, which is exactly the Node 18 condition.
+  const script = `
+    delete globalThis.crypto
+    if (typeof globalThis.crypto !== 'undefined') throw new Error('could not hide the global')
+    const { RemoteConfigFetcher } = require(${JSON.stringify(require.resolve('..'))}).load('remote_config')
+    new RemoteConfigFetcher({
+      clientId: 'client-id-1', runtimeId: 'runtime-id-1', service: 'my_svc', env: 'my_env',
+      appVersion: '1.0.0', tags: [], processTags: [], language: 'nodejs', tracerVersion: '1.2.3',
+      url: 'http://127.0.0.1:8126', timeoutMs: 1000,
+    })
+    process.stdout.write('constructed')
+  `
+
+  const out = execFileSync(process.execPath, ['-e', script], { encoding: 'utf8' })
+
+  assert.strictEqual(out, 'constructed')
 })
 
 test('rejects an agent url without a scheme and host', () => {
