@@ -398,7 +398,7 @@ impl WasmSpanState {
         debug_enabled: bool,
     ) {
         self.telemetry_config.set(Some(TelemetryConfig {
-            heartbeat: heartbeat_ms as u64,
+            heartbeat: u64::from(heartbeat_ms),
             runtime_id,
             debug_enabled,
         }));
