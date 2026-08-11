@@ -971,7 +971,7 @@ dependencies = [
  "libc",
  "libdd-common 4.2.0",
  "libdd-libunwind-sys",
- "libdd-telemetry 5.0.1",
+ "libdd-telemetry 5.0.0",
  "nix 0.29.0",
  "num-derive",
  "num-traits",
