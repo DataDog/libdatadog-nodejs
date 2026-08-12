@@ -8,8 +8,8 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 anyhow = "1"
-libdd-library-config = { git = "https://github.com/DataDog/libdatadog.git", rev = "0c6e2a5df2a163d34c4f385353ffc5d7257c72f4", features = ["otel-thread-ctx"] }
-libdd-trace-protobuf = { git = "https://github.com/DataDog/libdatadog.git", rev = "0c6e2a5df2a163d34c4f385353ffc5d7257c72f4" }
+libdd-library-config = { path = "../../../libdatadog/libdd-library-config", features = ["otel-thread-ctx"] }
+libdd-trace-protobuf = { path = "../../../libdatadog/libdd-trace-protobuf" }
 
 napi = { version = "2" }
 napi-derive = { version = "2", default-features = false }
