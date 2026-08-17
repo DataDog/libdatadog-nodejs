@@ -65,6 +65,10 @@ impl HttpClientCapability for WasmCapabilities {
         Self::new()
     }
 
+    fn new_without_connection_pooling() -> Self {
+        Self::new()
+    }
+
     fn request(
         &self,
         req: ::http::Request<::bytes::Bytes>,

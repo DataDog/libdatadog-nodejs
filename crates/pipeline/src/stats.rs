@@ -22,8 +22,7 @@ use libdd_capabilities::http::HttpClientCapability;
 use libdd_common::parse_uri;
 use libdd_trace_protobuf::pb;
 use libdd_trace_stats::span_concentrator::SpanConcentrator;
-
-use crate::trace_data::WasmTraceData;
+use libdd_trace_utils::span::{v04::Span, TraceData};
 
 const STATS_ENDPOINT_PATH: &str = "/v0.6/stats";
 
@@ -79,7 +78,7 @@ impl StatsCollector {
     ///
     /// The spans should already have `_dd.top_level` and `_dd.measured` metrics
     /// set (done by `ChangeBufferState::flush_chunk`).
-    pub fn add_spans(&mut self, spans: &[libdd_trace_utils::span::v04::Span<WasmTraceData>]) {
+    pub fn add_spans<T: TraceData>(&mut self, spans: &[Span<T>]) {
         for span in spans {
             self.concentrator.add_span(span);
         }

@@ -13,6 +13,19 @@ const skip = pipeline === undefined
 const { WasmSpanState } = pipeline ?? {}
 const OpCode = pipeline ? pipeline.getOpCodes() : {}
 const wasmMemory = pipeline ? pipeline.getWasmMemory() : undefined
+const ENCODED_TRACE_PAYLOAD = Buffer.from([
+  'dd00000001dd000000018ea474797065a3776562a874726163655f6964cf0000000000000001a77370616e5f6964cf',
+  '0000000000000002a9706172656e745f6964cf0000000000000000a46e616d65ac656e636f6465642d6e616d65a8',
+  '7265736f75726365b0656e636f6465642d7265736f75726365a773657276696365af656e636f6465642d7365727669',
+  '6365a56572726f7200a57374617274cf17979cfe362a0000a86475726174696f6ece000f4240a46d657461df000000',
+  '02ac656e636f6465642e6d657461ad656e636f6465642d76616c7565a97370616e2e6b696e64a6736572766572a7',
+  '6d657472696373df00000003ae656e636f6465642e6d65747269632aad5f64642e746f705f6c6576656c01ac5f64',
+  '642e6d6561737572656401ab7370616e5f6576656e7473dd0000000183a46e616d65ad656e636f6465642d657665',
+  '6e74ae74696d655f756e69785f6e616e6fcf17979cfe362a0000aa61747472696275746573df00000001a46b696e',
+  '6482a47479706500ac737472696e675f76616c7565b1656e636f6465642d617474726962757465ab6d6574615f73',
+  '7472756374df00000001a6617070736563c600000023df00000002a7626c6f636b6564c3a576616c7565ae656e63',
+  '6f6465642d737472756374',
+].join(''), 'hex')
 
 function getRandomBytes (byteCount) {
   return new Uint8Array(crypto.randomBytes(byteCount))
@@ -785,9 +798,58 @@ describe('pipeline', { skip }, () => {
     it('flushSpans with no spans is a no-op returning false', async () => {
       assert.strictEqual(await nativeSpans.flushSpans(), false)
     })
+
+    it('rejects malformed and empty encoded trace payloads', async () => {
+      await assert.rejects(nativeSpans.state.sendEncodedTraces(Buffer.alloc(0)), /sendEncodedTraces/)
+      await assert.rejects(nativeSpans.state.sendEncodedTraces(Buffer.from([0x80])), /sendEncodedTraces/)
+      await assert.rejects(nativeSpans.state.sendEncodedTraces(Buffer.from([0xDC, 0])), /MessagePack array32/)
+      await assert.rejects(nativeSpans.state.sendEncodedTraces(Buffer.from([0xDD, 0, 0, 0])), /incomplete MessagePack/)
+      await assert.rejects(
+        nativeSpans.state.sendEncodedTraces(Buffer.from([0xDD, 0, 0, 0, 0])),
+        /no encoded traces to send/,
+      )
+    })
   })
 
   describe('flush to agent', () => {
+    it('sends multiple encoded trace chunks without dropping structured fields', async () => {
+      const http = require('node:http')
+      const payloads = []
+      const server = http.createServer((req, res) => {
+        const chunks = []
+        req.on('data', chunk => chunks.push(chunk))
+        req.on('end', () => {
+          payloads.push({ url: req.url, body: Buffer.concat(chunks) })
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end('{}')
+        })
+      })
+      await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+      const { port } = server.address()
+      const ns = new NativeSpansInterface({ agentUrl: `http://127.0.0.1:${port}` })
+      const payload = Buffer.concat([
+        Buffer.from([0xDD, 0, 0, 0, 2]),
+        ENCODED_TRACE_PAYLOAD.subarray(5),
+        ENCODED_TRACE_PAYLOAD.subarray(5),
+      ])
+
+      try {
+        assert.ok(await ns.state.sendEncodedTraces(payload))
+        const post = payloads.find(payload => payload.url.includes('/v0.4/traces'))
+        assert.ok(post)
+        assert.deepStrictEqual(post.body, payload)
+        assert.strictEqual(msgpackOuterArrayLen(post.body), 2)
+        assert.ok(post.body.includes(Buffer.from('encoded-name')))
+        assert.ok(post.body.includes(Buffer.from('encoded-value')))
+        assert.ok(post.body.includes(Buffer.from('encoded-struct')))
+        assert.ok(post.body.includes(Buffer.from('encoded-event')))
+        assert.ok(post.body.includes(Buffer.from('encoded-attribute')))
+      } finally {
+        server.closeAllConnections?.()
+        server.close()
+      }
+    })
+
     it('should flush spans to a (mock) agent', async () => {
       // Stand up a throwaway HTTP server acting as the agent so the flush path
       // (prepareChunk -> build exporter -> serialize -> send) is exercised
@@ -908,14 +970,8 @@ describe('pipeline', { skip }, () => {
       const { port } = server.address()
       const ns = new NativeSpansInterface({ agentUrl: `http://127.0.0.1:${port}` })
       if (useV05) ns.state.setUseV05(true)
-      const span = ns.createSpan()
-      span.name = 'v05-span'
-      span.service = 'test-service'
-      span.resource = 'test-resource'
-      span.type = 'web'
-      span.duration = 1_000_000n
       try {
-        await ns.flushSpans(span)
+        await ns.state.sendEncodedTraces(ENCODED_TRACE_PAYLOAD)
         return seen.find(r => r.method === 'POST')
       } finally {
         server.closeAllConnections?.()
@@ -963,14 +1019,8 @@ describe('pipeline', { skip }, () => {
         tracerVersion: '7.0.0-pre',
       })
       ns.state.setOtlpEndpoint(`http://127.0.0.1:${port}/v1/traces`)
-      const span = ns.createSpan()
-      span.name = 'otlp-span'
-      span.service = 'test-service'
-      span.resource = 'test-resource'
-      span.type = 'web'
-      span.duration = 1_000_000n
       try {
-        await ns.flushSpans(span)
+        await ns.state.sendEncodedTraces(ENCODED_TRACE_PAYLOAD)
         const req = seen.find(r => r.method === 'POST')
         assert.ok(req, 'OTLP endpoint received a POST')
         assert.strictEqual(req.url, '/v1/traces')
@@ -1011,14 +1061,8 @@ describe('pipeline', { skip }, () => {
       // Two header pairs plus a trailing unpaired element (odd length): both
       // pairs are applied and the stray 'ignored-no-pair' is dropped.
       ns.state.setOtlpHeaders(['authorization', 'Bearer test-token', 'x-custom', 'cval', 'ignored-no-pair'])
-      const span = ns.createSpan()
-      span.name = 'otlp-span'
-      span.service = 'test-service'
-      span.resource = 'test-resource'
-      span.type = 'web'
-      span.duration = 1_000_000n
       try {
-        await ns.flushSpans(span)
+        await ns.state.sendEncodedTraces(ENCODED_TRACE_PAYLOAD)
         assert.ok(captured, 'OTLP endpoint received a POST')
         assert.match(captured.ct || '', /protobuf/)
         assert.strictEqual(captured.auth, 'Bearer test-token')
@@ -1106,18 +1150,12 @@ describe('pipeline', { skip }, () => {
       await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
       const { port } = server.address()
 
-      // statsEnabled:true builds the StatsCollector; prepareChunk feeds spans
-      // into it, and flushStats(true) force-flushes to /v0.6/stats.
+      // statsEnabled:true builds the StatsCollector; sendEncodedTraces feeds
+      // decoded spans into it, and flushStats(true) force-flushes to /v0.6/stats.
       const ns = new NativeSpansInterface({ agentUrl: `http://127.0.0.1:${port}`, statsEnabled: true })
-      const span = ns.createSpan()
-      span.name = 'stats-span'
-      span.service = 'stats-svc'
-      span.resource = '/stats'
-      span.type = 'web'
-      span.duration = 5_000_000n
 
       try {
-        await ns.flushSpans(span)
+        await ns.state.sendEncodedTraces(ENCODED_TRACE_PAYLOAD)
         const result = await ns.state.flushStats(true)
         assert.deepStrictEqual(result, { sent: true, collapsedSpans: 0 }, 'flushStats reported a send')
         const statsReq = seen.find(r => r.url === '/v0.6/stats')
@@ -1152,11 +1190,11 @@ describe('pipeline', { skip }, () => {
       let batch = []
 
       try {
-        for (let i = 0; i < 15_000; i++) {
+        for (let i = 0; i < 7001; i++) {
           const span = ns.createSpan()
           span.name = 'stats-span'
-          span.service = 'stats-svc'
-          span.resource = `/stats/${i}`
+          span.service = `stats-svc-${i}`
+          span.resource = '/stats'
           span.type = 'web'
           span.setTag('span.kind', 'server')
           span.duration = 5_000_000n
@@ -1173,7 +1211,7 @@ describe('pipeline', { skip }, () => {
 
         const result = await ns.state.flushStats(true)
         assert.strictEqual(result.sent, true)
-        assert.ok(result.collapsedSpans > 0, 'stats cardinality overflow reported collapsed spans')
+        assert.strictEqual(result.collapsedSpans, 1, 'stats cardinality overflow reported the first collapsed span')
         assert.ok(seen.some(r => r.url === '/v0.6/stats'), 'agent received a /v0.6/stats request')
       } finally {
         server.closeAllConnections?.()
@@ -1249,7 +1287,7 @@ describe('pipeline', { skip }, () => {
   })
 
   describe('send re-entrancy', () => {
-    it('rejects an overlapping sendPreparedChunk call', async () => {
+    it('rejects overlapping prepared and encoded sends', async () => {
       const http = require('node:http')
       const server = http.createServer((req, res) => {
         req.resume()
@@ -1280,6 +1318,18 @@ describe('pipeline', { skip }, () => {
         assert.ok(
           reasons.some(r => /already in flight/.test(r)),
           'one overlapping call rejected as already-in-flight',
+        )
+
+        const encodedSettled = await Promise.allSettled([
+          ns.state.sendEncodedTraces(ENCODED_TRACE_PAYLOAD),
+          ns.state.sendEncodedTraces(ENCODED_TRACE_PAYLOAD),
+        ])
+        const encodedReasons = encodedSettled
+          .filter(result => result.status === 'rejected')
+          .map(result => String(result.reason))
+        assert.ok(
+          encodedReasons.some(reason => /already in flight/.test(reason)),
+          'one overlapping encoded call rejected as already-in-flight',
         )
       } finally {
         server.closeAllConnections?.()

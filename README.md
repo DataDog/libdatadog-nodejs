@@ -6,3 +6,10 @@ Node.js bindings for [libdatadog](https://github.com/DataDog/libdatadog).
 
 This project is currently meant to be used only by [dd-trace-js](https://github.com/DataDog/dd-trace-js)
 and installing it directly is not supported at the moment.
+
+## Pipeline
+
+`WasmSpanState#sendEncodedTraces(data)` accepts an owned `Uint8Array` containing a v0.4 MessagePack array32 payload.
+It forwards the payload directly when no configured feature needs span objects. Native stats decode it for aggregation,
+and alternate output formats decode it before transforming and sending it through the configured exporter.
+Only one trace send may be active per state; an overlapping call rejects with an `already in flight` error.

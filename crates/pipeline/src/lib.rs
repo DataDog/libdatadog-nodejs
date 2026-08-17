@@ -1,5 +1,6 @@
 use libdatadog_nodejs_capabilities::WasmCapabilities;
 use libdd_data_pipeline::trace_exporter::agent_response::AgentResponse;
+use libdd_data_pipeline::trace_exporter::error::TraceExporterError;
 use libdd_data_pipeline::trace_exporter::{
     TelemetryConfig, TraceExporter, TraceExporterBuilder, TraceExporterOutputFormat,
 };
@@ -156,10 +157,8 @@ fn decode_span_event_attributes(
 pub struct WasmSpanState {
     change_queue: Vec<u8>,
     string_table_input: Vec<u8>,
-    /// UnsafeCell because send_trace_chunks_async needs &mut self across an
-    /// await point. WASM is single-threaded so this is safe — we just need
-    /// to ensure no overlapping mutable borrows (guaranteed by the JS-side
-    /// _flushInFlight guard which serializes sendPreparedChunk calls).
+    /// UnsafeCell because trace sends need &mut access across an await point.
+    /// WASM is single-threaded and `sending` rejects overlapping sends.
     /// On wasm the exporter must be built asynchronously (`build_async`), but
     /// the wasm-bindgen constructor is synchronous. We stash the configured
     /// builder here and build the exporter lazily on the first send (the only
@@ -176,11 +175,8 @@ pub struct WasmSpanState {
     /// flush batch by trace and calls `prepareChunk` once per trace so each chunk
     /// carries exactly one segment's spans with correct per-trace tags.
     prepared_spans: RefCell<Vec<Vec<libdd_trace_utils::span::v04::Span<WasmTraceData>>>>,
-    /// Re-entrancy guard for `sendPreparedChunk`. wasm-bindgen async exports
-    /// can be invoked again from JS before the prior future resolves; without
-    /// this, two calls would each take `&mut` out of `exporter`/`builder` and
-    /// alias across the await (UB). The guard makes a re-entrant call return
-    /// an error instead.
+    /// Re-entrancy guard shared by both trace-send entry points. wasm-bindgen
+    /// async exports can be invoked again before the prior future resolves.
     sending: Cell<bool>,
     /// When true, the lazily-built exporter is configured for v0.5 output
     /// (`/v0.5/traces`) instead of the default v0.4. v0.5 is a smaller, fixed
@@ -222,6 +218,97 @@ impl Drop for InFlightGuard<'_> {
     fn drop(&mut self) {
         self.0.set(false);
     }
+}
+
+impl WasmSpanState {
+    fn begin_send(&self, operation: &str) -> Result<InFlightGuard<'_>, JsValue> {
+        if self.sending.get() {
+            return Err(JsValue::from_str(&format!(
+                "{operation} is already in flight"
+            )));
+        }
+        self.sending.set(true);
+        Ok(InFlightGuard(&self.sending))
+    }
+
+    async fn exporter(
+        &self,
+        _in_flight: &InFlightGuard<'_>,
+    ) -> Result<&mut TraceExporter<WasmCapabilities, LocalRuntime>, JsValue> {
+        // SAFETY: WASM is single-threaded and the `sending` guard held by the
+        // caller guarantees no overlapping invocation, so this is the only
+        // live reference to the exporter for the duration of the awaits.
+        let exporter_slot = unsafe { &mut *self.exporter.get() };
+        if exporter_slot.is_none() {
+            // A previous build attempt failed. Building is one-shot and the
+            // failure is fatal (bad config won't fix itself), so return it
+            // consistently rather than a misleading "builder already consumed".
+            if let Some(message) = self.build_error.borrow().clone() {
+                return Err(build_failure_error(&message));
+            }
+            // First send: build the exporter asynchronously. `build` is not
+            // available on wasm (it needs a blocking runtime), so drive
+            // `build_async` here where there is already an async context.
+            let mut builder = unsafe { &mut *self.builder.get() }
+                .take()
+                .ok_or_else(|| JsValue::from_str("exporter builder already consumed"))?;
+            if self.use_v05.get() {
+                builder.set_output_format(TraceExporterOutputFormat::V05);
+            }
+            if let Some(url) = self.otlp_endpoint.take() {
+                builder.set_otlp_endpoint(&url);
+                if let Some(protocol) = self.otlp_protocol.take() {
+                    builder.set_otlp_protocol(protocol);
+                }
+                let headers = self.otlp_headers.take();
+                if !headers.is_empty() {
+                    builder.set_otlp_headers(headers);
+                }
+            }
+            if let Some(config) = self.telemetry_config.take() {
+                builder.enable_telemetry(config);
+            }
+            match builder.build_async::<WasmCapabilities>().await {
+                Ok(built) => *exporter_slot = Some(built),
+                Err(error) => {
+                    let message = format!("native exporter build failed: {error:?}");
+                    *self.build_error.borrow_mut() = Some(message.clone());
+                    return Err(build_failure_error(&message));
+                }
+            }
+        }
+        match exporter_slot.as_mut() {
+            Some(exporter) => Ok(exporter),
+            None => Err(build_failure_error("native exporter unavailable")),
+        }
+    }
+}
+
+fn exporter_response(
+    response: Result<AgentResponse, TraceExporterError>,
+) -> Result<JsValue, JsValue> {
+    response
+        .map(|response| match response {
+            AgentResponse::Unchanged => JsValue::from_str("unchanged"),
+            AgentResponse::Changed { body } => JsValue::from_str(&body),
+        })
+        .map_err(|error| JsValue::from_str(&format!("{error:?}")))
+}
+
+fn encoded_trace_count(data: &[u8]) -> Result<usize, JsValue> {
+    if data.first() != Some(&0xdd) {
+        return Err(JsValue::from_str(
+            "sendEncodedTraces: payload must begin with a MessagePack array32",
+        ));
+    }
+
+    if data.len() < 5 {
+        return Err(JsValue::from_str(
+            "sendEncodedTraces: incomplete MessagePack array32 header",
+        ));
+    }
+
+    Ok(u32::from_be_bytes([data[1], data[2], data[3], data[4]]) as usize)
 }
 
 fn stats_flush_result(sent: bool, collapsed_spans: u64) -> Result<JsValue, JsValue> {
@@ -511,83 +598,41 @@ impl WasmSpanState {
     /// rejects that with an error instead of allowing aliasing (UB).
     #[wasm_bindgen(js_name = "sendPreparedChunk")]
     pub async fn send_prepared_chunk(&self) -> Result<JsValue, JsValue> {
-        if self.sending.get() {
-            return Err(JsValue::from_str("sendPreparedChunk is already in flight"));
-        }
-        self.sending.set(true);
-        let _in_flight = InFlightGuard(&self.sending);
+        let in_flight = self.begin_send("sendPreparedChunk")?;
 
         let chunks = std::mem::take(&mut *self.prepared_spans.borrow_mut());
         if chunks.is_empty() {
             return Err(JsValue::from_str("no prepared chunk to send"));
         }
 
-        // SAFETY: WASM is single-threaded and the `sending` guard above
-        // guarantees no overlapping invocation, so this is the only live
-        // reference to the exporter for the duration of the awaits.
-        let exporter_slot = unsafe { &mut *self.exporter.get() };
-        if exporter_slot.is_none() {
-            // A previous build attempt failed. Building is one-shot and the
-            // failure is fatal (bad config won't fix itself), so return it
-            // consistently — as a distinguishable error the host bails on —
-            // rather than a misleading "builder already consumed".
-            if let Some(msg) = self.build_error.borrow().clone() {
-                return Err(build_failure_error(&msg));
-            }
-            // First send: build the exporter asynchronously. `build` is not
-            // available on wasm (it needs a blocking runtime), so we drive
-            // `build_async` here where we already have an async context.
-            let mut builder = unsafe { &mut *self.builder.get() }
-                .take()
-                .ok_or_else(|| JsValue::from_str("exporter builder already consumed"))?;
-            // Output format is decided here, at first build, and then fixed.
-            // v0.5 drops meta_struct/span_events/span_links by design (the v0.5
-            // schema has no slots for them); dd-trace-js only enables this after
-            // confirming agent `/v0.5/traces` support via `/info`.
-            if self.use_v05.get() {
-                builder.set_output_format(TraceExporterOutputFormat::V05);
-            }
-            // When an OTLP endpoint is configured, libdatadog exports traces via
-            // OTLP HTTP to that endpoint instead of the Datadog agent (mutually
-            // exclusive with the agent v0.4/v0.5 path).
-            if let Some(url) = self.otlp_endpoint.take() {
-                builder.set_otlp_endpoint(&url);
-                if let Some(protocol) = self.otlp_protocol.take() {
-                    builder.set_otlp_protocol(protocol);
-                }
-                let headers = self.otlp_headers.take();
-                if !headers.is_empty() {
-                    builder.set_otlp_headers(headers);
-                }
-            }
-            if let Some(cfg) = self.telemetry_config.take() {
-                builder.enable_telemetry(cfg);
-            }
-            match builder.build_async::<WasmCapabilities>().await {
-                Ok(built) => *exporter_slot = Some(built),
-                Err(e) => {
-                    // Latch the failure: the builder is now consumed and the
-                    // config won't change, so every later send must fail fast.
-                    let msg = format!("native exporter build failed: {e:?}");
-                    *self.build_error.borrow_mut() = Some(msg.clone());
-                    return Err(build_failure_error(&msg));
+        let exporter = self.exporter(&in_flight).await?;
+        exporter_response(exporter.send_trace_chunks_async(chunks).await)
+    }
+
+    /// Send one v0.4 MessagePack array32 payload containing one or more trace chunks.
+    /// The payload is owned by WASM for the full async send.
+    #[wasm_bindgen(js_name = "sendEncodedTraces")]
+    pub async fn send_encoded_traces(&self, data: Vec<u8>) -> Result<JsValue, JsValue> {
+        let in_flight = self.begin_send("sendEncodedTraces")?;
+        let trace_count = encoded_trace_count(&data)?;
+
+        if trace_count == 0 {
+            return Err(JsValue::from_str("no encoded traces to send"));
+        }
+
+        {
+            let mut stats_collector = self.stats_collector.borrow_mut();
+            if let Some(collector) = stats_collector.as_mut() {
+                let (chunks, _) = libdd_trace_utils::msgpack_decoder::v04::from_slice(&data)
+                    .map_err(|error| JsValue::from_str(&format!("sendEncodedTraces: {error}")))?;
+                for chunk in &chunks {
+                    collector.add_spans(chunk);
                 }
             }
         }
-        let exporter = match exporter_slot.as_mut() {
-            Some(exporter) => exporter,
-            // Unreachable: the block above either set `Some` or returned early.
-            None => return Err(build_failure_error("native exporter unavailable")),
-        };
-        let resp = exporter.send_trace_chunks_async(chunks).await;
-        let response_str = resp.map(|resp| match resp {
-            AgentResponse::Unchanged => "unchanged".to_string(),
-            AgentResponse::Changed { body } => body,
-        });
 
-        response_str
-            .map(|s| JsValue::from_str(&s))
-            .map_err(|e| JsValue::from_str(&format!("{:?}", e)))
+        let exporter = self.exporter(&in_flight).await?;
+        exporter_response(exporter.send_v04_payload_async(data, trace_count).await)
     }
 
     /// Flush aggregated stats to the agent's /v0.6/stats endpoint.
