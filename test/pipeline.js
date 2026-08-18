@@ -4,7 +4,11 @@ const { describe, it, before, beforeEach } = require('node:test')
 const assert = require('node:assert')
 const crypto = require('node:crypto')
 
-const pipeline = require('..').maybeLoad('pipeline')
+const libdatadog = require('..')
+
+assert.strictEqual(libdatadog.pipelineApiVersion, 1)
+
+const pipeline = libdatadog.maybeLoad('pipeline')
 // The pipeline binding is wasm-only and is absent in the native
 // (action-prebuildify) test matrix, where `maybeLoad` returns undefined. Skip
 // the suite there instead of crashing on the destructure below; the pipeline

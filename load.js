@@ -10,6 +10,7 @@ const PLATFORM = os.platform()
 const ARCH = process.arch
 const LIBC = PLATFORM === 'linux' ? (existsSync('/etc/alpine-release') ? 'musl' : 'glibc') : ''
 const ABI = process.versions.modules
+const PIPELINE_API_VERSION = 1
 
 const inWebpack = typeof __webpack_require__ === 'function'
 const runtimeRequire = inWebpack ? __non_webpack_require__ : require
@@ -91,4 +92,4 @@ function findFile (root, name, binary = false) {
     || files.find(f => f === `${name}.node`)
 }
 
-module.exports = { find, load, maybeLoad }
+module.exports = { find, load, maybeLoad, pipelineApiVersion: PIPELINE_API_VERSION }

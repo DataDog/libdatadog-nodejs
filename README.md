@@ -9,6 +9,9 @@ and installing it directly is not supported at the moment.
 
 ## Pipeline
 
+`pipelineApiVersion` is `1` when the package provides encoded trace and agentless pipeline APIs. Consumers can inspect
+this value without loading a native or WASM addon; an absent or older value must use the legacy pipeline.
+
 `WasmSpanState#sendEncodedTraces(data)` accepts an owned `Uint8Array` containing a v0.4 MessagePack array32 payload.
 It forwards the payload directly when no configured feature needs span objects. Native stats decode it for aggregation,
 and alternate output formats decode it before transforming and sending it through the configured exporter.
