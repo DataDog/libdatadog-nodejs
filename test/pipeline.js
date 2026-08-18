@@ -1154,9 +1154,9 @@ describe('pipeline', { skip }, () => {
       try {
         for (let i = 0; i < 15_000; i++) {
           const span = ns.createSpan()
-          span.name = 'stats-span'
+          span.name = `stats-span-${i}`
           span.service = 'stats-svc'
-          span.resource = `/stats/${i}`
+          span.resource = '/stats'
           span.type = 'web'
           span.setTag('span.kind', 'server')
           span.duration = 5_000_000n
