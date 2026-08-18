@@ -1,8 +1,9 @@
-use libdatadog_nodejs_capabilities::WasmCapabilities;
+use libdatadog_nodejs_capabilities::{WasmCapabilities, WasmEnvCapability};
 use libdd_data_pipeline::trace_exporter::agent_response::AgentResponse;
 use libdd_data_pipeline::trace_exporter::error::TraceExporterError;
 use libdd_data_pipeline::trace_exporter::{
-    TelemetryConfig, TraceExporter, TraceExporterBuilder, TraceExporterOutputFormat,
+    ObfuscationConfig, TelemetryConfig, TraceExporter, TraceExporterBuilder,
+    TraceExporterOutputFormat,
 };
 use libdd_data_pipeline::OtlpProtocol;
 use libdd_shared_runtime::LocalRuntime;
@@ -32,6 +33,12 @@ use utils::*;
 #[wasm_bindgen(start)]
 fn init() {
     console_error_panic_hook::set_once();
+}
+
+struct AgentlessExporterConfig {
+    endpoint: String,
+    api_key: String,
+    obfuscation: ObfuscationConfig,
 }
 
 // --- span event attribute decoding ---
@@ -168,6 +175,10 @@ pub struct WasmSpanState {
     // ForkSafeRuntime/BasicRuntime are native-only.
     exporter: UnsafeCell<Option<TraceExporter<WasmCapabilities, LocalRuntime>>>,
     builder: UnsafeCell<Option<TraceExporterBuilder<LocalRuntime>>>,
+    /// Agent endpoint applied only after the export mode is selected.
+    agent_url: Cell<Option<String>>,
+    /// Direct-intake settings applied instead of the Agent endpoint.
+    agentless_config: Cell<Option<AgentlessExporterConfig>>,
     cbs: RefCell<ChangeBufferState<WasmTraceData>>,
     stats_collector: RefCell<Option<stats::StatsCollector>>,
     /// Chunks staged by `prepareChunk`, one per trace (segment), sent together by
@@ -252,6 +263,15 @@ impl WasmSpanState {
             let mut builder = unsafe { &mut *self.builder.get() }
                 .take()
                 .ok_or_else(|| JsValue::from_str("exporter builder already consumed"))?;
+            if let Some(config) = self.agentless_config.take() {
+                builder.set_agentless_endpoint(
+                    &config.endpoint,
+                    &config.api_key,
+                    config.obfuscation,
+                );
+            } else if let Some(url) = self.agent_url.take() {
+                builder.set_url(&url);
+            }
             if self.use_v05.get() {
                 builder.set_output_format(TraceExporterOutputFormat::V05);
             }
@@ -348,7 +368,6 @@ impl WasmSpanState {
     ) -> Result<WasmSpanState, JsValue> {
         let mut builder = TraceExporterBuilder::<LocalRuntime>::new();
         builder
-            .set_url(url)
             .set_tracer_version(tracer_version)
             .set_language(lang)
             .set_language_version(lang_version)
@@ -421,6 +440,8 @@ impl WasmSpanState {
             string_table_input: vec![0u8; string_table_input_size as usize],
             exporter: UnsafeCell::new(None),
             builder: UnsafeCell::new(Some(builder)),
+            agent_url: Cell::new(Some(url.to_owned())),
+            agentless_config: Cell::new(None),
             cbs: RefCell::new(change_buffer_state),
             stats_collector: RefCell::new(stats_collector),
             prepared_spans: RefCell::new(Vec::new()),
@@ -444,6 +465,20 @@ impl WasmSpanState {
     #[wasm_bindgen(js_name = "setUseV05")]
     pub fn set_use_v05(&self, v: bool) {
         self.use_v05.set(v);
+    }
+
+    /// Route trace export directly to the Datadog intake. Must be called before the first send.
+    /// Obfuscation settings are read through the Node.js environment capability at this boundary.
+    #[wasm_bindgen(js_name = "setAgentlessEndpoint")]
+    pub fn set_agentless_endpoint(&self, endpoint: String, api_key: String) -> Result<(), JsValue> {
+        let obfuscation = ObfuscationConfig::from_env(&WasmEnvCapability)
+            .map_err(|error| JsValue::from_str(&format!("setAgentlessEndpoint: {error}")))?;
+        self.agentless_config.set(Some(AgentlessExporterConfig {
+            endpoint,
+            api_key,
+            obfuscation,
+        }));
+        Ok(())
     }
 
     /// Route trace export through libdatadog's OTLP HTTP exporter to `url`

@@ -13,3 +13,8 @@ and installing it directly is not supported at the moment.
 It forwards the payload directly when no configured feature needs span objects. Native stats decode it for aggregation,
 and alternate output formats decode it before transforming and sending it through the configured exporter.
 Only one trace send may be active per state; an overlapping call rejects with an `already in flight` error.
+
+`WasmSpanState#setAgentlessEndpoint(url, apiKey)` selects direct trace intake before the first send.
+The binding reads obfuscation settings from Node.js `process.env` through its environment capability;
+libdatadog normalizes and obfuscates spans before emitting JSON to the configured intake. Structured
+AppSec metadata remains attached to the emitted spans.

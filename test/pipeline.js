@@ -39,6 +39,18 @@ function bytesToBigInt (bytes) {
   return val
 }
 
+/**
+ * @param {string} name
+ * @param {string | undefined} value
+ */
+function restoreEnv (name, value) {
+  if (value === undefined) {
+    delete process.env[name]
+  } else {
+    process.env[name] = value
+  }
+}
+
 // The Span and NativeSpansInterface classes act as a sketch of what should
 // be implemented in dd-trace-js.
 
@@ -1076,6 +1088,88 @@ describe('pipeline', { skip }, () => {
     it('rejects unsupported OTLP protocols (e.g. grpc)', () => {
       const ns = new NativeSpansInterface({ agentUrl: 'http://127.0.0.1:8126' })
       assert.throws(() => ns.state.setOtlpProtocol('grpc'), /setOtlpProtocol|not supported/)
+    })
+  })
+
+  describe('agentless output', () => {
+    it('obfuscates through libdatadog before direct intake', async () => {
+      const http = require('node:http')
+      let captured
+      const server = http.createServer((req, res) => {
+        const chunks = []
+        req.on('data', chunk => chunks.push(chunk))
+        req.on('end', () => {
+          captured = {
+            apiKey: req.headers['dd-api-key'],
+            body: Buffer.concat(chunks),
+            contentType: req.headers['content-type'],
+            method: req.method,
+            url: req.url,
+          }
+          res.writeHead(200)
+          res.end()
+        })
+      })
+      await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+      const { port } = server.address()
+      const previousRules = process.env.DD_APM_REPLACE_TAGS
+      const nativeSpans = new NativeSpansInterface({ agentUrl: 'http://127.0.0.1:1' })
+
+      try {
+        process.env.DD_APM_REPLACE_TAGS = JSON.stringify([{
+          name: 'encoded.meta',
+          pattern: 'encoded-value',
+          repl: '?',
+        }])
+        nativeSpans.state.setAgentlessEndpoint(`http://127.0.0.1:${port}/v1/input`, 'test-api-key')
+        restoreEnv('DD_APM_REPLACE_TAGS', previousRules)
+
+        await nativeSpans.state.sendEncodedTraces(ENCODED_TRACE_PAYLOAD)
+
+        assert.ok(captured, 'direct intake received a POST')
+        assert.strictEqual(captured.body.includes(Buffer.from('encoded-value')), false)
+        assert.strictEqual(captured.method, 'POST')
+        assert.strictEqual(captured.url, '/v1/input')
+        assert.strictEqual(captured.apiKey, 'test-api-key')
+        assert.match(captured.contentType ?? '', /json/)
+        const payload = JSON.parse(captured.body)
+        const span = payload.traces[0].spans[0]
+        assert.strictEqual(span.meta['encoded.meta'], '?')
+        assert.deepStrictEqual(span.meta_struct.appsec, {
+          blocked: true,
+          value: 'encoded-struct',
+        })
+      } finally {
+        restoreEnv('DD_APM_REPLACE_TAGS', previousRules)
+        server.closeAllConnections?.()
+        await new Promise(resolve => server.close(resolve))
+      }
+    })
+
+    it('rejects malformed replacement rules before export', () => {
+      const previousRules = process.env.DD_APM_REPLACE_TAGS
+      const nativeSpans = new NativeSpansInterface()
+
+      try {
+        process.env.DD_APM_REPLACE_TAGS = '[{"name":"tag","pattern":"[","repl":"?"}]'
+        assert.throws(
+          () => nativeSpans.state.setAgentlessEndpoint('http://127.0.0.1:1/v1/input', 'test-api-key'),
+          /setAgentlessEndpoint/,
+        )
+      } finally {
+        restoreEnv('DD_APM_REPLACE_TAGS', previousRules)
+      }
+    })
+
+    it('rejects agentless and OTLP trace destinations together', async () => {
+      const nativeSpans = new NativeSpansInterface()
+      nativeSpans.state.setAgentlessEndpoint('http://127.0.0.1:1/v1/input', 'test-api-key')
+      nativeSpans.state.setOtlpEndpoint('http://127.0.0.1:1/v1/traces')
+
+      await assert.rejects(
+        nativeSpans.state.sendEncodedTraces(ENCODED_TRACE_PAYLOAD),
+        /OTLP and agentless trace export cannot both be enabled/,
+      )
     })
   })
 
