@@ -1096,7 +1096,7 @@ describe('pipeline', { skip }, () => {
   })
 
   describe('agentless output', () => {
-    it('obfuscates through libdatadog before direct intake', async () => {
+    it('formats and obfuscates through libdatadog before direct intake', async () => {
       const http = require('node:http')
       let captured
       const server = http.createServer((req, res) => {
@@ -1138,6 +1138,7 @@ describe('pipeline', { skip }, () => {
         assert.match(captured.contentType ?? '', /json/)
         const payload = JSON.parse(captured.body)
         const span = payload.traces[0].spans[0]
+        assert.strictEqual(span.start, 1_700_000_000)
         assert.strictEqual(span.meta['encoded.meta'], '?')
         assert.deepStrictEqual(span.meta_struct.appsec, {
           blocked: true,
