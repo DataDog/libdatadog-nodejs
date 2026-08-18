@@ -37,6 +37,7 @@ extern "C" {
         body_ptr: *const u8,
         body_len: u32,
         wasm_memory: &JsValue,
+        no_pooling: bool,
     ) -> js_sys::Promise;
 
     #[wasm_bindgen(js_name = "setStorage")]
@@ -52,15 +53,23 @@ extern "C" {
 /// [`crate::WasmCapabilities`] alongside the sleep and log-output capabilities
 /// that `TraceExporter` requires.
 #[derive(Debug, Clone)]
-pub struct WasmHttpClient;
+pub struct WasmHttpClient {
+    no_pooling: bool,
+}
 
 impl HttpClientCapability for WasmHttpClient {
     fn new_client() -> Self {
-        Self
+        Self { no_pooling: false }
     }
 
+    /// Requested by libdatadog's telemetry worker, whose sends are paced further
+    /// apart than the agent's HTTP keep-alive: a pooled socket is typically
+    /// half-closed by the next send, so reuse fails with EOF/ECONNRESET.
+    /// libdatadog used to force a fresh socket with a `Connection: close` header
+    /// and dropped it in #2286, because the agent's telemetry proxy mishandles
+    /// that hop-by-hop header.
     fn new_without_connection_pooling() -> Self {
-        Self
+        Self { no_pooling: true }
     }
 
     #[allow(clippy::manual_async_fn)]
@@ -68,6 +77,7 @@ impl HttpClientCapability for WasmHttpClient {
         &self,
         req: http::Request<Bytes>,
     ) -> impl Future<Output = Result<http::Response<Bytes>, HttpError>> + MaybeSend {
+        let no_pooling = self.no_pooling;
         async move {
             let scheme = req.uri().scheme_str().unwrap_or("http");
 
@@ -110,6 +120,7 @@ impl HttpClientCapability for WasmHttpClient {
                 body.as_ptr(),
                 body.len() as u32,
                 WASM_MEMORY.as_ref(),
+                no_pooling,
             ))
             .await
             .map_err(|e| HttpError::Network(anyhow::anyhow!("{:?}", e)))?;

@@ -409,3 +409,67 @@ describe('http_transport entity headers', () => {
     })
   })
 })
+
+// The `noPooling` argument carries libdatadog's `new_without_connection_pooling()`
+// down to the socket.
+describe('http_transport connection pooling', () => {
+  let server
+  let port
+  let connections = 0
+
+  before(async () => {
+    server = http.createServer((req, res) => {
+      req.on('data', () => {})
+      req.on('end', () => res.end(RESPONSE_BODY))
+    })
+    server.on('connection', () => {
+      connections++
+    })
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+    port = server.address().port
+  })
+
+  after(() => new Promise((resolve) => {
+    // A keep-alive socket left in the agent pool would hold `server.close()`
+    // open until the server's keep-alive timeout.
+    server.closeAllConnections?.()
+    server.close(resolve)
+  }))
+
+  // No `Connection: close` in the head — that header, not the agent, would then
+  // decide the socket's fate and mask what this is testing.
+  function doRequest (noPooling) {
+    const head = Buffer.from(
+      `POST /telemetry/proxy/api/v2/apmtelemetry HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\n`
+      + 'Content-Length: 0\r\n\r\n',
+      'utf8',
+    )
+    return transport.httpRequest(
+      '127.0.0.1', port, false, '', 0, head.length, 0, 0, fakeWasmMemory(head), noPooling,
+    )
+  }
+
+  it('reuses one connection across requests by default', async function () {
+    // `globalAgent` only pools with keep-alive on, the default from Node 19.
+    if (!http.globalAgent.keepAlive) return this.skip?.()
+    connections = 0
+
+    const [first] = await doRequest()
+    const [second] = await doRequest()
+
+    assert.strictEqual(first, 200)
+    assert.strictEqual(second, 200)
+    assert.strictEqual(connections, 1, 'second request reused the pooled socket')
+  })
+
+  it('opens a fresh connection per request when pooling is disabled', async () => {
+    connections = 0
+
+    const [first] = await doRequest(true)
+    const [second] = await doRequest(true)
+
+    assert.strictEqual(first, 200)
+    assert.strictEqual(second, 200)
+    assert.strictEqual(connections, 2, 'each request opened its own socket')
+  })
+})

@@ -171,7 +171,7 @@ module.exports._resetEntityHeadersCache = () => {
   cachedEntityHeaders = undefined
 }
 
-module.exports.httpRequest = function (host, port, isHttps, socketPath, head_ptr, head_len, body_ptr, body_len, wasm_memory) {
+module.exports.httpRequest = function (host, port, isHttps, socketPath, head_ptr, head_len, body_ptr, body_len, wasm_memory, noPooling) {
   // A non-empty socketPath routes over a Unix domain socket (or Windows named
   // pipe) instead of TCP. Sockets are always plaintext HTTP/1.1, so https is
   // ignored in that mode.
@@ -204,6 +204,10 @@ module.exports.httpRequest = function (host, port, isHttps, socketPath, head_ptr
         const requestOptions = useSocket
           ? { socketPath, method, path, headers }
           : { host, port, method, path, headers }
+        // `agent: false` builds a throwaway agent for this request instead of
+        // taking a possibly stale keep-alive socket from `globalAgent`, whose
+        // keep-alive is on by default since Node 19.
+        if (noPooling) requestOptions.agent = false
         const req = transport.request(requestOptions, (res) => {
           const chunks = []
           res.on('data', chunk => chunks.push(chunk))
