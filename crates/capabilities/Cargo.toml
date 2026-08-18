@@ -15,7 +15,7 @@ http = "1"
 bytes = "1.4"
 futures-core = "0.3"
 anyhow = "1"
-libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", rev = "0081bcbb1daffe04a6ac026cfbce3ba186ccce6c" }
+libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", rev = "4e4cf372d4e461d43d9061324ecf60946d5dae53" }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

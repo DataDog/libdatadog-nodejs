@@ -1144,6 +1144,19 @@ describe('pipeline', { skip }, () => {
           blocked: true,
           value: 'encoded-struct',
         })
+
+        const oldStartPayload = Buffer.from(ENCODED_TRACE_PAYLOAD)
+        const startMarker = Buffer.from('a57374617274cf', 'hex')
+        const startMarkerOffset = oldStartPayload.indexOf(startMarker)
+        assert.notStrictEqual(startMarkerOffset, -1)
+        const startOffset = startMarkerOffset + startMarker.length
+        oldStartPayload.writeBigUInt64BE(1_000_000_000n, startOffset)
+
+        await nativeSpans.state.sendEncodedTraces(oldStartPayload)
+
+        const normalized = JSON.parse(captured.body).traces[0].spans[0]
+        assert.strictEqual(Number.isInteger(normalized.start), true)
+        assert.ok(normalized.start >= 946_684_800)
       } finally {
         restoreEnv('DD_APM_REPLACE_TAGS', previousRules)
         server.closeAllConnections?.()
