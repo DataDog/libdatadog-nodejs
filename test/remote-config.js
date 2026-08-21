@@ -50,6 +50,23 @@ function agentResponse (configs, targetsVersion) {
   })
 }
 
+function fetcherOptions (overrides) {
+  return {
+    clientId: 'client-id-1',
+    runtimeId: 'runtime-id-1',
+    service: 'my_svc',
+    env: 'my_env',
+    appVersion: '1.0.0',
+    tags: ['runtime-id:runtime-id-1'],
+    processTags: ['entrypoint.type:script'],
+    language: 'nodejs',
+    tracerVersion: '1.2.3',
+    url: 'http://127.0.0.1:8126',
+    timeoutMs: 5000,
+    ...overrides,
+  }
+}
+
 async function withAgent (run) {
   const requests = []
   const responses = []
@@ -67,19 +84,9 @@ async function withAgent (run) {
 
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
 
-  const fetcher = new RemoteConfigFetcher({
-    clientId: 'client-id-1',
-    runtimeId: 'runtime-id-1',
-    service: 'my_svc',
-    env: 'my_env',
-    appVersion: '1.0.0',
-    tags: ['runtime-id:runtime-id-1'],
-    processTags: ['entrypoint.type:script'],
-    language: 'nodejs',
-    tracerVersion: '1.2.3',
+  const fetcher = new RemoteConfigFetcher(fetcherOptions({
     url: `http://127.0.0.1:${server.address().port}`,
-    timeoutMs: 5000,
-  })
+  }))
 
   try {
     await run({ fetcher, requests, responses })
@@ -211,11 +218,7 @@ test('constructs on a runtime without a WebCrypto global', () => {
     delete globalThis.crypto
     if (typeof globalThis.crypto !== 'undefined') throw new Error('could not hide the global')
     const { RemoteConfigFetcher } = require(${JSON.stringify(require.resolve('..'))}).load('remote_config')
-    new RemoteConfigFetcher({
-      clientId: 'client-id-1', runtimeId: 'runtime-id-1', service: 'my_svc', env: 'my_env',
-      appVersion: '1.0.0', tags: [], processTags: [], language: 'nodejs', tracerVersion: '1.2.3',
-      url: 'http://127.0.0.1:8126', timeoutMs: 1000,
-    })
+    new RemoteConfigFetcher(${JSON.stringify(fetcherOptions())})
     process.stdout.write('constructed')
   `
 
@@ -229,38 +232,45 @@ test('rejects an agent url without a scheme and host', () => {
   // without an authority would panic -- and abort the process, since release builds do not unwind.
   // `agent-host:8126` is the reachable shape: JavaScript's `new URL` accepts it too.
   assert.throws(
-    () => new RemoteConfigFetcher({
-      clientId: 'client-id-1',
-      runtimeId: 'runtime-id-1',
-      service: 'my_svc',
-      env: 'my_env',
-      appVersion: '1.0.0',
-      tags: [],
-      processTags: [],
-      language: 'nodejs',
-      tracerVersion: '1.2.3',
-      url: 'agent-host:8126',
-      timeoutMs: 1000,
-    }),
+    () => new RemoteConfigFetcher(fetcherOptions({ url: 'agent-host:8126' })),
     { message: /needs both a scheme and a host/ },
   )
 })
 
 test('rejects a failed poll', async () => {
   // Only the URL parsing is exercised here: no socket is listening, so the poll fails.
-  const fetcher = new RemoteConfigFetcher({
-    clientId: 'client-id-1',
-    runtimeId: 'runtime-id-1',
-    service: 'my_svc',
-    env: 'my_env',
-    appVersion: '1.0.0',
-    tags: [],
-    processTags: [],
-    language: 'nodejs',
-    tracerVersion: '1.2.3',
+  const fetcher = new RemoteConfigFetcher(fetcherOptions({
     url: 'unix:///tmp/definitely-not-a-datadog-apm-socket',
-    timeoutMs: 1000,
-  })
+  }))
 
   await assert.rejects(fetcher.fetchChanges())
+})
+
+test('polls the backend directly when an api key is set', async () => {
+  const fetcher = new RemoteConfigFetcher(fetcherOptions({
+    url: 'https://api.example.invalid',
+    apiKey: 'an-api-key',
+    hostname: 'my-host',
+  }))
+
+  // The backend cannot be faked: its responses are verified against TUF roots embedded in
+  // libdatadog. What the failure does show is that the poll went to the configs endpoint derived
+  // from the site URL rather than to the URL itself, which only happens in agentless mode.
+  await assert.rejects(fetcher.fetchChanges(), { message: /config\.api\.example\.invalid/ })
+})
+
+test('rejects an api key without an https site url', () => {
+  // Talking to the backend without the agent in between means there is no localhost hop to be
+  // plaintext on, so libdatadog refuses anything but https.
+  assert.throws(
+    () => new RemoteConfigFetcher(fetcherOptions({ apiKey: 'an-api-key', hostname: 'my-host' })),
+    { message: /agentless endpoint is invalid/ },
+  )
+})
+
+test('rejects an api key without a hostname', () => {
+  assert.throws(
+    () => new RemoteConfigFetcher(fetcherOptions({ url: 'https://api.example.invalid', apiKey: 'an-api-key' })),
+    { message: /hostname is empty/ },
+  )
 })

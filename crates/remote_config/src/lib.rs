@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use libdatadog_nodejs_capabilities::{HttpClientCapability, WasmCapabilities};
 use libdd_remote_config::fetch::{
-    ConfigApplyState, ConfigInvariants, ConfigOptions, SingleChangesFetcher,
+    AgentlessConfig, ConfigApplyState, ConfigInvariants, ConfigOptions, SingleChangesFetcher,
 };
 use libdd_remote_config::file_change_tracker::{Change, FilePath};
 use libdd_remote_config::file_storage::{RawFile, SimpleFileStorage};
@@ -63,10 +63,15 @@ struct FetcherOptions {
     process_tags: Vec<String>,
     language: String,
     tracer_version: String,
-    /// Agent base URL, either `http(s)://host:port` or `unix:///path/to/socket`. libdatadog appends
-    /// the remote config path itself; the JS transport also accepts a Windows named pipe path.
+    /// In agent mode the agent base URL, either `http(s)://host:port` or `unix:///path/to/socket`;
+    /// in agentless mode the Datadog site, e.g. `https://api.datadoghq.com`.
     url: String,
     timeout_ms: u64,
+    /// Enables agentless if set.
+    #[serde(default)]
+    api_key: Option<String>,
+    #[serde(default)]
+    hostname: Option<String>,
 }
 
 /// A single add/update/remove of one remote config file, as diffed against the previous poll.
@@ -97,9 +102,9 @@ fn to_record(
     ChangeRecord {
         kind,
         path: path.to_string(),
-        product: path.product.to_string(),
-        config_id: path.config_id.clone(),
-        name: path.name.clone(),
+        product: path.product().to_string(),
+        config_id: path.config_id().to_string(),
+        name: path.name().to_string(),
         // Read after `contents`: both lock the same mutex, which is not reentrant.
         version: file.version() as f64,
         contents,
@@ -130,9 +135,44 @@ struct PendingUpdates {
     config_states: Vec<(RemoteConfigPath, ConfigApplyState)>,
 }
 
+/// Everything needed to build the fetcher, kept around because building it is deferred.
+struct FetcherConfig {
+    target: Target,
+    runtime_id: String,
+    client_id: String,
+    invariants: ConfigInvariants,
+}
+
+impl FetcherConfig {
+    async fn build(&self) -> Result<Fetcher, JsValue> {
+        Ok(SingleChangesFetcher::new(
+            SimpleFileStorage::default(),
+            self.target.clone(),
+            self.runtime_id.clone(),
+            ConfigOptions {
+                invariants: self.invariants.clone(),
+                // Products and capabilities are only known once the subsystems that own them have
+                // registered their handlers, which always happens before the first poll.
+                products: vec![],
+                capabilities: vec![],
+            },
+            WasmCapabilities::new_without_connection_pooling(),
+        )
+        .await
+        .map_err(to_js_err)?
+        .with_client_id(self.client_id.clone()))
+    }
+}
+
+/// The fetcher is built on the first poll rather than in the constructor to be able to await..
+struct FetcherState {
+    config: FetcherConfig,
+    fetcher: Option<Fetcher>,
+}
+
 #[wasm_bindgen]
 pub struct RemoteConfigFetcher {
-    fetcher: Rc<RefCell<Fetcher>>,
+    state: Rc<RefCell<FetcherState>>,
     pending: Rc<RefCell<PendingUpdates>>,
 }
 
@@ -152,40 +192,44 @@ impl RemoteConfigFetcher {
             )));
         }
 
-        let fetcher = SingleChangesFetcher::new(
-            SimpleFileStorage::default(),
-            Target::new(
+        let endpoint = libdd_common::Endpoint {
+            url,
+            timeout_ms: options.timeout_ms,
+            api_key: options.api_key.map(Into::into),
+            ..Default::default()
+        };
+
+        let agentless = match endpoint.api_key {
+            Some(_) => Some(
+                AgentlessConfig::new(options.hostname.unwrap_or_default(), &endpoint)
+                    .map_err(to_js_err)?,
+            ),
+            None => None,
+        };
+
+        let config = FetcherConfig {
+            target: Target::new(
                 options.service,
                 options.env,
                 options.app_version,
                 options.tags,
                 options.process_tags,
             ),
-            options.runtime_id,
-            ConfigOptions {
-                invariants: ConfigInvariants {
-                    language: options.language,
-                    tracer_version: options.tracer_version,
-                    endpoint: libdd_common::Endpoint {
-                        url,
-                        timeout_ms: options.timeout_ms,
-                        ..Default::default()
-                    },
-                },
-                // Products and capabilities are only known once the subsystems that own them have
-                // registered their handlers, which always happens before the first poll.
-                products: vec![],
-                capabilities: vec![],
+            runtime_id: options.runtime_id,
+            client_id: options.client_id,
+            invariants: ConfigInvariants {
+                language: options.language,
+                tracer_version: options.tracer_version,
+                endpoint,
+                agentless,
             },
-            // Polling on a fixed interval is exactly the case a pooled connection hurts: the agent's
-            // short idle keep-alive can close it between polls, turning reuse into intermittent
-            // failures.
-            WasmCapabilities::new_without_connection_pooling(),
-        )
-        .with_client_id(options.client_id);
+        };
 
         Ok(RemoteConfigFetcher {
-            fetcher: Rc::new(RefCell::new(fetcher)),
+            state: Rc::new(RefCell::new(FetcherState {
+                config,
+                fetcher: None,
+            })),
             pending: Rc::new(RefCell::new(PendingUpdates::default())),
         })
     }
@@ -198,14 +242,20 @@ impl RemoteConfigFetcher {
     #[allow(clippy::await_holding_refcell_ref)]
     #[wasm_bindgen(js_name = "fetchChanges")]
     pub async fn fetch_changes(&self) -> Result<JsValue, JsValue> {
-        let cell = self.fetcher.clone();
+        let cell = self.state.clone();
         let pending = self.pending.clone();
 
         // The scheduler above this only arms the next poll once the previous settled, so an
         // overlapping call is a guard, not a path.
-        let mut fetcher = cell
+        let mut state = cell
             .try_borrow_mut()
             .map_err(|_| to_js_err("A remote config poll is already in flight"))?;
+        let state = &mut *state;
+
+        let fetcher = match &mut state.fetcher {
+            Some(fetcher) => fetcher,
+            slot => slot.insert(state.config.build().await?),
+        };
 
         let updates = std::mem::take(&mut *pending.borrow_mut());
         if let Some((products, capabilities)) = updates.product_capabilities {
