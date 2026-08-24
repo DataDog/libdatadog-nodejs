@@ -71,12 +71,23 @@ module.exports = [
     // flags these as "experimental" for the >=18 floor, but they are available on
     // every Node version the test matrix runs (18.20+). Test harnesses also pass
     // `null` to mirror the real inputs the wasm bindings receive.
-    files: ['test/**/*.js'],
+    files: ['test/**/*.js', 'packages/*/test/**/*.js'],
     rules: {
       'n/no-unsupported-features/node-builtins': 'off',
       'unicorn/no-null': 'off',
       // Test helpers are commonly scoped inside their describe block.
       'unicorn/consistent-function-scoping': 'off',
+    },
+  },
+  {
+    // These imports are either installed by the package test workflow or
+    // generated during its build; root lint cannot resolve them.
+    files: [
+      'packages/libdatadog/lib/wasm.js',
+      'packages/libdatadog/test/bundlers.test.js',
+    ],
+    rules: {
+      'n/no-missing-require': 'off',
     },
   },
   {
@@ -88,6 +99,6 @@ module.exports = [
     },
   },
   {
-    ignores: ['build/', 'target/', 'prebuilds/'],
+    ignores: ['build/', 'dist/', 'target/', 'prebuilds/', 'packages/libdatadog/dist/'],
   },
 ]

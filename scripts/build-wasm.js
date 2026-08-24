@@ -11,16 +11,15 @@
 // script only allows development to happen on macOS.
 
 const os = require('node:os')
+const fs = require('node:fs')
+const path = require('node:path')
 const childProcess = require('node:child_process')
 
 const isMacOS = os.platform() === 'darwin'
-const noWasmOpt = isMacOS ? '--no-opt' : ''
 const libraries = [
   'library_config',
-  'datadog-js-zstd',
   'pipeline',
   'remote_config',
-  'sketches',
 ]
 
 const env = {
@@ -35,7 +34,11 @@ if (isMacOS) {
   try {
     childProcess.execSync(`${llvmBinDir}/llvm-config --version`)
   } catch {
-    console.error(`‼️ LLVM not found in ${llvmDir}.\n‼️ Please install LLVM using Homebrew:\n📝   brew install llvm`)
+    console.error([
+      `‼️ LLVM not found in ${llvmDir}.`,
+      '‼️ Please install LLVM using Homebrew:',
+      '📝   brew install llvm',
+    ].join('\n'))
     process.exit(1) // eslint-disable-line unicorn/no-process-exit
   }
 
@@ -50,10 +53,40 @@ if (isMacOS) {
   env.CXX_wasm32_unknown_unknown = `${llvmBinDir}/clang++`
 }
 
-for (const library of libraries) {
-  childProcess.execSync(
-    `wasm-pack build ${noWasmOpt} --target nodejs ./crates/${library} --out-dir ../../prebuilds/${library}`, {
-      env,
-    },
-  )
+/**
+ * Build one WASM crate with the platform-specific compiler configuration.
+ *
+ * @param {string} cratePath
+ * @param {string} outputDirectory
+ * @param {{ skipOptimization?: boolean }} options
+ * @returns {void}
+ */
+function buildWasm (cratePath, outputDirectory, options = {}) {
+  const { skipOptimization = false } = options
+  fs.rmSync(outputDirectory, { force: true, recursive: true })
+  const args = ['build']
+  if (skipOptimization) args.push('--no-opt')
+  args.push('--target', 'nodejs', cratePath, '--out-dir', outputDirectory)
+  childProcess.execFileSync('wasm-pack', args, { env })
+  // wasm-pack ignores its output by default. These outputs are package inputs,
+  // so remove the nested ignore file and let each npm package's files allowlist
+  // decide whether they are published.
+  const resolvedOutputDirectory = path.resolve(cratePath, outputDirectory)
+  fs.rmSync(path.join(resolvedOutputDirectory, '.gitignore'), { force: true })
+}
+
+const [cratePath, outputDirectory] = process.argv.slice(2)
+if (cratePath || outputDirectory) {
+  if (!cratePath || !outputDirectory) {
+    throw new Error('Both the WASM crate path and output directory are required')
+  }
+  buildWasm(path.resolve(cratePath), path.resolve(outputDirectory), {
+    skipOptimization: isMacOS,
+  })
+} else {
+  for (const library of libraries) {
+    buildWasm(`./crates/${library}`, `../../prebuilds/${library}`, {
+      skipOptimization: isMacOS,
+    })
+  }
 }

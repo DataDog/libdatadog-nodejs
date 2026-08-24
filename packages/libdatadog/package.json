@@ -1,0 +1,66 @@
+{
+  "name": "@datadog/libdatadog",
+  "version": "0.1.0-pre",
+  "description": "Universal Node.js bindings for libdatadog",
+  "license": "Apache-2.0",
+  "type": "commonjs",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "require": "./index.js",
+      "default": "./index.js"
+    },
+    "./wasm": {
+      "types": "./index.d.ts",
+      "require": "./wasm.js",
+      "default": "./wasm.js"
+    }
+  },
+  "files": [
+    "index.js",
+    "wasm.js",
+    "index.d.ts",
+    "lib/",
+    "dist/wasm/"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build:native": "node scripts/clean-native.js && bash scripts/build-native.sh",
+    "build:wasm": "npm run build:wasm:binary && npm run inline:wasm",
+    "build:wasm:binary": "node ../../scripts/build-wasm.js ../../crates/libdatadog-wasm dist/wasm",
+    "inline:wasm": "node scripts/inline-wasm.js",
+    "package:native": "node scripts/package-native.js",
+    "build": "npm run build:native && npm run build:wasm",
+    "test": "node --test test/*.test.js",
+    "test:package": "node scripts/assert-package.js"
+  },
+  "napi": {
+    "binaryName": "libdatadog",
+    "targets": [
+      "x86_64-apple-darwin",
+      "aarch64-apple-darwin",
+      "x86_64-unknown-linux-gnu",
+      "aarch64-unknown-linux-gnu",
+      "x86_64-unknown-linux-musl",
+      "aarch64-unknown-linux-musl"
+    ]
+  },
+  "optionalDependencies": {
+    "@datadog/libdatadog-darwin-arm64": "0.1.0-pre",
+    "@datadog/libdatadog-darwin-x64": "0.1.0-pre",
+    "@datadog/libdatadog-linux-arm64-gnu": "0.1.0-pre",
+    "@datadog/libdatadog-linux-arm64-musl": "0.1.0-pre",
+    "@datadog/libdatadog-linux-x64-gnu": "0.1.0-pre",
+    "@datadog/libdatadog-linux-x64-musl": "0.1.0-pre"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^3.5.1",
+    "esbuild": "^0.28.2",
+    "webpack": "^5.109.2",
+    "webpack-cli": "^7.2.2"
+  }
+}
