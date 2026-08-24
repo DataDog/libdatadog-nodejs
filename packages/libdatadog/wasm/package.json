@@ -1,0 +1,15 @@
+{
+  "name": "@datadog/libdatadog-wasm",
+  "version": "0.1.0-pre",
+  "description": "WASM fallback for @datadog/libdatadog",
+  "license": "Apache-2.0",
+  "type": "commonjs",
+  "main": "dist/libdatadog_wasm.js",
+  "types": "dist/libdatadog_wasm.d.ts",
+  "files": [
+    "dist/"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}

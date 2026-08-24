@@ -3,25 +3,43 @@
 const path = require('node:path')
 const os = require('node:os')
 
-const nativePackage = getNativePackageName()
-const binding = process.env.DD_LIBDATADOG_NATIVE_PATH
-  ? require(path.resolve(process.env.DD_LIBDATADOG_NATIVE_PATH))
-  : require(nativePackage)
+const target = getNativeTarget()
+const binding = loadBinding(target)
 
-function getNativePackageName () {
+function getNativeTarget () {
   const platform = os.platform()
   const architecture = process.arch
 
   if (platform === 'darwin' && (architecture === 'arm64' || architecture === 'x64')) {
-    return `@datadog/libdatadog-${platform}-${architecture}`
+    return `${platform}-${architecture}`
   }
 
   if (platform === 'linux' && (architecture === 'arm64' || architecture === 'x64')) {
     const libc = process.report?.getReport?.().header?.glibcVersionRuntime ? 'gnu' : 'musl'
-    return `@datadog/libdatadog-linux-${architecture}-${libc}`
+    return `linux-${architecture}-${libc}`
   }
 
   throw new Error(`unsupported native libdatadog platform: ${platform}-${architecture}`)
+}
+
+function loadBinding (target) {
+  if (process.env.DD_LIBDATADOG_NATIVE_PATH) {
+    return require(path.resolve(process.env.DD_LIBDATADOG_NATIVE_PATH))
+  }
+
+  const localArtifact = path.join(
+    __dirname,
+    '..',
+    'dist',
+    'native',
+    `libdatadog.${target}.node`,
+  )
+
+  try {
+    return require(localArtifact)
+  } catch {
+    return require(`@datadog/libdatadog-${target}`)
+  }
 }
 
 module.exports = {

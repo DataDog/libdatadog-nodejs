@@ -99,6 +99,13 @@ module.exports = [
     },
   },
   {
-    ignores: ['build/', 'dist/', 'target/', 'prebuilds/', 'packages/libdatadog/dist/'],
+    ignores: [
+      'build/',
+      'dist/',
+      'target/',
+      'prebuilds/',
+      'packages/libdatadog/dist/',
+      'packages/libdatadog/wasm/dist/',
+    ],
   },
 ]

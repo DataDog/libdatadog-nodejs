@@ -35,25 +35,36 @@ test('uses napi-rs platform package names', () => {
 
 test('uses the libdatadog release version', () => {
   const packageJson = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json')))
+  const wasmPackageJson = JSON.parse(fs.readFileSync(
+    path.join(packageRoot, 'wasm', 'package.json'),
+  ))
   const repositoryPackageJson = JSON.parse(fs.readFileSync(path.join(repositoryRoot, 'package.json')))
 
   assert.strictEqual(packageJson.version, repositoryPackageJson.version)
+  assert.strictEqual(wasmPackageJson.version, repositoryPackageJson.version)
+  assert.strictEqual(
+    packageJson.dependencies['@datadog/libdatadog-wasm'],
+    repositoryPackageJson.version,
+  )
   for (const version of Object.values(packageJson.optionalDependencies)) {
     assert.strictEqual(version, repositoryPackageJson.version)
   }
 })
 
-test('root entry point falls back to embedded WASM without a platform package', () => {
+test('root entry point uses the expected backend', () => {
   const libdatadog = require('..')
+  const nativeArtifact = getNativeArtifact()
+  const expected = process.env.DD_LIBDATADOG_EXPECTED_BACKEND
+    ?? (nativeArtifact ? 'native' : 'wasm')
 
-  assert.strictEqual(libdatadog.backend(), 'wasm')
+  assert.strictEqual(libdatadog.backend(), expected)
 })
 
 test('embeds a Brotli-compressed WASM fallback below the size budgets', () => {
   const gluePath = path.join(
     packageRoot,
-    'dist',
     'wasm',
+    'dist',
     'libdatadog_wasm.js',
   )
   const glue = fs.readFileSync(gluePath, 'utf8')
@@ -64,3 +75,12 @@ test('embeds a Brotli-compressed WASM fallback below the size budgets', () => {
   assert.ok(compressedWasm.length < 400 * 1024)
   assert.ok(brotliDecompressSync(compressedWasm).length < 1024 * 1024)
 })
+
+function getNativeArtifact () {
+  const nativeDirectory = path.join(packageRoot, 'dist', 'native')
+
+  if (!fs.existsSync(nativeDirectory)) return
+
+  return fs.readdirSync(nativeDirectory)
+    .find(file => /^libdatadog\..+\.node$/.test(file))
+}

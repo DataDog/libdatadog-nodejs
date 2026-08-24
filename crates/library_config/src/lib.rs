@@ -56,13 +56,13 @@ impl JsConfigurator {
     }
 
     #[wasm_bindgen]
-    pub fn set_envp(&mut self, envp: Vec<JsValue>) -> Result<(), JsValue> {
+    pub fn set_envp(&mut self, envp: Box<[JsValue]>) -> Result<(), JsValue> {
         self.envp = envp.iter().filter_map(|val| val.as_string()).collect();
         Ok(())
     }
 
     #[wasm_bindgen]
-    pub fn set_args(&mut self, args: Vec<JsValue>) -> Result<(), JsValue> {
+    pub fn set_args(&mut self, args: Box<[JsValue]>) -> Result<(), JsValue> {
         self.args = args.iter().filter_map(|val| val.as_string()).collect();
         Ok(())
     }
@@ -109,8 +109,8 @@ impl JsConfigurator {
             config_string_local.as_bytes(),
             config_string_managed.as_bytes(),
             libdd_library_config::ProcessInfo {
-                envp,
-                args,
+                envp: envp,
+                args: args,
                 language: b"nodejs".to_vec(),
             },
         );
@@ -120,7 +120,7 @@ impl JsConfigurator {
                 let config_entries: Vec<ConfigEntry> = config
                     .into_iter()
                     .map(|c| ConfigEntry {
-                        name: c.name.to_string(),
+                        name: c.name.to_string().into(),
                         value: c.value,
                         source: c.source.to_str().into(),
                         config_id: c.config_id.unwrap_or_default(),
@@ -133,11 +133,5 @@ impl JsConfigurator {
                 e
             ))),
         }
-    }
-}
-
-impl Default for JsConfigurator {
-    fn default() -> Self {
-        Self::new()
     }
 }

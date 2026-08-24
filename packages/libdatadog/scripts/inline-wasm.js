@@ -4,7 +4,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 const { constants, brotliCompressSync } = require('node:zlib')
 
-const outputDirectory = path.join(__dirname, '..', 'dist', 'wasm')
+const outputDirectory = path.join(__dirname, '..', 'wasm', 'dist')
 const gluePath = path.join(outputDirectory, 'libdatadog_wasm.js')
 const wasmPath = path.join(outputDirectory, 'libdatadog_wasm_bg.wasm')
 const glue = fs.readFileSync(gluePath, 'utf8')
@@ -32,17 +32,4 @@ fs.writeFileSync(
 )
 fs.rmSync(wasmPath)
 fs.rmSync(path.join(outputDirectory, '.gitignore'), { force: true })
-
-const packagePath = path.join(outputDirectory, 'package.json')
-const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'))
-const libdatadogPackage = require('../package.json')
-packageJson.name = '@datadog/libdatadog-wasm'
-packageJson.version = libdatadogPackage.version
-packageJson.description = 'WASM fallback for @datadog/libdatadog'
-packageJson.license = libdatadogPackage.license
-packageJson.files = [
-  'libdatadog_wasm.js',
-  'libdatadog_wasm.d.ts',
-  'libdatadog_wasm_bg.wasm.d.ts',
-]
-fs.writeFileSync(packagePath, JSON.stringify(packageJson, undefined, 2) + '\n')
+fs.rmSync(path.join(outputDirectory, 'package.json'), { force: true })

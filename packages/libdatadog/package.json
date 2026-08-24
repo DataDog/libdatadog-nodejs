@@ -19,24 +19,28 @@
     }
   },
   "files": [
+    "README.md",
     "index.js",
     "wasm.js",
     "index.d.ts",
-    "lib/",
-    "dist/wasm/"
+    "lib/"
+  ],
+  "workspaces": [
+    "wasm"
   ],
   "engines": {
     "node": ">=18"
   },
   "scripts": {
-    "build:native": "node scripts/clean-native.js && bash scripts/build-native.sh",
+    "build:native": "node scripts/build-native.js",
     "build:wasm": "npm run build:wasm:binary && npm run inline:wasm",
-    "build:wasm:binary": "node ../../scripts/build-wasm.js ../../crates/libdatadog-wasm dist/wasm",
+    "build:wasm:binary": "node ../../scripts/build-wasm.js ../../crates/libdatadog-wasm wasm/dist",
     "inline:wasm": "node scripts/inline-wasm.js",
     "package:native": "node scripts/package-native.js",
     "build": "npm run build:native && npm run build:wasm",
-    "test": "node --test test/*.test.js",
-    "test:package": "node scripts/assert-package.js"
+    "test": "node --test test/*.test.js && npm run test:types",
+    "test:package": "node --test test/package-contents.test.js",
+    "test:types": "tsc --noEmit --strict --target ES2022 --module Node16 --moduleResolution Node16 test/types.test.ts"
   },
   "napi": {
     "binaryName": "libdatadog",
@@ -49,6 +53,9 @@
       "aarch64-unknown-linux-musl"
     ]
   },
+  "dependencies": {
+    "@datadog/libdatadog-wasm": "0.1.0-pre"
+  },
   "optionalDependencies": {
     "@datadog/libdatadog-darwin-arm64": "0.1.0-pre",
     "@datadog/libdatadog-darwin-x64": "0.1.0-pre",
@@ -60,6 +67,7 @@
   "devDependencies": {
     "@napi-rs/cli": "^3.5.1",
     "esbuild": "^0.28.2",
+    "typescript": "^6.0.3",
     "webpack": "^5.109.2",
     "webpack-cli": "^7.2.2"
   }

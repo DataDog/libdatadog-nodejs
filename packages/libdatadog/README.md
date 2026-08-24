@@ -15,5 +15,10 @@ or WASM artifact.
 
 The package tries a platform-native napi-rs backend first and falls back to a
 wasm-bindgen backend with the WebAssembly bytes embedded in JavaScript. The
-canonical inlined output is written to this package's `dist/wasm` directory.
-No raw `.wasm` asset is published.
+canonical inlined output is published as the regular
+`@datadog/libdatadog-wasm` dependency from the `wasm` workspace. This directory
+is itself the published metapackage. Platform-native packages follow the
+napi-rs layout, are generated in `dist/packages`, and are installed as optional
+dependencies. They are not npm workspaces because their mutually exclusive
+`os`, `cpu`, and `libc` constraints would make local workspace installs
+platform-dependent. No raw `.wasm` asset is published.

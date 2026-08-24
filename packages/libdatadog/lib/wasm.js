@@ -1,6 +1,6 @@
 'use strict'
 
-const binding = require('../dist/wasm/libdatadog_wasm')
+const binding = require('@datadog/libdatadog-wasm')
 
 module.exports = {
   backend: () => 'wasm',
