@@ -8,10 +8,30 @@ crate-type = ["cdylib"]
 name = "libdatadog"
 
 [dependencies]
-napi = { version = "3", default-features = false, features = ["napi8"] }
+napi = { version = "3", default-features = false, features = ["async", "napi8"] }
 napi-derive = "3"
+anyhow = "1"
+bytes = "1"
+futures = "0.3"
+http = "1"
 libdd-ddsketch = "1.1.1"
 zstd = { version = "0.13.3", default-features = false, features = ["thin"] }
+
+[dependencies.libdd-capabilities]
+git = "https://github.com/DataDog/libdatadog.git"
+rev = "322d9336fed24dcf78a214f488b0fd3fb9583ba6"
+default-features = false
+
+[dependencies.libdd-trace-utils]
+git = "https://github.com/DataDog/libdatadog.git"
+rev = "322d9336fed24dcf78a214f488b0fd3fb9583ba6"
+default-features = false
+
+[dependencies.libdd-data-pipeline-core]
+git = "https://github.com/DataDog/libdatadog.git"
+rev = "322d9336fed24dcf78a214f488b0fd3fb9583ba6"
+default-features = false
+features = ["compression"]
 
 [build-dependencies]
 napi-build = "2"

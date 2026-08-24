@@ -1,0 +1,75 @@
+'use strict'
+
+function createHostTransport () {
+  const requests = new Map()
+  const timers = new Map()
+
+  async function request ({ id, url, method, headers: headerList, body }) {
+    const target = new URL(url)
+    const client = target.protocol === 'https:' ? require('node:https') : require('node:http')
+    const headers = Object.fromEntries(headerList.map(({ name, value }) => [name, value]))
+
+    return new Promise((resolve, reject) => {
+      let settled = false
+      const finish = (callback, value) => {
+        if (settled) return
+        settled = true
+        requests.delete(id)
+        callback(value)
+      }
+      const outgoing = client.request(target, {
+        agent: false,
+        headers: { ...headers, connection: 'close' },
+        method,
+      }, (response) => {
+        const chunks = []
+        response.on('data', chunk => chunks.push(chunk))
+        response.once('aborted', () => finish(reject, new Error('response aborted')))
+        response.once('error', error => finish(reject, error))
+        response.on('end', () => finish(resolve, {
+          status: response.statusCode,
+          body: Buffer.concat(chunks),
+        }))
+      })
+
+      requests.set(id, {
+        cancel: () => {
+          const error = new Error('agentless request was cancelled')
+          finish(reject, error)
+          outgoing.destroy(error)
+        },
+      })
+      outgoing.once('error', error => finish(reject, error))
+      outgoing.end(body)
+    })
+  }
+
+  function cancelRequest (id) {
+    requests.get(id)?.cancel()
+  }
+
+  function sleep (id, milliseconds) {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        timers.delete(id)
+        resolve()
+      }, milliseconds)
+      timeout.unref?.()
+      timers.set(id, {
+        cancel: () => {
+          clearTimeout(timeout)
+          timers.delete(id)
+          reject(new Error('agentless timer was cancelled'))
+        },
+      })
+    })
+  }
+
+  function cancelSleep (id) {
+    timers.get(id)?.cancel()
+  }
+
+  return { request, cancelRequest, sleep, cancelSleep }
+}
+
+module.exports = { createHostTransport }
