@@ -58,29 +58,38 @@ if (isMacOS) {
  *
  * @param {string} cratePath
  * @param {string} outputDirectory
- * @param {{ skipOptimization?: boolean }} options
+ * @param {{ profiling?: boolean, skipOptimization?: boolean }} options
  * @returns {void}
  */
 function buildWasm (cratePath, outputDirectory, options = {}) {
-  const { skipOptimization = false } = options
+  const { profiling = false, skipOptimization = false } = options
   const resolvedOutputDirectory = path.resolve(cratePath, outputDirectory)
   fs.rmSync(resolvedOutputDirectory, { force: true, recursive: true })
   const args = ['build']
+  if (profiling) args.push('--profiling')
   if (skipOptimization) args.push('--no-opt')
   args.push('--target', 'nodejs', cratePath, '--out-dir', resolvedOutputDirectory)
-  childProcess.execFileSync('wasm-pack', args, { env })
+  childProcess.execFileSync('wasm-pack', args, {
+    env: {
+      ...env,
+      // Cargo's release profile strips the function names needed for size attribution.
+      ...(profiling && { CARGO_PROFILE_RELEASE_STRIP: 'false' }),
+    },
+  })
   // wasm-pack ignores its output by default. These outputs are package inputs,
   // so remove the nested ignore file and let each npm package's files allowlist
   // decide whether they are published.
   fs.rmSync(path.join(resolvedOutputDirectory, '.gitignore'), { force: true })
 }
 
-const [cratePath, outputDirectory] = process.argv.slice(2)
+const [cratePath, outputDirectory, mode] = process.argv.slice(2)
 if (cratePath || outputDirectory) {
   if (!cratePath || !outputDirectory) {
     throw new Error('Both the WASM crate path and output directory are required')
   }
+  if (mode && mode !== '--profiling') throw new Error(`Unknown build mode: ${mode}`)
   buildWasm(path.resolve(cratePath), path.resolve(outputDirectory), {
+    profiling: mode === '--profiling',
     skipOptimization: isMacOS,
   })
 } else {
