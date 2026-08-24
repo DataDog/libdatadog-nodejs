@@ -72,8 +72,8 @@ test('embeds a Brotli-compressed WASM fallback below the size budgets', () => {
 
   assert.ok(encodedWasm, 'WASM must be embedded as a Brotli-compressed base64 string')
   const compressedWasm = Buffer.from(encodedWasm, 'base64')
-  assert.ok(compressedWasm.length < 400 * 1024)
-  assert.ok(brotliDecompressSync(compressedWasm).length < 1024 * 1024)
+  assert.ok(Buffer.byteLength(glue) < 200 * 1024)
+  assert.ok(brotliDecompressSync(compressedWasm).length < 500 * 1024)
 })
 
 function getNativeArtifact () {
