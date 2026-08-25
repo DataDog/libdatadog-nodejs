@@ -349,7 +349,7 @@ function createReport (gluePath, profilePath) {
 }
 
 if (require.main === module) {
-  const gluePath = path.join(__dirname, '..', 'dist', 'wasm', 'libdatadog_wasm.js')
+  const gluePath = path.join(__dirname, '..', 'wasm', 'dist', 'libdatadog_wasm.js')
   const profilePath = process.argv[2] && path.resolve(process.argv[2])
   const report = createReport(gluePath, profilePath)
   console.log(report)

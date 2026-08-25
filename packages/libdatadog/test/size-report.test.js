@@ -1,6 +1,8 @@
 'use strict'
 
 const assert = require('node:assert/strict')
+const { spawnSync } = require('node:child_process')
+const fs = require('node:fs')
 const path = require('node:path')
 const test = require('node:test')
 
@@ -16,8 +18,23 @@ const {
   parseElfSections,
 } = require('../scripts/report-napi-size')
 
+const nativeDirectory = path.join(__dirname, '..', 'dist', 'native')
+const nativeArtifact = fs.existsSync(nativeDirectory)
+  ? fs.readdirSync(nativeDirectory)
+      .find(file => /^libdatadog\..+\.node$/.test(file))
+  : undefined
+
+function napiReportSkipReason () {
+  if (!nativeArtifact) return 'a native artifact is not installed'
+
+  const size = spawnSync('size', ['--version'], { stdio: 'ignore' })
+  if (size.error?.code === 'ENOENT') return 'the size command is not installed'
+
+  return false
+}
+
 test('reports inline packaging and WASM section sizes', () => {
-  const gluePath = path.join(__dirname, '..', 'dist', 'wasm', 'libdatadog_wasm.js')
+  const gluePath = path.join(__dirname, '..', 'wasm', 'dist', 'libdatadog_wasm.js')
   const report = createWasmReport(gluePath)
 
   assert.match(report, /Raw WASM \(before Brotli\)/)
@@ -27,11 +44,10 @@ test('reports inline packaging and WASM section sizes', () => {
   assert.match(report, /\| data \|/)
 })
 
-test('reports N-API artifact, section, and crate sizes', () => {
-  const nativeDirectory = path.join(__dirname, '..', 'dist', 'native')
-  const artifact = require('node:fs').readdirSync(nativeDirectory)
-    .find(file => /^libdatadog\..+\.node$/.test(file))
-  const report = createNapiReport(path.join(nativeDirectory, artifact), {
+test('reports N-API artifact, section, and crate sizes', {
+  skip: napiReportSkipReason(),
+}, () => {
+  const report = createNapiReport(path.join(nativeDirectory, nativeArtifact), {
     'text-section-size': 7000,
     'crates': [
       { name: 'libdatadog', size: 2500 },
