@@ -9,11 +9,13 @@
   "exports": {
     ".": {
       "types": "./index.d.ts",
+      "import": "./index.mjs",
       "require": "./index.js",
       "default": "./index.js"
     },
     "./wasm": {
       "types": "./index.d.ts",
+      "import": "./wasm.mjs",
       "require": "./wasm.js",
       "default": "./wasm.js"
     }
@@ -21,7 +23,9 @@
   "files": [
     "README.md",
     "index.js",
+    "index.mjs",
     "wasm.js",
+    "wasm.mjs",
     "index.d.ts",
     "lib/"
   ],

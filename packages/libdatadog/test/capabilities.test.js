@@ -27,8 +27,9 @@ test('universal backends exclude optional extras', () => {
 })
 
 for (const [name, backend] of backends()) {
-  test(`${name} backend compresses with Zstandard`, () => {
-    const compressed = backend.zstd_compress(Buffer.alloc(4096, 42), 3)
+  test(`${name} backend compresses a Uint8Array with Zstandard`, () => {
+    const input = new Uint8Array(4096).fill(42)
+    const compressed = backend.zstd_compress(input, 3)
 
     assert(compressed instanceof Uint8Array)
     assert.deepStrictEqual([...compressed.subarray(0, 4)], [0x28, 0xB5, 0x2F, 0xFD])

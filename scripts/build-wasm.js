@@ -63,15 +63,15 @@ if (isMacOS) {
  */
 function buildWasm (cratePath, outputDirectory, options = {}) {
   const { skipOptimization = false } = options
-  fs.rmSync(outputDirectory, { force: true, recursive: true })
+  const resolvedOutputDirectory = path.resolve(cratePath, outputDirectory)
+  fs.rmSync(resolvedOutputDirectory, { force: true, recursive: true })
   const args = ['build']
   if (skipOptimization) args.push('--no-opt')
-  args.push('--target', 'nodejs', cratePath, '--out-dir', outputDirectory)
+  args.push('--target', 'nodejs', cratePath, '--out-dir', resolvedOutputDirectory)
   childProcess.execFileSync('wasm-pack', args, { env })
   // wasm-pack ignores its output by default. These outputs are package inputs,
   // so remove the nested ignore file and let each npm package's files allowlist
   // decide whether they are published.
-  const resolvedOutputDirectory = path.resolve(cratePath, outputDirectory)
   fs.rmSync(path.join(resolvedOutputDirectory, '.gitignore'), { force: true })
 }
 

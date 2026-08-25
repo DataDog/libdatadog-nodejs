@@ -44,6 +44,12 @@ module.exports = [
     },
   },
   {
+    files: ['**/*.mjs'],
+    languageOptions: {
+      sourceType: 'module',
+    },
+  },
+  {
     files: ['load.js'],
     languageOptions: {
       globals: {

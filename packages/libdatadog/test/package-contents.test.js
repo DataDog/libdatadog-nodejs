@@ -123,6 +123,7 @@ test('installed metapackage falls back to its WASM dependency', () => {
     assert.strictEqual(explicitWasm.backend(), 'wasm')
     assert(libdatadog.zstd_compress(Buffer.alloc(16), 3) instanceof Uint8Array)
     assert.strictEqual(new libdatadog.DDSketch().count(), 0)
+    assertEsmImports(installRoot, environment, 'wasm')
   } finally {
     fs.rmSync(temporaryRoot, { force: true, recursive: true })
   }
@@ -172,10 +173,43 @@ test('installed metapackage selects its native optional dependency', {
 
     assert.strictEqual(libdatadog.backend(), 'native')
     assert.strictEqual(explicitWasm.backend(), 'wasm')
+    assertEsmImports(installRoot, environment, 'native')
   } finally {
     fs.rmSync(temporaryRoot, { force: true, recursive: true })
   }
 })
+
+function assertEsmImports (installRoot, environment, expectedBackend) {
+  const script = `
+    import assert from 'node:assert/strict'
+    import libdatadog, {
+      backend,
+      DDSketch,
+      zstd_compress,
+    } from '@datadog/libdatadog'
+    import wasm, {
+      backend as wasmBackend,
+      DDSketch as WasmDDSketch,
+      zstd_compress as wasmCompress,
+    } from '@datadog/libdatadog/wasm'
+
+    assert.strictEqual(backend(), ${JSON.stringify(expectedBackend)})
+    assert.strictEqual(libdatadog.backend, backend)
+    assert(zstd_compress(new Uint8Array(16), 3) instanceof Uint8Array)
+    assert.strictEqual(new DDSketch().count(), 0)
+
+    assert.strictEqual(wasmBackend(), 'wasm')
+    assert.strictEqual(wasm.backend, wasmBackend)
+    assert(wasmCompress(new Uint8Array(16), 3) instanceof Uint8Array)
+    assert.strictEqual(new WasmDDSketch().count(), 0)
+  `
+
+  execFileSync(process.execPath, ['--input-type=module', '--eval', script], {
+    cwd: installRoot,
+    env: environment,
+    stdio: 'pipe',
+  })
+}
 
 function createTarball (directory, destination, environment) {
   const output = execFileSync(npm, [
