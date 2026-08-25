@@ -48,6 +48,9 @@ function createHostTransport () {
     requests.get(id)?.cancel()
   }
 
+  // TODO(libdd-capabilities): Make host-backed capability futures cancel their
+  // underlying operation when dropped. Then sleep can return a cancellable
+  // operation directly, removing timer IDs, the timers map, and cancelSleep.
   function sleep (id, milliseconds) {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
