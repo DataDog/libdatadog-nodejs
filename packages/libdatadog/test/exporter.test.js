@@ -18,7 +18,7 @@ const nativeDirectory = path.join(packageRoot, 'dist', 'native')
 const nativeArtifact = fs.existsSync(nativeDirectory)
   ? fs.readdirSync(nativeDirectory).find(file => file.startsWith('libdatadog.') && file.endsWith('.node'))
   : undefined
-const wasmArtifact = path.join(packageRoot, 'dist', 'wasm', 'libdatadog_wasm.js')
+const wasmArtifact = path.join(packageRoot, 'wasm', 'dist', 'libdatadog_wasm.js')
 
 test('native backend compresses agentless v0.4 exports with Zstandard', {
   skip: !nativeArtifact,
