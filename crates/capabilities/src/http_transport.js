@@ -171,7 +171,7 @@ module.exports._resetEntityHeadersCache = () => {
   cachedEntityHeaders = undefined
 }
 
-module.exports.httpRequest = function (host, port, isHttps, socketPath, head_ptr, head_len, body_ptr, body_len, wasm_memory) {
+module.exports.httpRequest = function (host, port, isHttps, socketPath, connectionPooling, head_ptr, head_len, body_ptr, body_len, wasm_memory) {
   // A non-empty socketPath routes over a Unix domain socket (or Windows named
   // pipe) instead of TCP. Sockets are always plaintext HTTP/1.1, so https is
   // ignored in that mode.
@@ -206,9 +206,12 @@ module.exports.httpRequest = function (host, port, isHttps, socketPath, head_ptr
         // request options so the connection uses the correct method/path/headers
         // on both Node and Bun (host/port or socketPath drive the connection).
         const { method, path, headers } = parseRequestHead(applyEntityHeaders(headView))
+        // `agent: false` gives this request its own short-lived agent rather than the global
+        // keep-alive one, which is what a caller asking for no connection pooling wants.
         const requestOptions = useSocket
           ? { socketPath, method, path, headers }
           : { host, port, method, path, headers }
+        if (!connectionPooling) requestOptions.agent = false
         const req = transport.request(requestOptions, (res) => {
           const chunks = []
           res.on('data', chunk => chunks.push(chunk))

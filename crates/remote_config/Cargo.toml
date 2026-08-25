@@ -1,0 +1,27 @@
+[package]
+name = "remote-config"
+version = "0.1.0"
+edition = "2021"
+description = "Wasm binding for libdatadog's remote config client"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+libdd-remote-config = { git = "https://github.com/DataDog/libdatadog.git", rev = "966f921c226b63a1ba84c2e53e3d0f4625f90c75", default-features = false, features = ["client", "agentless"] }
+libdd-common = { git = "https://github.com/DataDog/libdatadog.git", rev = "966f921c226b63a1ba84c2e53e3d0f4625f90c75", default-features = false }
+libdatadog-nodejs-capabilities = { path = "../capabilities" }
+
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+wasm-bindgen-futures = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+serde-wasm-bindgen = "0.4"
+serde_json = "1"
+console_error_panic_hook = "0.1"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-O", "--all-features"]
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"

@@ -1163,6 +1163,10 @@ describe('pipeline', { skip }, () => {
     })
 
     it('returns collapsed span count when stats cardinality overflows', async () => {
+      // The resource field has its own cardinality limit (1024) and collapses to a placeholder long
+      // before the whole-key limit (~7000) is reached, so varying it no longer overflows the key at all.
+      // `service` has no per-field limit, so distinct services still overflow the whole key -- which is
+      // what `collapsedSpans` counts.
       const http = require('node:http')
       const seen = []
       const server = http.createServer((req, res) => {
@@ -1184,8 +1188,8 @@ describe('pipeline', { skip }, () => {
         for (let i = 0; i < 15_000; i++) {
           const span = ns.createSpan()
           span.name = 'stats-span'
-          span.service = 'stats-svc'
-          span.resource = `/stats/${i}`
+          span.service = `stats-svc-${i}`
+          span.resource = '/stats'
           span.type = 'web'
           span.setTag('span.kind', 'server')
           span.duration = 5_000_000n

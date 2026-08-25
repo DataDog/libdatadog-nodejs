@@ -19,6 +19,7 @@ const libraries = [
   'library_config',
   'datadog-js-zstd',
   'pipeline',
+  'remote_config',
   'sketches',
 ]
 
