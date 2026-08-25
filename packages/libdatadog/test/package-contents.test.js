@@ -184,22 +184,26 @@ function assertEsmImports (installRoot, environment, expectedBackend) {
     import assert from 'node:assert/strict'
     import libdatadog, {
       backend,
+      createAgentlessExporter,
       DDSketch,
       zstd_compress,
     } from '@datadog/libdatadog'
     import wasm, {
       backend as wasmBackend,
+      createAgentlessExporter as createWasmAgentlessExporter,
       DDSketch as WasmDDSketch,
       zstd_compress as wasmCompress,
     } from '@datadog/libdatadog/wasm'
 
     assert.strictEqual(backend(), ${JSON.stringify(expectedBackend)})
     assert.strictEqual(libdatadog.backend, backend)
+    assert.strictEqual(libdatadog.createAgentlessExporter, createAgentlessExporter)
     assert(zstd_compress(new Uint8Array(16), 3) instanceof Uint8Array)
     assert.strictEqual(new DDSketch().count(), 0)
 
     assert.strictEqual(wasmBackend(), 'wasm')
     assert.strictEqual(wasm.backend, wasmBackend)
+    assert.strictEqual(wasm.createAgentlessExporter, createWasmAgentlessExporter)
     assert(wasmCompress(new Uint8Array(16), 3) instanceof Uint8Array)
     assert.strictEqual(new WasmDDSketch().count(), 0)
   `
