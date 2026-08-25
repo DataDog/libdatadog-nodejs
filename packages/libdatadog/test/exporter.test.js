@@ -120,7 +120,7 @@ for (const backend of backends) {
     })
 
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
-    const exporter = createExporter(pipeline, server, { timeoutMs: 10 })
+    const exporter = createExporter(pipeline, server, { timeoutMs: 100 })
     try {
       await assert.rejects(exporter.sendV04(tracePayload()), /Request timed out/)
       assert.strictEqual(requests, 3)
