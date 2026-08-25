@@ -14,13 +14,13 @@ js-sys = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1"
 libdatadog-nodejs-capabilities = { path = "../capabilities" }
-libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", rev = "542a34effabf23ac9ac1a9a81793f1f0a604cfd9" }
-libdd-common = { git = "https://github.com/DataDog/libdatadog.git", rev = "542a34effabf23ac9ac1a9a81793f1f0a604cfd9", default-features = false }
-libdd-data-pipeline = { git = "https://github.com/DataDog/libdatadog.git", rev = "542a34effabf23ac9ac1a9a81793f1f0a604cfd9", default-features = false, features = ["telemetry"] }
-libdd-trace-utils = { git = "https://github.com/DataDog/libdatadog.git", rev = "542a34effabf23ac9ac1a9a81793f1f0a604cfd9", default-features = false, features = ["change-buffer"] }
-libdd-trace-stats = { git = "https://github.com/DataDog/libdatadog.git", rev = "542a34effabf23ac9ac1a9a81793f1f0a604cfd9", default-features = false }
-libdd-trace-protobuf = { git = "https://github.com/DataDog/libdatadog.git", rev = "542a34effabf23ac9ac1a9a81793f1f0a604cfd9", default-features = false }
-libdd-shared-runtime = { git = "https://github.com/DataDog/libdatadog.git", rev = "542a34effabf23ac9ac1a9a81793f1f0a604cfd9", default-features = false }
+libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", rev = "966f921c226b63a1ba84c2e53e3d0f4625f90c75" }
+libdd-common = { git = "https://github.com/DataDog/libdatadog.git", rev = "966f921c226b63a1ba84c2e53e3d0f4625f90c75", default-features = false }
+libdd-data-pipeline = { git = "https://github.com/DataDog/libdatadog.git", rev = "966f921c226b63a1ba84c2e53e3d0f4625f90c75", default-features = false, features = ["telemetry"] }
+libdd-trace-utils = { git = "https://github.com/DataDog/libdatadog.git", rev = "966f921c226b63a1ba84c2e53e3d0f4625f90c75", default-features = false, features = ["change-buffer"] }
+libdd-trace-stats = { git = "https://github.com/DataDog/libdatadog.git", rev = "966f921c226b63a1ba84c2e53e3d0f4625f90c75", default-features = false }
+libdd-trace-protobuf = { git = "https://github.com/DataDog/libdatadog.git", rev = "966f921c226b63a1ba84c2e53e3d0f4625f90c75", default-features = false }
+libdd-shared-runtime = { git = "https://github.com/DataDog/libdatadog.git", rev = "966f921c226b63a1ba84c2e53e3d0f4625f90c75", default-features = false }
 rmp-serde = "1"
 bytes = "1"
 http = "1"

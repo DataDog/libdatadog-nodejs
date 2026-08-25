@@ -206,25 +206,33 @@ test('skips unknown products and capabilities, and rejects bad apply states', as
   })
 })
 
-test('constructs on a runtime without a WebCrypto global', () => {
-  // libdatadog generates the default client id with a uuid whose wasm shim reads
-  // `globalThis.crypto` and has no Node fallback. Node only exposes that global inside a module
-  // from v20, so without the shim in `src/node_webcrypto.js` every constructor panics and traps the
-  // module -- which is how it presented on Node 18, as total failure followed by a hang.
+test('polls on a runtime without a WebCrypto global', () => {
+  // libdatadog identifies the client with a UUID, and `uuid`'s wasm RNG is bound to
+  // `globalThis.crypto` with no fallback -- a global Node only exposes inside a module from v20, so
+  // it panicked there and trapped the whole module. libdatadog draws those bytes through
+  // `getrandom` instead, which reaches Node's `crypto` module when the global is missing.
   //
-  // A child process, because the shim runs once when the module loads: the global has to be absent
-  // before that, which is exactly the Node 18 condition.
+  // Polling rather than constructing: the id is generated when the fetcher is built, which is
+  // deferred to the first poll, so a constructor alone proves nothing. A child process, because
+  // the global has to be absent before the module loads.
   const script = `
     delete globalThis.crypto
-    if (typeof globalThis.crypto !== 'undefined') throw new Error('could not hide the global')
+    if (globalThis.crypto !== undefined) throw new Error('could not hide the global')
+    const { createServer } = require('node:http')
     const { RemoteConfigFetcher } = require(${JSON.stringify(require.resolve('..'))}).load('remote_config')
-    new RemoteConfigFetcher(${JSON.stringify(fetcherOptions())})
-    process.stdout.write('constructed')
+    const server = createServer((req, res) => { res.writeHead(200); res.end('{}') })
+    server.listen(0, '127.0.0.1', async () => {
+      const options = ${JSON.stringify(fetcherOptions())}
+      options.url = 'http://127.0.0.1:' + server.address().port
+      const changes = await new RemoteConfigFetcher(options).fetchChanges()
+      process.stdout.write('polled ' + JSON.stringify(changes))
+      server.close()
+    })
   `
 
   const out = execFileSync(process.execPath, ['-e', script], { encoding: 'utf8' })
 
-  assert.strictEqual(out, 'constructed')
+  assert.strictEqual(out, 'polled []')
 })
 
 test('rejects an agent url without a scheme and host', () => {
