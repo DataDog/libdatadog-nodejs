@@ -24,7 +24,7 @@ zrip = { version = "=0.6.0", default-features = false, features = ["alloc"] }
 
 [dependencies.libdd-capabilities]
 git = "https://github.com/DataDog/libdatadog.git"
-rev = "cbe142c07c649fb24faa6eba0f294c2a31726cd0"
+rev = "b442108ae3c2e19fc17acaf80a8ac01454fa8899"
 default-features = false
 
 [dependencies.libdatadog-data-pipeline]
