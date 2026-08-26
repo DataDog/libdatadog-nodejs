@@ -10,6 +10,7 @@ const PLATFORM = os.platform()
 const ARCH = process.arch
 const LIBC = PLATFORM === 'linux' ? (existsSync('/etc/alpine-release') ? 'musl' : 'glibc') : ''
 const ABI = process.versions.modules
+const EXE_SUFFIX = PLATFORM === 'win32' ? '.exe' : ''
 
 const inWebpack = typeof __webpack_require__ === 'function'
 const runtimeRequire = inWebpack ? __non_webpack_require__ : require
@@ -52,7 +53,7 @@ function find (name, binary = false) {
   // Only apply hyphen-to-underscore conversion for .node libraries, not binaries
   const transformedName = binary ? name : name.replaceAll('-', '_')
 
-  const filename = binary ? transformedName : `${transformedName}.node`
+  const filename = binary ? `${transformedName}${EXE_SUFFIX}` : `${transformedName}.node`
   const build = `${root}/build/Release/${filename}`
 
   if (existsSync(build)) return build
@@ -84,7 +85,7 @@ function findFolder (root) {
 function findFile (root, name, binary = false) {
   const files = readdirSync(root)
 
-  if (binary) return files.find(f => f === name)
+  if (binary) return files.find(f => f === `${name}${EXE_SUFFIX}`)
 
   return files.find(f => f === `${name}-${ABI}.node`)
     || files.find(f => f === `${name}-napi.node`)
