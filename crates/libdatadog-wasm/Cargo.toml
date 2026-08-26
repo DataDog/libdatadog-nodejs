@@ -24,18 +24,11 @@ zrip = { version = "=0.6.0", default-features = false, features = ["alloc"] }
 
 [dependencies.libdd-capabilities]
 git = "https://github.com/DataDog/libdatadog.git"
-rev = "322d9336fed24dcf78a214f488b0fd3fb9583ba6"
+rev = "cbe142c07c649fb24faa6eba0f294c2a31726cd0"
 default-features = false
 
-[dependencies.libdd-trace-utils]
-git = "https://github.com/DataDog/libdatadog.git"
-rev = "322d9336fed24dcf78a214f488b0fd3fb9583ba6"
-default-features = false
-
-[dependencies.libdd-data-pipeline-core]
-git = "https://github.com/DataDog/libdatadog.git"
-rev = "322d9336fed24dcf78a214f488b0fd3fb9583ba6"
-default-features = false
+[dependencies.libdatadog-data-pipeline]
+path = "../libdatadog-data-pipeline"
 features = ["compression", "regex-lite"]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

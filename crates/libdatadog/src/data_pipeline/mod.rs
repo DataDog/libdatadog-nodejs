@@ -6,11 +6,11 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use futures::future::{AbortHandle, Abortable};
-use libdd_capabilities::{HttpClientCapability, HttpError, SleepCapability};
-use libdd_data_pipeline_core::{
-    prepare_agentless_v04_request, AgentlessTraceConfig, TracerMetadata, DEFAULT_AGENTLESS_TIMEOUT,
+use libdatadog_data_pipeline::{
+    send_agentless_v04, AgentlessTraceConfig, SendAgentlessV04Error, TracerMetadata,
+    DEFAULT_AGENTLESS_TIMEOUT,
 };
-use libdd_trace_utils::send_with_retry::{send_prepared_with_retry, SendWithRetryError};
+use libdd_capabilities::{HttpClientCapability, HttpError, SleepCapability};
 use napi::bindgen_prelude::*;
 use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use napi::Status;
@@ -262,16 +262,12 @@ impl AgentlessExporter {
 
     #[napi]
     pub fn send_v04<'env>(&self, env: &'env Env, payload: Buffer) -> Result<PromiseRaw<'env, ()>> {
-        let prepared =
-            prepare_agentless_v04_request(payload.as_ref(), &self.metadata, &self.config).map_err(
-                |error| {
-                    Error::from_reason(format!("failed to prepare data-pipeline export: {error}"))
-                },
-            )?;
         let operation_id = self.next_operation_id.fetch_add(1, Ordering::Relaxed);
         let (abort, registration) = AbortHandle::new_pair();
         lock(&self.in_flight).insert(operation_id, abort);
         let capabilities = self.capabilities.clone();
+        let metadata = self.metadata.clone();
+        let config = self.config.clone();
         let in_flight = self.in_flight.clone();
         let cleanup = in_flight.clone();
         let future = async move {
@@ -279,11 +275,7 @@ impl AgentlessExporter {
                 id: operation_id,
                 in_flight,
             };
-            let send = send_prepared_with_retry(
-                &capabilities,
-                prepared.request_plan(),
-                prepared.retry_strategy(),
-            );
+            let send = send_agentless_v04(&capabilities, payload.as_ref(), &metadata, &config);
 
             match Abortable::new(send, registration).await {
                 Ok(Ok(_)) => Ok(()),
@@ -338,6 +330,6 @@ fn network_error(error: napi::Error) -> HttpError {
     HttpError::Network(anyhow::anyhow!(error.reason))
 }
 
-fn send_error(error: SendWithRetryError) -> Error {
+fn send_error(error: SendAgentlessV04Error) -> Error {
     Error::from_reason(format!("failed to send data-pipeline export: {error}"))
 }

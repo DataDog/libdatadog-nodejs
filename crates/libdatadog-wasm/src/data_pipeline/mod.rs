@@ -7,11 +7,11 @@ use std::time::Duration;
 use bytes::Bytes;
 use futures::future::{AbortHandle, Abortable};
 use js_sys::{Array, Function, Object, Promise, Reflect, Uint8Array};
-use libdd_capabilities::{HttpClientCapability, HttpError, SleepCapability};
-use libdd_data_pipeline_core::{
-    prepare_agentless_v04_request, AgentlessTraceConfig, TracerMetadata, DEFAULT_AGENTLESS_TIMEOUT,
+use libdatadog_data_pipeline::{
+    send_agentless_v04, AgentlessTraceConfig, SendAgentlessV04Error, TracerMetadata,
+    DEFAULT_AGENTLESS_TIMEOUT,
 };
-use libdd_trace_utils::send_with_retry::{send_prepared_with_retry, SendWithRetryError};
+use libdd_capabilities::{HttpClientCapability, HttpError, SleepCapability};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 
@@ -213,10 +213,6 @@ impl AgentlessExporter {
 
     #[wasm_bindgen(js_name = sendV04)]
     pub async fn send_v04(&self, payload: &[u8]) -> Result<(), JsValue> {
-        let prepared = prepare_agentless_v04_request(payload, &self.metadata, &self.config)
-            .map_err(|error| {
-                JsValue::from_str(&format!("failed to prepare data-pipeline export: {error}"))
-            })?;
         let operation_id = self.next_operation_id.get();
         self.next_operation_id.set(operation_id.wrapping_add(1));
         let (abort, registration) = AbortHandle::new_pair();
@@ -225,11 +221,7 @@ impl AgentlessExporter {
             id: operation_id,
             in_flight: self.in_flight.clone(),
         };
-        let send = send_prepared_with_retry(
-            &self.capabilities,
-            prepared.request_plan(),
-            prepared.retry_strategy(),
-        );
+        let send = send_agentless_v04(&self.capabilities, payload, &self.metadata, &self.config);
 
         match Abortable::new(send, registration).await {
             Ok(Ok(_)) => Ok(()),
@@ -309,7 +301,7 @@ fn network_error(error: JsValue) -> HttpError {
     HttpError::Network(anyhow::anyhow!(js_error_message(error)))
 }
 
-fn send_error(error: SendWithRetryError) -> JsValue {
+fn send_error(error: SendAgentlessV04Error) -> JsValue {
     JsValue::from_str(&format!("failed to send data-pipeline export: {error}"))
 }
 
