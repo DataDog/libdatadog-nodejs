@@ -7,7 +7,7 @@ const repositoryRoot = path.join(__dirname, '..')
 const packageJson = require('../packages/libdatadog/package.json')
 const trees = [
   ...packageJson.napi.targets.map(target => ({ package: 'libdatadog', target })),
-  { package: 'libdatadog', target: 'wasm32-wasip1-threads' },
+  { package: 'libdatadog', target: 'wasm32-unknown-unknown' },
 ]
 
 function parseCargoTree (output) {

@@ -8,7 +8,7 @@ crate-type = ["cdylib"]
 name = "libdatadog"
 
 [dependencies]
-napi = { version = "3", default-features = false, features = ["async", "napi8"] }
+napi = { version = "3", default-features = false, features = ["napi8"] }
 napi-derive = "3"
 anyhow = "1"
 bytes = "1"
@@ -17,9 +17,12 @@ http = "1"
 libdd-ddsketch = "1.1.1"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+napi = { version = "3", default-features = false, features = ["async"] }
 zstd = { version = "0.13.3", default-features = false, features = ["thin"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+napi = { version = "3", default-features = false, features = ["async-runtime"] }
+napi-async-runtime = "0.2"
 zrip = { version = "=0.6.0", default-features = false, features = ["alloc"] }
 
 [dependencies.libdd-capabilities]

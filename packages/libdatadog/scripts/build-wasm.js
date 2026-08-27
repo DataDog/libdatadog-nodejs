@@ -12,15 +12,11 @@ if (unknownArguments.length > 0) {
   throw new Error(`unknown arguments: ${unknownArguments.join(', ')}`)
 }
 
-const output = profiling
+const profile = profiling ? 'profiling' : 'release'
+const staging = profiling
   ? path.join(repositoryRoot, 'target', 'size')
   : path.join(packageRoot, 'wasm', 'napi-dist')
-const napi = path.join(
-  packageRoot,
-  'node_modules',
-  '.bin',
-  process.platform === 'win32' ? 'napi.cmd' : 'napi',
-)
+const cargo = process.env.CARGO ?? 'cargo'
 const wasmOpt = path.join(
   packageRoot,
   'node_modules',
@@ -28,35 +24,54 @@ const wasmOpt = path.join(
   process.platform === 'win32' ? 'wasm-opt.cmd' : 'wasm-opt',
 )
 
-fs.rmSync(output, { force: true, recursive: true })
-execFileSync(napi, [
+fs.rmSync(staging, { force: true, recursive: true })
+fs.mkdirSync(staging, { recursive: true })
+
+execFileSync(cargo, [
   'build',
   ...(profiling ? ['--profile', 'profiling'] : ['--release']),
-  '--platform',
   '--target',
-  'wasm32-wasip1-threads',
+  'wasm32-unknown-unknown',
   '--manifest-path',
   path.join(repositoryRoot, 'crates', 'libdatadog', 'Cargo.toml'),
-  '--output-dir',
-  output,
 ], {
-  cwd: packageRoot,
+  cwd: repositoryRoot,
   stdio: 'inherit',
 })
 
-const wasm = path.join(output, 'libdatadog.wasm32-wasi.wasm')
-const debugWasm = path.join(output, 'libdatadog.wasm32-wasi.debug.wasm')
-const optimized = path.join(output, 'libdatadog.wasm32-wasi.optimized.wasm')
+const rawWasm = path.join(
+  repositoryRoot,
+  'target',
+  'wasm32-unknown-unknown',
+  profile,
+  'libdatadog.wasm',
+)
+execFileSync(cargo, [
+  'run',
+  '--quiet',
+  '--package',
+  'libdatadog-wasm-bindgen',
+  '--',
+  rawWasm,
+  staging,
+], {
+  cwd: repositoryRoot,
+  stdio: 'inherit',
+})
+
+const transformed = path.join(staging, 'libdatadog_bg.wasm')
+const optimized = path.join(staging, 'libdatadog.optimized.wasm')
+const wasm = path.join(staging, 'libdatadog.wasm')
 execFileSync(wasmOpt, [
-  profiling ? debugWasm : wasm,
+  transformed,
   '-Oz',
   '--converge',
   ...(profiling ? ['-g', '--strip-dwarf'] : ['--strip-debug']),
-  '--enable-threads',
   '--enable-bulk-memory',
   '--enable-mutable-globals',
   '--enable-sign-ext',
   '--enable-nontrapping-float-to-int',
+  '--enable-reference-types',
   '-o',
   optimized,
 ], {
@@ -64,4 +79,6 @@ execFileSync(wasmOpt, [
   stdio: 'inherit',
 })
 fs.renameSync(optimized, wasm)
-fs.rmSync(debugWasm, { force: true })
+fs.rmSync(transformed, { force: true })
+fs.rmSync(path.join(staging, 'libdatadog.d.ts'), { force: true })
+fs.rmSync(path.join(staging, 'libdatadog_bg.wasm.d.ts'), { force: true })
