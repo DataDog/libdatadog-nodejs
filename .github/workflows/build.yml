@@ -16,6 +16,7 @@ jobs:
       - run: yarn install
       - run: yarn install
         working-directory: test/crashtracker
+      - run: npm ci --prefix packages/libdatadog
       - run: yarn lint
 
   build-libdatadog:
