@@ -34,16 +34,16 @@ test('dependency validation rejects Tokio outside the NAPI async bridge', () => 
   assert.deepStrictEqual(failures.map(({ name }) => name), ['tokio', 'tokio-util'])
 })
 
-test('dependency validation rejects all Tokio packages in WASM', () => {
+test('dependency validation allows the NAPI Tokio bridge in WASM', () => {
   const dependencies = parseCargoTree([
-    '0libdatadog-wasm v0.1.0',
+    '0libdatadog v0.1.0',
     '1napi v3.12.1',
     '2tokio v1.52.1',
   ].join('\n'))
 
-  assert.strictEqual(
-    findForbiddenDependencies(dependencies, { package: 'libdatadog-wasm' }).length,
-    1,
+  assert.deepStrictEqual(
+    findForbiddenDependencies(dependencies, { package: 'libdatadog' }),
+    [],
   )
 })
 

@@ -52,6 +52,7 @@ dispatch2,https://github.com/madsmtm/objc2,Zlib OR Apache-2.0 OR MIT,"Mads Marqu
 displaydoc,https://github.com/yaahc/displaydoc,MIT OR Apache-2.0,Jane Lusby <jlusby@yaah.dev>
 dyn-clone,https://github.com/dtolnay/dyn-clone,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
 either,https://github.com/rayon-rs/either,MIT OR Apache-2.0,bluss
+emnapi,https://github.com/toyobayashi/emnapi,MIT,Toyobayashi
 equivalent,https://github.com/indexmap-rs/equivalent,Apache-2.0 OR MIT,The equivalent Authors
 errno,https://github.com/lambda-fairy/rust-errno,MIT OR Apache-2.0,"Chris Wong <lambda.fairy@gmail.com>, Dan Gohman <dev@sunfishcode.online>"
 fallible-iterator,https://github.com/sfackler/rust-fallible-iterator,MIT OR Apache-2.0,Steven Fackler <sfackler@gmail.com>
@@ -152,6 +153,7 @@ napi,https://github.com/napi-rs/napi-rs,MIT,"Nathan Sobo <nathan@github.com>, Yi
 napi-derive,https://github.com/napi-rs/napi-rs,MIT,"LongYinan <lynweklm@gmail.com>, Forehalo <forehalo@gmail.com>"
 napi-derive-backend,https://github.com/napi-rs/napi-rs,MIT,The napi-derive-backend Authors
 napi-sys,https://github.com/napi-rs/napi-rs,MIT,LongYinan <lynweklm@gmail.com>
+napi-wasm-runtime,https://github.com/napi-rs/napi-rs/tree/main/wasm-runtime,MIT,LongYinan
 nix,https://github.com/nix-rust/nix,MIT,The nix-rust Project Developers
 nu-ansi-term,https://github.com/nushell/nu-ansi-term,MIT,"ogham@bsago.me, Ryan Scheel (Havvy) <ryan.havvy@gmail.com>, Josh Triplett <josh@joshtriplett.org>, The Nushell Project Developers"
 num-conv,https://github.com/jhpratt/num-conv,MIT OR Apache-2.0,Jacob Pratt <jacob@jhpratt.dev>

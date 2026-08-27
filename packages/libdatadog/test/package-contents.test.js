@@ -47,6 +47,11 @@ test('published packages contain only the intended artifacts', () => {
   assert(wasmNames.includes('dist/libdatadog_wasm.js'),
     'WASM package must contain the inline-WASM JavaScript fallback')
   assert.strictEqual(libdatadogWasm.name, '@datadog/libdatadog-wasm')
+  assert.deepStrictEqual(new Set(wasmNames), new Set([
+    'dist/libdatadog_wasm.d.ts',
+    'dist/libdatadog_wasm.js',
+    'package.json',
+  ]))
   assert.strictEqual(
     metapackageJson.dependencies['@datadog/libdatadog-wasm'],
     libdatadog.version,

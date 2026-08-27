@@ -10,8 +10,30 @@ name = "libdatadog"
 [dependencies]
 napi = { version = "3", default-features = false, features = ["napi8"] }
 napi-derive = "3"
+anyhow = "1"
+bytes = "1"
+futures = "0.3"
+http = "1"
 libdd-ddsketch = "1.1.1"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 zstd = { version = "0.13.3", default-features = false, features = ["thin"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+zrip = { version = "=0.6.0", default-features = false, features = ["alloc"] }
+
+[dependencies.libdd-capabilities]
+git = "https://github.com/DataDog/libdatadog.git"
+rev = "7327f3049c281090f7cce7830b9430206fba11cf"
+default-features = false
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies.libdatadog-data-pipeline]
+path = "../libdatadog-data-pipeline"
+features = ["compression"]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies.libdatadog-data-pipeline]
+path = "../libdatadog-data-pipeline"
+features = ["compression", "regex-lite"]
 
 [build-dependencies]
 napi-build = "2"
