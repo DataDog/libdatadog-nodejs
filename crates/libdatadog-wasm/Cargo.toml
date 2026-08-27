@@ -10,9 +10,26 @@ name = "libdatadog_wasm"
 [dependencies]
 js-sys = "0.3"
 wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+anyhow = "1"
+bytes = "1"
+futures = "0.3"
+http = "1"
+# The agentless v0.4 path does not compile or evaluate user-provided patterns.
+# Use the smaller regex engine so the full engine and its Unicode tables are
+# removed by the WASM linker.
 libdd-ddsketch = "1.1.1"
 # Keep this aligned with the pure-Rust WASM encoder used by libdatadog.
 zrip = { version = "=0.6.0", default-features = false, features = ["alloc"] }
+
+[dependencies.libdd-capabilities]
+git = "https://github.com/DataDog/libdatadog.git"
+rev = "7327f3049c281090f7cce7830b9430206fba11cf"
+default-features = false
+
+[dependencies.libdatadog-data-pipeline]
+path = "../libdatadog-data-pipeline"
+features = ["compression", "regex-lite"]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2", features = ["js"] }
