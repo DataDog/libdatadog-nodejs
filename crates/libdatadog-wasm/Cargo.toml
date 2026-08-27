@@ -48,3 +48,17 @@ wasm-opt = [
   "--enable-multivalue",
   "--converge",
 ]
+
+[package.metadata.wasm-pack.profile.profiling]
+# Keep function names for crate attribution after wasm-opt runs in Linux CI.
+wasm-opt = [
+  "-Oz",
+  "--enable-mutable-globals",
+  "--enable-nontrapping-float-to-int",
+  "--enable-bulk-memory",
+  "--enable-sign-ext",
+  "--enable-reference-types",
+  "--enable-multivalue",
+  "--converge",
+  "-g",
+]
