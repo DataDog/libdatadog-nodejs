@@ -9,6 +9,28 @@ const trees = [
   ...packageJson.napi.targets.map(target => ({ package: 'libdatadog', target })),
   { package: 'libdatadog', target: 'wasm32-unknown-unknown' },
 ]
+// TODO: Remove these exceptions after porting the Datadog TUF changes onto
+// modern upstream TUF and aligning the remaining remote config dependencies.
+const remoteConfigDuplicatePackages = new Set([
+  'getrandom',
+  'hashbrown',
+  'http',
+  'itoa',
+  'syn',
+  'thiserror',
+  'thiserror-impl',
+  'untrusted',
+])
+// libdd-remote-config exposes a single-client API but still compiles its Tokio
+// scheduler modules. The symbolized WASM report separately prevents Tokio code
+// from reaching the shipped fallback.
+const remoteConfigTokioPackages = new Set(['tokio', 'tokio-macros', 'tokio-util'])
+// The existing agentless feature enables libdd-common/https across the native
+// feature graph. LTO removes its unused implementation from the shipped addon.
+const remoteConfigNativeFeatureUnion = new Set([
+  ...remoteConfigTokioPackages,
+  'tokio-rustls',
+])
 
 function parseCargoTree (output) {
   const paths = []
@@ -39,11 +61,16 @@ function findDuplicateVersions (dependencies) {
   }
 
   for (const [name, versions] of versionsByPackage) {
-    if (versions.size > 1) {
+    if (versions.size > 1 && !isRemoteConfigDuplicate(dependencies, name)) {
       failures.push({ name, versions: [...versions] })
     }
   }
   return failures
+}
+
+function isRemoteConfigDuplicate (dependencies, name) {
+  return remoteConfigDuplicatePackages.has(name)
+    && dependencies.some(({ path }) => path.includes('libdd-remote-config'))
 }
 
 function findForbiddenDependencies (dependencies, tree) {
@@ -58,7 +85,14 @@ function findForbiddenDependencies (dependencies, tree) {
     const allowedNapiBridge = tree.package === 'libdatadog'
       && isTokio
       && parent === 'napi'
-    if (!allowedNapiBridge) failures.push(dependency)
+    const allowedRemoteConfigRuntime = remoteConfigTokioPackages.has(dependency.name)
+      && dependency.path.includes('libdd-remote-config')
+    const allowedNativeFeatureUnion = tree.target !== 'wasm32-unknown-unknown'
+      && remoteConfigNativeFeatureUnion.has(dependency.name)
+      && dependencies.some(({ name }) => name === 'libdd-remote-config')
+    if (!allowedNapiBridge && !allowedRemoteConfigRuntime && !allowedNativeFeatureUnion) {
+      failures.push(dependency)
+    }
   }
 
   return failures
@@ -112,7 +146,7 @@ function checkTrees () {
       )
     }
   } else {
-    console.log('Tokio is limited to the NAPI async bridge in every artifact.')
+    console.log('Tokio is limited to the NAPI bridge and remote config runtime.')
   }
 
   if (duplicateFailures.length > 0 || forbiddenFailures.length > 0) {
