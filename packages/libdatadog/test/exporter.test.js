@@ -1,7 +1,11 @@
 'use strict'
 
+/* eslint-disable unicorn/prefer-event-target -- Node stream mocks use EventEmitter. */
+
 const assert = require('node:assert/strict')
+const { AsyncLocalStorage } = require('node:async_hooks')
 const { spawnSync } = require('node:child_process')
+const { EventEmitter } = require('node:events')
 const fs = require('node:fs')
 const http = require('node:http')
 const path = require('node:path')
@@ -84,6 +88,48 @@ const backends = [
 ]
 
 for (const backend of backends) {
+  test(`${backend.name} preserves async context in host callbacks`, {
+    skip: backend.skip,
+  }, async (context) => {
+    const storage = new AsyncLocalStorage()
+    const stores = []
+    context.mock.method(http, 'request', (_url, _options, onResponse) => {
+      stores.push(storage.getStore())
+      const request = new EventEmitter()
+      request.destroy = error => request.emit('error', error)
+      request.end = () => queueMicrotask(() => {
+        const response = new EventEmitter()
+        response.statusCode = 200
+        onResponse(response)
+        response.emit('end')
+      })
+      return request
+    })
+    const pipeline = backend.load()
+    const exporter = pipeline.createAgentlessExporter({
+      endpoint: 'http://example.test/api/v2/spans',
+      apiKey: 'test-api-key',
+      tracerVersion: '0.1.0',
+      languageVersion: process.version,
+      languageInterpreter: 'v8',
+    })
+    const first = { operation: 'first' }
+    const second = { operation: 'second' }
+
+    try {
+      await Promise.all([
+        storage.run(first, () => exporter.sendV04(tracePayload())),
+        storage.run(second, () => exporter.sendV04(tracePayload())),
+      ])
+    } finally {
+      await exporter.close()
+    }
+
+    assert.strictEqual(stores.length, 2)
+    assert.ok(stores.includes(first))
+    assert.ok(stores.includes(second))
+  })
+
   test(`${backend.name} retries in Rust until the third attempt succeeds`, {
     skip: backend.skip,
   }, async () => {

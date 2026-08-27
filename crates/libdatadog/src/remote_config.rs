@@ -74,6 +74,7 @@ impl From<ChangeRecord> for RemoteConfigChange {
 #[napi]
 pub struct RemoteConfigFetcher {
     client: Arc<AsyncMutex<RemoteConfigClient<HostCapabilities>>>,
+    capabilities: HostCapabilities,
     pending: Arc<Mutex<PendingUpdates>>,
 }
 
@@ -84,23 +85,25 @@ impl RemoteConfigFetcher {
         options: RemoteConfigFetcherOptions,
         request: Function<'_, AgentlessRequest, Promise<AgentlessResponse>>,
         cancel_request: Function<'_, u32, ()>,
-        sleep: Function<'_, FnArgs<(u32, u32)>, Promise<()>>,
+        sleep: Function<'_, FnArgs<(u32, u32, u32)>, Promise<()>>,
         cancel_sleep: Function<'_, u32, ()>,
     ) -> Result<Self> {
         let capabilities = HostCapabilities::new(request, cancel_request, sleep, cancel_sleep)?;
-        let client =
-            RemoteConfigClient::new(options.into(), capabilities).map_err(Error::from_reason)?;
+        let client = RemoteConfigClient::new(options.into(), capabilities.clone())
+            .map_err(Error::from_reason)?;
 
         Ok(Self {
             client: Arc::new(AsyncMutex::new(client)),
+            capabilities,
             pending: Arc::new(Mutex::new(PendingUpdates::default())),
         })
     }
 
     #[napi]
-    pub async fn fetch_changes(&self) -> Result<Vec<RemoteConfigChange>> {
+    pub async fn fetch_changes(&self, context_id: u32) -> Result<Vec<RemoteConfigChange>> {
         let updates = std::mem::take(&mut *lock(&self.pending));
         let mut client = self.client.lock().await;
+        self.capabilities.set_context(context_id);
         client
             .fetch_changes(updates)
             .await

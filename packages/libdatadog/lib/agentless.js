@@ -8,6 +8,7 @@ class AgentlessExporter {
   #binding
   #closed = false
   #inFlight = new Set()
+  #transport
 
   constructor (binding, options) {
     validateOptions(options)
@@ -16,13 +17,13 @@ class AgentlessExporter {
       Object.entries({ ...options, runtimeId })
         .filter(([, value]) => value !== null),
     )
-    const transport = createHostTransport()
+    this.#transport = createHostTransport()
     this.#binding = new binding.AgentlessExporter(
       normalized,
-      transport.request,
-      transport.cancelRequest,
-      transport.sleep,
-      transport.cancelSleep,
+      this.#transport.request,
+      this.#transport.cancelRequest,
+      this.#transport.sleep,
+      this.#transport.cancelSleep,
     )
   }
 
@@ -33,7 +34,10 @@ class AgentlessExporter {
 
     let operation
     try {
-      operation = this.#binding.sendV04(payload)
+      operation = this.#transport.runWithAsyncResource(
+        'libdatadog:AgentlessExporter.sendV04',
+        contextId => this.#binding.sendV04(payload, contextId),
+      )
     } catch (error) {
       operation = Promise.reject(error)
     }
