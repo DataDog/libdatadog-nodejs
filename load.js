@@ -39,9 +39,13 @@ function load (name) {
 function findWASM (name) {
   const root = __dirname
   const prebuilds = path.join(root, 'prebuilds')
-  const folders = readdirSync(prebuilds)
-  if (folders.includes(name)) {
-    return path.join(prebuilds, name, `${name.replaceAll('-', '_')}.js`)
+  try {
+    const folders = readdirSync(prebuilds)
+    if (folders.includes(name)) {
+      return path.join(prebuilds, name, `${name.replaceAll('-', '_')}.js`)
+    }
+  } catch {
+    // No WASM build exists for this optional capability.
   }
 }
 
