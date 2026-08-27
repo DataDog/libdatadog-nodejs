@@ -91,6 +91,7 @@ module.exports = [
     files: [
       'packages/libdatadog/lib/wasm.js',
       'packages/libdatadog/test/bundlers.test.js',
+      'packages/libdatadog/test/exporter.test.js',
     ],
     rules: {
       'n/no-missing-require': 'off',

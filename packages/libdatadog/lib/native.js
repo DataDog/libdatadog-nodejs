@@ -3,6 +3,8 @@
 const path = require('node:path')
 const os = require('node:os')
 
+const { createAgentlessExporter } = require('./agentless')
+
 const target = getNativeTarget()
 const binding = loadBinding(target)
 
@@ -45,5 +47,6 @@ function loadBinding (target) {
 module.exports = {
   backend: () => 'native',
   DDSketch: binding.DDSketch,
+  createAgentlessExporter: options => createAgentlessExporter(binding, options),
   zstd_compress: binding.zstd_compress,
 }

@@ -10,8 +10,11 @@ are maintained in the root `crates/libdatadog` and `crates/libdatadog-wasm`
 workspace crates. Optional libdatadog functionality is published separately as
 `@datadog/libdatadog-extras`.
 
-Both backends expose Zstandard compression and DDSketch from a single native
-or WASM artifact.
+Both backends expose the agentless data pipeline, Zstandard compression, and
+DDSketch from a single native or WASM artifact.
+
+The package accepts Datadog v0.4 MessagePack payloads and exports them to an
+agentless intake.
 
 The package tries a platform-native napi-rs backend first and falls back to a
 wasm-bindgen backend with the WebAssembly bytes embedded in JavaScript. The
