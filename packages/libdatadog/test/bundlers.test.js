@@ -30,6 +30,7 @@ test('webpack bundles the WASM entry point without emitting an asset', async () 
       mode: 'production',
       output: {
         filename: path.basename(output),
+        library: { type: 'commonjs2' },
         path: path.dirname(output),
       },
       target: 'node',
@@ -52,6 +53,7 @@ async function assertBundle (bundle) {
 
     assert.deepStrictEqual(files, ['bundle.cjs'])
     assert.doesNotMatch(contents, /\.wasm(?:['"`)]|$)/m)
+    assert.strictEqual(require(output).backend(), 'wasm')
   } finally {
     fs.rmSync(directory, { force: true, recursive: true })
   }
