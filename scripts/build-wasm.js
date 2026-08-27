@@ -19,7 +19,6 @@ const isMacOS = os.platform() === 'darwin'
 const libraries = [
   'library_config',
   'pipeline',
-  'remote_config',
 ]
 
 const env = {

@@ -22,13 +22,12 @@ runs:
           wasm-pack build --target nodejs ./crates/${{ inputs.crate }} --out-dir ../../prebuilds/${{ inputs.crate }}
         shell: bash
       - name: Test WASM
-        # pipeline and remote_config have top-level node:test suites; the other wasm crates use
-        # plain test/wasm/<crate>/ scripts. pipeline additionally needs --test-force-exit, since its
-        # wasm exporter keeps the event loop alive after a flush.
+        # pipeline has a top-level node:test suite that needs --test-force-exit, since its WASM
+        # exporter keeps the event loop alive after a flush. The other WASM crates use plain
+        # test/wasm/<crate>/ scripts.
         run: |
           case "${{ inputs.crate }}" in
             pipeline) node --test --test-force-exit test/pipeline.js ;;
-            remote_config) node --test test/remote-config.js ;;
             *) node test-wasm.js ${{ inputs.crate }} ;;
           esac
         shell: bash

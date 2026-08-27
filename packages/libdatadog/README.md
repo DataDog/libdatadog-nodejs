@@ -10,8 +10,14 @@ from the single root `crates/libdatadog` napi-rs workspace crate. Optional
 libdatadog functionality is published separately as
 `@datadog/libdatadog-extras`.
 
-Both backends expose the agentless data pipeline, Zstandard compression, and
-DDSketch from a single native or WASM artifact.
+Both backends expose remote configuration, the agentless data pipeline,
+Zstandard compression, and DDSketch from a single native or WASM artifact.
+
+Remote configuration connects directly to the Datadog backend and verifies
+responses with TUF. Both bindings use the smaller regex implementation and
+Node's host-managed HTTP transport. Reusing Node's HTTPS implementation avoids
+shipping another TLS stack in native packages and keeps networking behavior
+consistent across the NAPI and WASM backends.
 
 The package accepts Datadog v0.4 MessagePack payloads and exports them to an
 agentless intake.

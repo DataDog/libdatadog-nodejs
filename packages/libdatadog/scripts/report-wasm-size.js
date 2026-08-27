@@ -34,6 +34,10 @@ const forbiddenWasmCode = [
     dependency: 'zstd-sys',
     owners: new Set(['zstd-sys', 'zstd-sys (C)']),
   },
+  {
+    dependency: 'tokio',
+    owners: new Set(['tokio', 'tokio-util']),
+  },
 ]
 
 function readUnsignedLeb128 (bytes, start) {

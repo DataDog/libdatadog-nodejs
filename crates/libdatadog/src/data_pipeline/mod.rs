@@ -4,8 +4,21 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+#[cfg(target_arch = "wasm32")]
+use std::cell::RefCell;
+#[cfg(target_arch = "wasm32")]
+use std::future::Future;
+#[cfg(target_arch = "wasm32")]
+use std::pin::Pin;
+#[cfg(target_arch = "wasm32")]
+use std::rc::Rc;
+#[cfg(target_arch = "wasm32")]
+use std::task::{Context, Poll};
+
 use bytes::Bytes;
 use futures::future::{AbortHandle, Abortable};
+#[cfg(target_arch = "wasm32")]
+use js_sys::{Function as JsFunction, Promise as JsPromise, Reflect};
 use libdatadog_data_pipeline::{
     send_agentless_v04, AgentlessTraceConfig, SendAgentlessV04Error, TracerMetadata,
     DEFAULT_AGENTLESS_TIMEOUT,
@@ -15,6 +28,10 @@ use napi::bindgen_prelude::*;
 use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use napi::Status;
 use napi_derive::napi;
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::{JsCast, JsValue};
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen_futures::JsFuture;
 
 type RequestFunction = ThreadsafeFunction<
     AgentlessRequest,
@@ -66,12 +83,16 @@ pub struct AgentlessResponse {
 }
 
 #[derive(Clone)]
-struct HostCapabilities {
+pub(crate) struct HostCapabilities {
+    host: Option<Arc<HostFunctions>>,
+}
+
+struct HostFunctions {
     request: Arc<RequestFunction>,
     cancel_request: Arc<CancelFunction>,
     sleep: Arc<SleepFunction>,
     cancel_sleep: Arc<CancelFunction>,
-    next_call_id: Arc<AtomicU32>,
+    next_call_id: AtomicU32,
 }
 
 impl fmt::Debug for HostCapabilities {
@@ -81,14 +102,47 @@ impl fmt::Debug for HostCapabilities {
 }
 
 impl HostCapabilities {
-    fn next_call_id(&self) -> u32 {
-        self.next_call_id.fetch_add(1, Ordering::Relaxed)
+    pub(crate) fn new(
+        request: Function<'_, AgentlessRequest, Promise<AgentlessResponse>>,
+        cancel_request: Function<'_, u32, ()>,
+        sleep: Function<'_, FnArgs<(u32, u32)>, Promise<()>>,
+        cancel_sleep: Function<'_, u32, ()>,
+    ) -> Result<Self> {
+        Ok(Self {
+            host: Some(Arc::new(HostFunctions {
+                request: Arc::new(
+                    request
+                        .build_threadsafe_function::<AgentlessRequest>()
+                        .weak::<true>()
+                        .build()?,
+                ),
+                cancel_request: Arc::new(
+                    cancel_request
+                        .build_threadsafe_function::<u32>()
+                        .weak::<true>()
+                        .build()?,
+                ),
+                sleep: Arc::new(
+                    sleep
+                        .build_threadsafe_function::<SleepArgs>()
+                        .weak::<true>()
+                        .build()?,
+                ),
+                cancel_sleep: Arc::new(
+                    cancel_sleep
+                        .build_threadsafe_function::<u32>()
+                        .weak::<true>()
+                        .build()?,
+                ),
+                next_call_id: AtomicU32::new(1),
+            })),
+        })
     }
 }
 
 impl HttpClientCapability for HostCapabilities {
     fn new_client() -> Self {
-        panic!("host capabilities must be constructed with JavaScript functions")
+        Self { host: None }
     }
 
     fn new_without_connection_pooling() -> Self {
@@ -99,7 +153,10 @@ impl HttpClientCapability for HostCapabilities {
         &self,
         request: http::Request<Bytes>,
     ) -> std::result::Result<http::Response<Bytes>, HttpError> {
-        let id = self.next_call_id();
+        let host = self.host.as_ref().ok_or_else(|| {
+            HttpError::Network(anyhow::anyhow!("host HTTP capability is unavailable"))
+        })?;
+        let id = host.next_call_id.fetch_add(1, Ordering::Relaxed);
         let (parts, body) = request.into_parts();
         let headers = parts
             .headers
@@ -121,8 +178,8 @@ impl HttpClientCapability for HostCapabilities {
             headers,
             body: body.to_vec().into(),
         };
-        let mut guard = CancelGuard::new(id, self.cancel_request.clone());
-        let promise = self
+        let mut guard = CancelGuard::new(id, host.cancel_request.clone());
+        let promise = host
             .request
             .call_async(request)
             .await
@@ -139,17 +196,115 @@ impl HttpClientCapability for HostCapabilities {
 
 impl SleepCapability for HostCapabilities {
     fn new() -> Self {
-        panic!("host capabilities must be constructed with JavaScript functions")
+        Self { host: None }
     }
 
     async fn sleep(&self, duration: Duration) {
-        let id = self.next_call_id();
+        let Some(host) = &self.host else {
+            sleep_without_host(duration).await;
+            return;
+        };
+        let id = host.next_call_id.fetch_add(1, Ordering::Relaxed);
         let milliseconds = duration_millis(duration);
-        let mut guard = CancelGuard::new(id, self.cancel_sleep.clone());
-        if let Ok(promise) = self.sleep.call_async((id, milliseconds).into()).await {
+        let mut guard = CancelGuard::new(id, host.cancel_sleep.clone());
+        if let Ok(promise) = host.sleep.call_async((id, milliseconds).into()).await {
             let _ = promise.await;
         }
         guard.disarm();
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+async fn sleep_without_host(duration: Duration) {
+    tokio::time::sleep(duration).await;
+}
+
+#[cfg(target_arch = "wasm32")]
+async fn sleep_without_host(duration: Duration) {
+    WasmSendFuture(Box::pin(async move {
+        let global = js_sys::global();
+        let Ok(set_timeout) = Reflect::get(&global, &JsValue::from_str("setTimeout"))
+            .and_then(|value| value.dyn_into::<JsFunction>())
+        else {
+            return;
+        };
+        let clear_timeout = Reflect::get(&global, &JsValue::from_str("clearTimeout"))
+            .and_then(|value| value.dyn_into::<JsFunction>())
+            .ok();
+        let handle = Rc::new(RefCell::new(None));
+        let promise_handle = handle.clone();
+        let promise_global = global.clone();
+        let milliseconds = duration_millis(duration);
+        let promise = JsPromise::new(&mut move |resolve, _| {
+            let result = set_timeout.call2(
+                &promise_global,
+                resolve.as_ref(),
+                &JsValue::from_f64(f64::from(milliseconds)),
+            );
+            match result {
+                Ok(value) => {
+                    if let Ok(unref) = Reflect::get(&value, &JsValue::from_str("unref"))
+                        .and_then(|value| value.dyn_into::<JsFunction>())
+                    {
+                        let _ = unref.call0(&value);
+                    }
+                    *promise_handle.borrow_mut() = Some(value);
+                }
+                Err(_) => {
+                    let _ = resolve.call0(&JsValue::UNDEFINED);
+                }
+            }
+        });
+        let mut guard = GlobalTimerGuard {
+            clear_timeout,
+            global: global.into(),
+            handle,
+        };
+        let _ = JsFuture::from(promise).await;
+        guard.disarm();
+    }))
+    .await;
+}
+
+#[cfg(target_arch = "wasm32")]
+struct WasmSendFuture(Pin<Box<dyn Future<Output = ()>>>);
+
+// SAFETY: wasm32-unknown-unknown uses the single-thread NAPI runtime, so this
+// future cannot move to another thread while it contains JavaScript values.
+#[cfg(target_arch = "wasm32")]
+unsafe impl Send for WasmSendFuture {}
+
+#[cfg(target_arch = "wasm32")]
+impl Future for WasmSendFuture {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
+        self.0.as_mut().poll(context)
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+struct GlobalTimerGuard {
+    clear_timeout: Option<JsFunction>,
+    global: JsValue,
+    handle: Rc<RefCell<Option<JsValue>>>,
+}
+
+#[cfg(target_arch = "wasm32")]
+impl GlobalTimerGuard {
+    fn disarm(&mut self) {
+        self.handle.borrow_mut().take();
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl Drop for GlobalTimerGuard {
+    fn drop(&mut self) {
+        if let (Some(clear_timeout), Some(handle)) =
+            (&self.clear_timeout, self.handle.borrow_mut().take())
+        {
+            let _ = clear_timeout.call1(&self.global, &handle);
+        }
     }
 }
 
@@ -223,33 +378,7 @@ impl AgentlessExporter {
             api_key: options.api_key,
             timeout,
         };
-        let capabilities = HostCapabilities {
-            request: Arc::new(
-                request
-                    .build_threadsafe_function::<AgentlessRequest>()
-                    .weak::<true>()
-                    .build()?,
-            ),
-            cancel_request: Arc::new(
-                cancel_request
-                    .build_threadsafe_function::<u32>()
-                    .weak::<true>()
-                    .build()?,
-            ),
-            sleep: Arc::new(
-                sleep
-                    .build_threadsafe_function::<SleepArgs>()
-                    .weak::<true>()
-                    .build()?,
-            ),
-            cancel_sleep: Arc::new(
-                cancel_sleep
-                    .build_threadsafe_function::<u32>()
-                    .weak::<true>()
-                    .build()?,
-            ),
-            next_call_id: Arc::new(AtomicU32::new(1)),
-        };
+        let capabilities = HostCapabilities::new(request, cancel_request, sleep, cancel_sleep)?;
 
         Ok(Self {
             metadata,

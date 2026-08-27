@@ -1,4 +1,5 @@
 mod data_pipeline;
+mod remote_config;
 mod sketches;
 mod zstd;
 

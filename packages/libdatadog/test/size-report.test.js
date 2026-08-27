@@ -94,8 +94,10 @@ test('rejects forbidden code linked into WASM', () => {
     { bytes: 20, name: 'regex-automata' },
     { bytes: 30, name: 'zstd-sys (C)' },
     { bytes: 40, name: 'zrip-encode' },
+    { bytes: 50, name: 'tokio' },
   ]), [
     { bytes: 20, dependency: 'regex', name: 'regex-automata' },
     { bytes: 30, dependency: 'zstd-sys', name: 'zstd-sys (C)' },
+    { bytes: 50, dependency: 'tokio', name: 'tokio' },
   ])
 })

@@ -18,11 +18,16 @@ libdd-ddsketch = "1.1.1"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 napi = { version = "3", default-features = false, features = ["async"] }
+tokio = { version = "1", features = ["time"] }
 zstd = { version = "0.13.3", default-features = false, features = ["thin"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
+js-sys = "0.3"
 napi = { version = "3", default-features = false, features = ["async-runtime"] }
 napi-async-runtime = "0.2"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
 zrip = { version = "=0.6.0", default-features = false, features = ["alloc"] }
 
 [dependencies.libdd-capabilities]
@@ -37,6 +42,10 @@ features = ["compression"]
 [target.'cfg(target_arch = "wasm32")'.dependencies.libdatadog-data-pipeline]
 path = "../libdatadog-data-pipeline"
 features = ["compression", "regex-lite"]
+
+[dependencies.libdatadog-remote-config]
+path = "../libdatadog-remote-config"
+features = ["agentless", "regex-lite"]
 
 [build-dependencies]
 napi-build = "2"
