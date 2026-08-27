@@ -9,17 +9,17 @@ thiserror = "1"
 
 [dependencies.libdd-capabilities]
 git = "https://github.com/DataDog/libdatadog.git"
-rev = "85cf00df3b396dabf341e9eeb0e286816225f386"
+rev = "7327f3049c281090f7cce7830b9430206fba11cf"
 default-features = false
 
 [dependencies.libdd-data-pipeline-core]
 git = "https://github.com/DataDog/libdatadog.git"
-rev = "85cf00df3b396dabf341e9eeb0e286816225f386"
+rev = "7327f3049c281090f7cce7830b9430206fba11cf"
 default-features = false
 
 [dependencies.libdd-trace-utils]
 git = "https://github.com/DataDog/libdatadog.git"
-rev = "85cf00df3b396dabf341e9eeb0e286816225f386"
+rev = "7327f3049c281090f7cce7830b9430206fba11cf"
 default-features = false
 
 [features]
