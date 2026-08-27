@@ -37,10 +37,8 @@
   },
   "scripts": {
     "build:native": "node scripts/build-native.js",
-    "build:wasm": "npm run build:wasm:binary && npm run inline:wasm",
-    "build:wasm:binary": "node ../../scripts/build-wasm.js ../../crates/libdatadog-wasm wasm/dist",
-    "size:profile": "node ../../scripts/build-wasm.js ../../crates/libdatadog-wasm ../../target/size --profiling",
-    "inline:wasm": "node scripts/inline-wasm.js",
+    "build:wasm": "node scripts/build-wasm.js && node scripts/inline-wasm.js",
+    "size:profile": "node scripts/build-wasm.js --profiling",
     "report:napi-size": "node scripts/report-napi-size.js",
     "report:wasm-size": "node scripts/report-wasm-size.js",
     "package:native": "node scripts/package-native.js",
@@ -72,8 +70,13 @@
     "@datadog/libdatadog-linux-x64-musl": "0.1.0-pre"
   },
   "devDependencies": {
+    "@emnapi/core": "1.11.2",
+    "@emnapi/runtime": "1.11.2",
     "@msgpack/msgpack": "^3.1.3",
     "@napi-rs/cli": "^3.5.1",
+    "@napi-rs/wasm-runtime": "1.2.3",
+    "binaryen": "132.0.0",
+    "emnapi": "1.11.2",
     "esbuild": "^0.28.2",
     "typescript": "^6.0.3",
     "webpack": "^5.109.2",

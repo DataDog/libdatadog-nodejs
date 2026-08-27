@@ -10,10 +10,15 @@ class AgentlessExporter {
   #inFlight = new Set()
 
   constructor (binding, options) {
+    validateOptions(options)
     const runtimeId = options.runtimeId ?? randomUUID()
+    const normalized = Object.fromEntries(
+      Object.entries({ ...options, runtimeId })
+        .filter(([, value]) => value !== null),
+    )
     const transport = createHostTransport()
     this.#binding = new binding.AgentlessExporter(
-      { ...options, runtimeId },
+      normalized,
       transport.request,
       transport.cancelRequest,
       transport.sleep,
@@ -44,6 +49,17 @@ class AgentlessExporter {
     this.#closed = true
     this.#binding.cancelAll()
     await Promise.allSettled(this.#inFlight)
+  }
+}
+
+function validateOptions (options) {
+  const { timeoutMs } = options
+  if (timeoutMs !== undefined && timeoutMs !== null && (
+    !Number.isInteger(timeoutMs)
+    || timeoutMs < 0
+    || timeoutMs > 4_294_967_295
+  )) {
+    throw new TypeError('timeoutMs must be an unsigned integer')
   }
 }
 

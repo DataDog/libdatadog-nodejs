@@ -16,6 +16,17 @@ test('publishes the universal libdatadog package', () => {
   assert.strictEqual(packageJson.exports['./wasm'].require, './wasm.js')
 })
 
+test('builds native and WASM artifacts from one binding crate', () => {
+  const oldBinding = path.join(repositoryRoot, 'crates', 'libdatadog-wasm')
+  const scripts = ['build-native.js', 'build-wasm.js']
+
+  assert.strictEqual(fs.existsSync(oldBinding), false)
+  for (const script of scripts) {
+    const source = fs.readFileSync(path.join(packageRoot, 'scripts', script), 'utf8')
+    assert.match(source, /'crates', 'libdatadog'/)
+  }
+})
+
 test('uses napi-rs platform package names', () => {
   const packageJson = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json')))
   const targets = [
@@ -68,11 +79,11 @@ test('embeds a Brotli-compressed WASM fallback below the size budgets', () => {
     'libdatadog_wasm.js',
   )
   const glue = fs.readFileSync(gluePath, 'utf8')
-  const encodedWasm = glue.match(/brotliDecompressSync\(Buffer\.from\('([^']+)', 'base64'\)\)/)?.[1]
+  const encodedWasm = glue.match(/wasmBrotliBase64:"([A-Za-z0-9+/=]+)"/)?.[1]
 
   assert.ok(encodedWasm, 'WASM must be embedded as a Brotli-compressed base64 string')
   const compressedWasm = Buffer.from(encodedWasm, 'base64')
-  assert.ok(Buffer.byteLength(glue) < 200 * 1024)
+  assert.ok(Buffer.byteLength(glue) < 300 * 1024)
   assert.ok(brotliDecompressSync(compressedWasm).length < 500 * 1024)
 })
 

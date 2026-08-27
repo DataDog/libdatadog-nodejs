@@ -77,9 +77,8 @@ jobs:
         with:
           node-version: 24
       - name: Add WASM target
-        run: rustup target add wasm32-unknown-unknown
+        run: rustup target add wasm32-wasip1-threads
       - run: npm ci --prefix packages/libdatadog
-      - run: cargo install wasm-pack --version 0.14.0 --locked
       - name: Set package version
         run: node packages/libdatadog/scripts/set-version.js '${{ needs.versions.outputs.version }}'
       - run: npm run build:wasm --prefix packages/libdatadog

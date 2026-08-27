@@ -21,13 +21,13 @@ The universal package is maintained under
 backends expose the agentless data pipeline, Zstandard compression, and
 DDSketch from a single native or WASM artifact.
 
-The package tries a platform-native napi-rs backend first. Native artifacts are
-published as optional dependencies using napi-rs-compatible package names such
-as `@datadog/libdatadog-linux-x64-gnu`. If the platform package cannot be
-loaded, the package falls back to a wasm-bindgen backend whose WebAssembly bytes
-are embedded in JavaScript. This fallback is always part of the metapackage, so
-it also works when native extensions are unavailable, omitted by a bundler, or
-moved to another platform.
+The package uses one napi-rs binding crate for both native and WASM artifacts.
+Native artifacts are published as optional dependencies using napi-rs-compatible
+package names such as `@datadog/libdatadog-linux-x64-gnu`. If the platform
+package cannot be loaded, the package falls back to the WASM build of the same
+bindings. Its WebAssembly bytes and emnapi runtime are embedded in JavaScript,
+so the fallback also works when native extensions are unavailable, omitted by
+a bundler, or moved to another platform.
 
 See the [package README](packages/libdatadog/README.md) for implementation and
 packaging details.

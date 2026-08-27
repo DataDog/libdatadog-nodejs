@@ -7,7 +7,7 @@ const repositoryRoot = path.join(__dirname, '..')
 const packageJson = require('../packages/libdatadog/package.json')
 const trees = [
   ...packageJson.napi.targets.map(target => ({ package: 'libdatadog', target })),
-  { package: 'libdatadog-wasm', target: 'wasm32-unknown-unknown' },
+  { package: 'libdatadog', target: 'wasm32-wasip1-threads' },
 ]
 
 function parseCargoTree (output) {
@@ -112,7 +112,7 @@ function checkTrees () {
       )
     }
   } else {
-    console.log('Tokio is limited to the NAPI async bridge and absent from WASM.')
+    console.log('Tokio is limited to the NAPI async bridge in every artifact.')
   }
 
   if (duplicateFailures.length > 0 || forbiddenFailures.length > 0) {
