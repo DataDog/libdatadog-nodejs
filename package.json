@@ -1,7 +1,7 @@
 {
-  "name": "@datadog/libdatadog",
-  "version": "0.18.1",
-  "description": "Node.js binding for libdatadog",
+  "name": "@datadog/libdatadog-extras",
+  "version": "0.1.0-pre",
+  "description": "Optional native and WASM libdatadog functionality for Node.js",
   "main": "index.js",
   "scripts": {
     "install-wasm-pack": "curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh",
