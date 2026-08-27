@@ -13,12 +13,9 @@ const trees = [
 // modern upstream TUF and aligning the remaining remote config dependencies.
 const remoteConfigDuplicatePackages = new Set([
   'getrandom',
-  'hashbrown',
   'http',
   'itoa',
   'syn',
-  'thiserror',
-  'thiserror-impl',
   'untrusted',
 ])
 // libdd-remote-config exposes a single-client API but still compiles its Tokio
