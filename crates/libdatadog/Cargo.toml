@@ -18,21 +18,17 @@ libdd-ddsketch = "1.1.1"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 napi = { version = "3", default-features = false, features = ["async"] }
-tokio = { version = "1", features = ["time"] }
 zstd = { version = "0.13.3", default-features = false, features = ["thin"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2", features = ["js"] }
-js-sys = "0.3"
 napi = { version = "3", default-features = false, features = ["async-runtime"] }
 napi-async-runtime = "0.2"
-wasm-bindgen = "0.2"
-wasm-bindgen-futures = "0.4"
 zrip = { version = "=0.6.0", default-features = false, features = ["alloc"] }
 
 [dependencies.libdd-capabilities]
 git = "https://github.com/DataDog/libdatadog.git"
-rev = "7327f3049c281090f7cce7830b9430206fba11cf"
+rev = "3fa1d1395022d3f3fcff6215cc8aa22d5df616df"
 default-features = false
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.libdatadog-data-pipeline]
