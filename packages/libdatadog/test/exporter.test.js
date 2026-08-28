@@ -18,7 +18,7 @@ const nativeArtifact = fs.existsSync(nativeDirectory)
   : undefined
 const wasmArtifact = path.join(packageRoot, 'wasm', 'dist', 'libdatadog_wasm.js')
 
-test('native entry point uses WASM for agentless v0.4 exports', {
+test('universal entry point uses WASM for agentless v0.4 exports with a native backend', {
   skip: !nativeArtifact || !fs.existsSync(wasmArtifact),
 }, async () => {
   await assertExport(loadNativePipeline(), 'native')
@@ -220,7 +220,7 @@ function tracePayload () {
 function loadNativePipeline () {
   process.env.DD_LIBDATADOG_NATIVE_PATH = path.join(nativeDirectory, nativeArtifact)
   try {
-    return require('../lib/native')
+    return require('..')
   } finally {
     delete process.env.DD_LIBDATADOG_NATIVE_PATH
   }

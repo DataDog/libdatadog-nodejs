@@ -8,4 +8,12 @@ try {
   native = undefined
 }
 
-module.exports = native ?? require('./wasm')
+module.exports = {
+  ...(native ?? require('./wasm')),
+  createAgentlessExporter,
+}
+
+/** @param {import('../index').AgentlessExporterOptions} options */
+function createAgentlessExporter (options) {
+  return require('./agentless').createAgentlessExporter(options)
+}

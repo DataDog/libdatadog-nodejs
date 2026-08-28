@@ -13,10 +13,10 @@ const nativeArtifact = fs.existsSync(nativeDirectory)
 const wasm = require('../wasm')
 const native = nativeArtifact ? loadNative() : undefined
 
-test('native and WASM backends expose the same capabilities', {
+test('native backend excludes the WASM-only agentless exporter', {
   skip: !native,
 }, () => {
-  assert.deepStrictEqual(new Set(Object.keys(native)), new Set(Object.keys(wasm)))
+  assert.strictEqual(native.createAgentlessExporter, undefined)
 })
 
 test('universal backends exclude optional extras', () => {
