@@ -242,3 +242,60 @@ fn to_record(
 fn contents(file: &Arc<RawFile<Vec<u8>>>) -> Option<String> {
     Some(String::from_utf8_lossy(file.contents().as_slice()).into_owned())
 }
+
+#[cfg(test)]
+mod tests {
+    use libdd_remote_config::fetch::FileStorage;
+
+    use super::*;
+
+    const CONFIG_PATH: &str = "datadog/2/ASM_FEATURES/asm-features-1/config";
+
+    fn stored_file(version: u64, contents: &[u8]) -> Arc<RawFile<Vec<u8>>> {
+        let path = Arc::new(RemoteConfigPath::parse(CONFIG_PATH).unwrap());
+        SimpleFileStorage::default()
+            .store(version, path, contents.to_vec())
+            .unwrap()
+    }
+
+    #[test]
+    fn converts_add_update_and_remove_changes() {
+        let added_file = stored_file(1, br#"{"asm":{"enabled":true}}"#);
+        let added = to_change_record(Change::Add(added_file));
+
+        assert_eq!(added.kind, "add");
+        assert_eq!(added.path, CONFIG_PATH);
+        assert_eq!(added.product, "ASM_FEATURES");
+        assert_eq!(added.config_id, "asm-features-1");
+        assert_eq!(added.name, "config");
+        assert_eq!(added.version, 1.0);
+        assert_eq!(
+            added.contents.as_deref(),
+            Some(r#"{"asm":{"enabled":true}}"#)
+        );
+
+        let updated_file = stored_file(2, br#"{"asm":{"enabled":false}}"#);
+        let updated = to_change_record(Change::Update(updated_file.clone(), Vec::new()));
+
+        assert_eq!(updated.kind, "update");
+        assert_eq!(updated.path, CONFIG_PATH);
+        assert_eq!(updated.product, "ASM_FEATURES");
+        assert_eq!(updated.config_id, "asm-features-1");
+        assert_eq!(updated.name, "config");
+        assert_eq!(updated.version, 2.0);
+        assert_eq!(
+            updated.contents.as_deref(),
+            Some(r#"{"asm":{"enabled":false}}"#)
+        );
+
+        let removed = to_change_record(Change::Remove(updated_file));
+
+        assert_eq!(removed.kind, "remove");
+        assert_eq!(removed.path, CONFIG_PATH);
+        assert_eq!(removed.product, "ASM_FEATURES");
+        assert_eq!(removed.config_id, "asm-features-1");
+        assert_eq!(removed.name, "config");
+        assert_eq!(removed.version, 2.0);
+        assert_eq!(removed.contents, None);
+    }
+}

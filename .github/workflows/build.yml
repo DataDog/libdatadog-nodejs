@@ -30,6 +30,10 @@ jobs:
       - uses: ./.github/actions/setup-wasm
       - name: Validate artifact dependencies
         run: npm run check:dependencies
+      - name: Test remote config adapter
+        run: >-
+          cargo test --locked --package libdatadog-remote-config
+          --features agentless,regex-lite
       - run: npm ci --prefix packages/libdatadog
       - run: cargo install cargo-bloat --version 0.12.1 --locked
       - run: npm run build --prefix packages/libdatadog
