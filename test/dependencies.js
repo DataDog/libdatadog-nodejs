@@ -125,3 +125,29 @@ test('dependency validation allows known remote config duplicate crates', () => 
   })
   assert.deepStrictEqual(findDuplicateVersions(dependencies), [])
 })
+
+test('dependency validation rejects known crates duplicated outside remote config', () => {
+  const dependencies = parseCargoTree([
+    '0libdatadog v0.1.0',
+    '1first-dependency v1.0.0',
+    '2syn v2.0.119',
+    '1libdd-remote-config v4.0.0',
+    '2bytes v1.0.0',
+    '1second-dependency v1.0.0',
+    '2syn v3.0.4',
+  ].join('\n'))
+
+  const expected = [{
+    name: 'syn',
+    versions: ['2.0.119', '3.0.4'],
+  }]
+  assert.deepStrictEqual(findDuplicateVersions(dependencies), expected)
+
+  dependencies.push({
+    depth: 2,
+    name: 'syn',
+    path: ['libdatadog', 'libdd-remote-config', 'syn'],
+    version: '3.0.5',
+  })
+  assert.deepStrictEqual(findDuplicateVersions(dependencies), [])
+})
