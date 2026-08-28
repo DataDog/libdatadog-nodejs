@@ -67,7 +67,9 @@ function findDuplicateVersions (dependencies) {
 
 function isRemoteConfigDuplicate (dependencies, name) {
   return remoteConfigDuplicatePackages.has(name)
-    && dependencies.some(({ path }) => path.includes('libdd-remote-config'))
+    && dependencies.some(({ name: dependencyName, path }) => (
+      dependencyName === name && path.includes('libdd-remote-config')
+    ))
 }
 
 function findForbiddenDependencies (dependencies, tree) {
