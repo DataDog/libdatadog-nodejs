@@ -3,6 +3,7 @@
 /* eslint-disable unicorn/prefer-event-target -- Node stream mocks use EventEmitter. */
 
 const assert = require('node:assert/strict')
+const { AsyncLocalStorage } = require('node:async_hooks')
 const { EventEmitter } = require('node:events')
 const https = require('node:https')
 const { test } = require('node:test')
@@ -45,13 +46,22 @@ test('keeps remote config out of the universal WASM entry point', () => {
 
 test('exports agentless remote config from the dedicated entry point', async () => {
   const requests = []
+  const storage = new AsyncLocalStorage()
+  const storageValue = {}
+  const observedStorageValues = []
   const originalRequest = https.request
+
+  /** @param {() => void} callback */
+  function runInStorage (callback) {
+    storage.run(storageValue, callback)
+  }
 
   /**
    * @param {import('node:https').RequestOptions} options
    * @param {(response: import('node:http').IncomingMessage) => void} onResponse
    */
   function request (options, onResponse) {
+    observedStorageValues.push(storage.getStore())
     const outgoing = new EventEmitter()
     const chunks = []
 
@@ -74,6 +84,7 @@ test('exports agentless remote config from the dedicated entry point', async () 
     return outgoing
   }
   https.request = request
+  setStorage(runInStorage)
 
   try {
     const fetcher = new RemoteConfigFetcher(fetcherOptions())
@@ -84,6 +95,8 @@ test('exports agentless remote config from the dedicated entry point', async () 
     fetcher.setExtraServices(['extra-service'])
 
     await assert.rejects(fetcher.fetchChanges())
+    assert.strictEqual(observedStorageValues.some(value => value !== storageValue), false)
+    assert(observedStorageValues.length > 0)
 
     let configRequest
     for (const request of requests) {
@@ -97,9 +110,15 @@ test('exports agentless remote config from the dedicated entry point', async () 
     assert.strictEqual(configRequest.options.method, 'POST')
     assert(configRequest.body.length > 0)
   } finally {
+    setStorage(runWithoutStorage)
     https.request = originalRequest
   }
 })
+
+/** @param {() => void} callback */
+function runWithoutStorage (callback) {
+  callback()
+}
 
 test('keeps the WASM remote config validation contract', () => {
   const fetcher = new RemoteConfigFetcher(fetcherOptions())
