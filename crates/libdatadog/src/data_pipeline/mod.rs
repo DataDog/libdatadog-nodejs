@@ -7,8 +7,7 @@ use std::time::Duration;
 use bytes::Bytes;
 use futures::future::{AbortHandle, Abortable};
 use libdatadog_data_pipeline::{
-    send_agentless_v04, AgentlessTraceConfig, SendAgentlessV04Error, TracerMetadata,
-    DEFAULT_AGENTLESS_TIMEOUT,
+    send_agentless_v04, AgentlessTraceConfig, TracerMetadata, DEFAULT_AGENTLESS_TIMEOUT,
 };
 use libdd_capabilities::{HttpClientCapability, HttpError, SleepCapability};
 use napi::bindgen_prelude::*;
@@ -24,7 +23,7 @@ type RequestFunction = ThreadsafeFunction<
     false,
     true,
 >;
-type SleepArgs = FnArgs<(u32, u32, u32)>;
+type SleepArgs = FnArgs<(u32, u32)>;
 type SleepFunction = ThreadsafeFunction<SleepArgs, Promise<()>, SleepArgs, Status, false, true>;
 type CancelFunction = ThreadsafeFunction<u32, (), u32, Status, false, true>;
 
@@ -53,7 +52,6 @@ pub struct AgentlessRequestHeader {
 #[napi(object)]
 pub struct AgentlessRequest {
     pub id: u32,
-    pub context_id: u32,
     pub url: String,
     pub method: String,
     pub headers: Vec<AgentlessRequestHeader>,
@@ -73,7 +71,6 @@ pub(crate) struct HostCapabilities {
     sleep: Arc<SleepFunction>,
     cancel_sleep: Arc<CancelFunction>,
     next_call_id: Arc<AtomicU32>,
-    context_id: Arc<AtomicU32>,
 }
 
 impl fmt::Debug for HostCapabilities {
@@ -86,7 +83,7 @@ impl HostCapabilities {
     pub(crate) fn new(
         request: Function<'_, AgentlessRequest, Promise<AgentlessResponse>>,
         cancel_request: Function<'_, u32, ()>,
-        sleep: Function<'_, FnArgs<(u32, u32, u32)>, Promise<()>>,
+        sleep: Function<'_, FnArgs<(u32, u32)>, Promise<()>>,
         cancel_sleep: Function<'_, u32, ()>,
     ) -> Result<Self> {
         Ok(Self {
@@ -115,26 +112,11 @@ impl HostCapabilities {
                     .build()?,
             ),
             next_call_id: Arc::new(AtomicU32::new(1)),
-            context_id: Arc::new(AtomicU32::new(0)),
         })
     }
 
     fn next_call_id(&self) -> u32 {
         self.next_call_id.fetch_add(1, Ordering::Relaxed)
-    }
-
-    pub(crate) fn with_context(&self, context_id: u32) -> Self {
-        let mut capabilities = self.clone();
-        capabilities.context_id = Arc::new(AtomicU32::new(context_id));
-        capabilities
-    }
-
-    pub(crate) fn set_context(&self, context_id: u32) {
-        self.context_id.store(context_id, Ordering::Relaxed);
-    }
-
-    fn context_id(&self) -> u32 {
-        self.context_id.load(Ordering::Relaxed)
     }
 }
 
@@ -168,7 +150,6 @@ impl HttpClientCapability for HostCapabilities {
             .collect::<std::result::Result<Vec<_>, _>>()?;
         let request = AgentlessRequest {
             id,
-            context_id: self.context_id(),
             url: parts.uri.to_string(),
             method: parts.method.to_string(),
             headers,
@@ -199,8 +180,7 @@ impl SleepCapability for HostCapabilities {
         let id = self.next_call_id();
         let milliseconds = duration_millis(duration);
         let mut guard = CancelGuard::new(id, self.cancel_sleep.clone());
-        let args = (id, milliseconds, self.context_id()).into();
-        if let Ok(promise) = self.sleep.call_async(args).await {
+        if let Ok(promise) = self.sleep.call_async((id, milliseconds).into()).await {
             let _ = promise.await;
         }
         guard.disarm();
@@ -252,7 +232,7 @@ impl AgentlessExporter {
         options: AgentlessExporterOptions,
         request: Function<'_, AgentlessRequest, Promise<AgentlessResponse>>,
         cancel_request: Function<'_, u32, ()>,
-        sleep: Function<'_, FnArgs<(u32, u32, u32)>, Promise<()>>,
+        sleep: Function<'_, FnArgs<(u32, u32)>, Promise<()>>,
         cancel_sleep: Function<'_, u32, ()>,
     ) -> Result<Self> {
         let timeout = options
@@ -289,16 +269,11 @@ impl AgentlessExporter {
     }
 
     #[napi]
-    pub fn send_v04<'env>(
-        &self,
-        env: &'env Env,
-        payload: Buffer,
-        context_id: u32,
-    ) -> Result<PromiseRaw<'env, ()>> {
+    pub fn send_v04<'env>(&self, env: &'env Env, payload: Buffer) -> Result<PromiseRaw<'env, ()>> {
         let operation_id = self.next_operation_id.fetch_add(1, Ordering::Relaxed);
         let (abort, registration) = AbortHandle::new_pair();
         lock(&self.in_flight).insert(operation_id, abort);
-        let capabilities = self.capabilities.with_context(context_id);
+        let capabilities = self.capabilities.clone();
         let metadata = self.metadata.clone();
         let config = self.config.clone();
         let in_flight = self.in_flight.clone();
@@ -312,7 +287,7 @@ impl AgentlessExporter {
 
             match Abortable::new(send, registration).await {
                 Ok(Ok(_)) => Ok(()),
-                Ok(Err(error)) => Err(send_error(error)),
+                Ok(Err(error)) => Err(Error::from_reason(error.to_string())),
                 Err(_) => Err(Error::from_reason("data-pipeline export was cancelled")),
             }
         };
@@ -361,8 +336,4 @@ fn duration_millis(duration: Duration) -> u32 {
 
 fn network_error(error: napi::Error) -> HttpError {
     HttpError::Network(anyhow::anyhow!(error.reason))
-}
-
-fn send_error(error: SendAgentlessV04Error) -> Error {
-    Error::from_reason(format!("failed to send data-pipeline export: {error}"))
 }

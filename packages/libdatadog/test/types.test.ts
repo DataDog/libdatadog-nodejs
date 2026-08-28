@@ -1,5 +1,7 @@
 import {
+  type AgentlessLogger,
   backend,
+  createAgentlessExporter,
   DDSketch,
   RemoteConfigFetcher,
   zstd_compress,
@@ -24,12 +26,24 @@ const remoteConfig = new RemoteConfigFetcher({
   apiKey: 'test-api-key',
   hostname: 'test-host',
 })
+const agentlessExporter = createAgentlessExporter({
+  endpoint: 'https://example.test/api/v2/spans',
+  apiKey: 'test-api-key',
+  tracerVersion: '1.2.3',
+  languageVersion: '22.0.0',
+  languageInterpreter: 'v8',
+})
+const logger: AgentlessLogger = {
+  error () {},
+}
 
 sketch.add(1)
 sketch.addWithCount(2, 3)
 const count: number = sketch.count()
 const encoded: Uint8Array = sketch.encode()
 const changes = remoteConfig.fetchChanges()
+agentlessExporter.sendV04(new Uint8Array(16), () => {}, logger)
+agentlessExporter.close()
 remoteConfig.setExtraServices(['other-service'])
 remoteConfig.setProductCapabilities(['ASM_FEATURES'], ['ASM_ACTIVATION'])
 

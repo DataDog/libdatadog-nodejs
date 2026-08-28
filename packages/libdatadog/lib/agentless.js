@@ -7,58 +7,63 @@ const { createHostTransport } = require('./agentless-transport')
 class AgentlessExporter {
   #binding
   #closed = false
-  #inFlight = new Set()
-  #transport
 
   constructor (binding, options) {
     validateOptions(options)
-    const runtimeId = options.runtimeId ?? randomUUID()
-    const normalized = Object.fromEntries(
-      Object.entries({ ...options, runtimeId })
-        .filter(([, value]) => value !== null),
-    )
-    this.#transport = createHostTransport()
+    const bindingOptions = options.runtimeId === undefined
+      ? { ...options, runtimeId: randomUUID() }
+      : options
+    const transport = createHostTransport()
     this.#binding = new binding.AgentlessExporter(
-      normalized,
-      this.#transport.request,
-      this.#transport.cancelRequest,
-      this.#transport.sleep,
-      this.#transport.cancelSleep,
+      bindingOptions,
+      transport.request,
+      transport.cancelRequest,
+      transport.sleep,
+      transport.cancelSleep,
     )
   }
 
-  sendV04 (payload) {
+  /**
+   * @param {Uint8Array} payload
+   * @param {() => void} done
+   * @param {{ error: (message: string, ...args: unknown[]) => void }} log
+   */
+  sendV04 (payload, done, log) {
     if (this.#closed) {
-      return Promise.reject(new Error('data-pipeline exporter is closed'))
+      log.error('Cannot send data-pipeline export after the exporter is closed')
+      done()
+      return
     }
 
     let operation
     try {
-      operation = this.#transport.runWithAsyncResource(
-        'libdatadog:AgentlessExporter.sendV04',
-        contextId => this.#binding.sendV04(payload, contextId),
-      )
+      operation = this.#binding.sendV04(payload)
     } catch (error) {
-      operation = Promise.reject(error)
+      log.error('Failed to send data-pipeline export: %s', error.message)
+      done()
+      return
     }
-    this.#inFlight.add(operation)
+
     operation.then(
-      () => this.#inFlight.delete(operation),
-      () => this.#inFlight.delete(operation),
+      done,
+      (error) => {
+        if (!this.#closed) {
+          log.error('Failed to send data-pipeline export: %s', error.message)
+        }
+        done()
+      },
     )
-    return operation
   }
 
-  async close () {
+  close () {
     this.#closed = true
     this.#binding.cancelAll()
-    await Promise.allSettled(this.#inFlight)
   }
 }
 
 function validateOptions (options) {
   const { timeoutMs } = options
-  if (timeoutMs !== undefined && timeoutMs !== null && (
+  if (timeoutMs !== undefined && (
     !Number.isInteger(timeoutMs)
     || timeoutMs < 0
     || timeoutMs > 4_294_967_295

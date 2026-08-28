@@ -5,24 +5,20 @@ const { createHostTransport } = require('./agentless-transport')
 function remoteConfigFetcher (binding) {
   return class RemoteConfigFetcher {
     #binding
-    #transport
 
     constructor (options) {
-      this.#transport = createHostTransport()
+      const transport = createHostTransport()
       this.#binding = new binding.RemoteConfigFetcher(
         options,
-        this.#transport.request,
-        this.#transport.cancelRequest,
-        this.#transport.sleep,
-        this.#transport.cancelSleep,
+        transport.request,
+        transport.cancelRequest,
+        transport.sleep,
+        transport.cancelSleep,
       )
     }
 
     fetchChanges () {
-      return this.#transport.runWithAsyncResource(
-        'libdatadog:RemoteConfigFetcher.fetchChanges',
-        contextId => this.#binding.fetchChanges(contextId),
-      )
+      return this.#binding.fetchChanges()
     }
 
     setConfigState (path, applyState, applyError) {

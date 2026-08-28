@@ -3,7 +3,6 @@
 /* eslint-disable unicorn/prefer-event-target -- Node stream mocks use EventEmitter. */
 
 const assert = require('node:assert/strict')
-const { AsyncLocalStorage } = require('node:async_hooks')
 const { execFileSync } = require('node:child_process')
 const { EventEmitter } = require('node:events')
 const https = require('node:https')
@@ -95,21 +94,6 @@ test('WASM agentless remote config does not require WebCrypto', () => {
 })
 
 for (const [name, { RemoteConfigFetcher }] of backends) {
-  test(`${name} remote config preserves async context in host callbacks`, async (context) => {
-    const storage = new AsyncLocalStorage()
-    const stores = []
-    mockHttps(context, () => stores.push(storage.getStore()))
-    const fetcher = new RemoteConfigFetcher(fetcherOptions())
-    const expected = { operation: 'remote-config' }
-
-    await assert.rejects(
-      storage.run(expected, () => fetcher.fetchChanges()),
-      /missing config meta/,
-    )
-    assert.ok(stores.length > 0)
-    assert.ok(stores.every(store => store === expected))
-  })
-
   test(`${name} remote config sends directly to the backend`, async (context) => {
     const requests = mockHttps(context)
     const fetcher = new RemoteConfigFetcher(fetcherOptions())

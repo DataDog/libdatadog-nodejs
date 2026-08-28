@@ -1,11 +1,7 @@
 'use strict'
 
-/* eslint-disable unicorn/prefer-event-target -- Node stream mocks use EventEmitter. */
-
 const assert = require('node:assert/strict')
-const { AsyncLocalStorage } = require('node:async_hooks')
 const { spawnSync } = require('node:child_process')
-const { EventEmitter } = require('node:events')
 const fs = require('node:fs')
 const http = require('node:http')
 const path = require('node:path')
@@ -15,6 +11,8 @@ const { zstdDecompressSync } = require('node:zlib')
 
 const { encode } = require('@msgpack/msgpack')
 
+const { createAgentlessExporter } = require('../lib/agentless')
+
 const zstdMagic = Buffer.from([0x28, 0xB5, 0x2F, 0xFD])
 
 const packageRoot = path.join(__dirname, '..')
@@ -23,6 +21,108 @@ const nativeArtifact = fs.existsSync(nativeDirectory)
   ? fs.readdirSync(nativeDirectory).find(file => file.startsWith('libdatadog.') && file.endsWith('.node'))
   : undefined
 const wasmArtifact = path.join(packageRoot, 'wasm', 'dist', 'libdatadog_wasm.js')
+
+test('agentless exporter reports completion through its callback', async () => {
+  class BindingExporter {
+    sendV04 () {
+      return Promise.resolve()
+    }
+
+    cancelAll () {}
+  }
+
+  const exporter = createAgentlessExporter({ AgentlessExporter: BindingExporter }, exporterOptions())
+  const log = { error: assert.fail }
+  let completed = 0
+  let result
+
+  await new Promise((resolve) => {
+    result = exporter.sendV04(Buffer.alloc(0), () => {
+      completed++
+      resolve()
+    }, log)
+  })
+  assert.strictEqual(result, undefined)
+  assert.strictEqual(completed, 1)
+})
+
+test('agentless exporter logs asynchronous failures before reporting completion', async () => {
+  class BindingExporter {
+    sendV04 () {
+      return Promise.reject(new Error('intake unavailable'))
+    }
+
+    cancelAll () {}
+  }
+
+  const exporter = createAgentlessExporter({ AgentlessExporter: BindingExporter }, exporterOptions())
+  const log = testLog()
+  let completed = 0
+
+  await new Promise((resolve) => {
+    exporter.sendV04(Buffer.alloc(0), () => {
+      completed++
+      assert.strictEqual(log.errors.length, 1)
+      resolve()
+    }, log)
+  })
+
+  assert.strictEqual(completed, 1)
+  assert.deepStrictEqual(log.errors, [[
+    'Failed to send data-pipeline export: %s',
+    'intake unavailable',
+  ]])
+})
+
+test('agentless exporter logs synchronous failures before reporting completion', () => {
+  class BindingExporter {
+    sendV04 () {
+      throw new Error('binding unavailable')
+    }
+
+    cancelAll () {}
+  }
+
+  const exporter = createAgentlessExporter({ AgentlessExporter: BindingExporter }, exporterOptions())
+  const log = testLog()
+  let completed = 0
+
+  exporter.sendV04(Buffer.alloc(0), () => {
+    completed++
+    assert.strictEqual(log.errors.length, 1)
+  }, log)
+
+  assert.strictEqual(completed, 1)
+  assert.deepStrictEqual(log.errors, [[
+    'Failed to send data-pipeline export: %s',
+    'binding unavailable',
+  ]])
+})
+
+test('agentless exporter reports sends after close without calling the binding', () => {
+  let sends = 0
+
+  class BindingExporter {
+    sendV04 () {
+      sends++
+    }
+
+    cancelAll () {}
+  }
+
+  const exporter = createAgentlessExporter({ AgentlessExporter: BindingExporter }, exporterOptions())
+  const log = testLog()
+  let completed = 0
+
+  exporter.close()
+  exporter.sendV04(Buffer.alloc(0), () => completed++, log)
+
+  assert.strictEqual(completed, 1)
+  assert.strictEqual(sends, 0)
+  assert.deepStrictEqual(log.errors, [[
+    'Cannot send data-pipeline export after the exporter is closed',
+  ]])
+})
 
 test('native backend compresses agentless v0.4 exports with Zstandard', {
   skip: !nativeArtifact,
@@ -44,7 +144,7 @@ test('inline-WASM backend compresses agentless v0.4 exports with Zstandard', {
   )
 })
 
-test('inline-WASM backend validates optional values', {
+test('inline-WASM backend rejects invalid optional values', {
   skip: !fs.existsSync(wasmArtifact),
 }, async () => {
   const pipeline = require('../wasm')
@@ -56,17 +156,10 @@ test('inline-WASM backend validates optional values', {
     languageInterpreter: 'v8',
   }
 
-  const exporter = pipeline.createAgentlessExporter({
-    ...options,
-    hostname: null,
-    env: null,
-    service: null,
-    version: null,
-    runtimeId: null,
-    containerId: null,
-    timeoutMs: null,
-  })
-  await exporter.close()
+  assert.throws(
+    () => pipeline.createAgentlessExporter({ ...options, timeoutMs: null }),
+    /timeoutMs must be an unsigned integer/,
+  )
 
   assert.throws(
     () => pipeline.createAgentlessExporter({ ...options, timeoutMs: 1.5 }),
@@ -88,48 +181,6 @@ const backends = [
 ]
 
 for (const backend of backends) {
-  test(`${backend.name} preserves async context in host callbacks`, {
-    skip: backend.skip,
-  }, async (context) => {
-    const storage = new AsyncLocalStorage()
-    const stores = []
-    context.mock.method(http, 'request', (_url, _options, onResponse) => {
-      stores.push(storage.getStore())
-      const request = new EventEmitter()
-      request.destroy = error => request.emit('error', error)
-      request.end = () => queueMicrotask(() => {
-        const response = new EventEmitter()
-        response.statusCode = 200
-        onResponse(response)
-        response.emit('end')
-      })
-      return request
-    })
-    const pipeline = backend.load()
-    const exporter = pipeline.createAgentlessExporter({
-      endpoint: 'http://example.test/api/v2/spans',
-      apiKey: 'test-api-key',
-      tracerVersion: '0.1.0',
-      languageVersion: process.version,
-      languageInterpreter: 'v8',
-    })
-    const first = { operation: 'first' }
-    const second = { operation: 'second' }
-
-    try {
-      await Promise.all([
-        storage.run(first, () => exporter.sendV04(tracePayload())),
-        storage.run(second, () => exporter.sendV04(tracePayload())),
-      ])
-    } finally {
-      await exporter.close()
-    }
-
-    assert.strictEqual(stores.length, 2)
-    assert.ok(stores.includes(first))
-    assert.ok(stores.includes(second))
-  })
-
   test(`${backend.name} retries in Rust until the third attempt succeeds`, {
     skip: backend.skip,
   }, async () => {
@@ -147,10 +198,10 @@ for (const backend of backends) {
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
     const exporter = createExporter(pipeline, server)
     try {
-      await exporter.sendV04(tracePayload())
+      await sendExport(exporter)
       assert.strictEqual(requests, 3)
     } finally {
-      await exporter.close()
+      exporter.close()
       await new Promise(resolve => server.close(resolve))
     }
   })
@@ -168,10 +219,12 @@ for (const backend of backends) {
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
     const exporter = createExporter(pipeline, server, { timeoutMs: 100 })
     try {
-      await assert.rejects(exporter.sendV04(tracePayload()), /Request timed out/)
+      const log = testLog()
+      await sendExport(exporter, log)
       assert.strictEqual(requests, 3)
+      assert.match(log.errors[0][1], /Request timed out/)
     } finally {
-      await exporter.close()
+      exporter.close()
       await new Promise(resolve => server.close(resolve))
     }
   })
@@ -192,12 +245,14 @@ for (const backend of backends) {
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
     const exporter = createExporter(pipeline, server)
     try {
-      const send = exporter.sendV04(tracePayload())
+      const log = testLog()
+      const send = sendExport(exporter, log)
       await request
-      await exporter.close()
-      await assert.rejects(send, /export was cancelled/)
+      exporter.close()
+      await send
+      assert.deepStrictEqual(log.errors, [])
     } finally {
-      await exporter.close()
+      exporter.close()
       await new Promise(resolve => server.close(resolve))
     }
   })
@@ -223,15 +278,17 @@ for (const backend of backends) {
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
     const exporter = createExporter(pipeline, server)
     try {
-      const send = exporter.sendV04(tracePayload())
+      const log = testLog()
+      const send = sendExport(exporter, log)
       await responseSent
       await new Promise(resolve => setTimeout(resolve, 50))
-      await exporter.close()
-      await assert.rejects(send, /export was cancelled/)
+      exporter.close()
+      await send
+      assert.deepStrictEqual(log.errors, [])
       await new Promise(resolve => setTimeout(resolve, 1100))
       assert.strictEqual(requests, 1)
     } finally {
-      await exporter.close()
+      exporter.close()
       await new Promise(resolve => server.close(resolve))
     }
   })
@@ -286,7 +343,7 @@ test('NAPI exporter survives worker teardown during an HTTP request', {
       languageVersion: process.version,
       languageInterpreter: 'v8',
     })
-    exporter.sendV04(Buffer.from(workerData.payload)).catch(() => {})
+    exporter.sendV04(Buffer.from(workerData.payload), () => {}, { error: () => {} })
   `, {
     eval: true,
     workerData: {
@@ -318,14 +375,15 @@ async function assertExport (pipeline, expectedBackend) {
       tracerVersion: '0.1.0',
       languageVersion: process.version,
       languageInterpreter: 'v8',
+      runtimeId: 'runtime-id',
       service: 'service',
       containerId: 'container-id',
     })
 
     try {
-      await exporter.sendV04(tracePayload())
+      await sendExport(exporter)
     } finally {
-      await exporter.close()
+      exporter.close()
     }
   })
 
@@ -337,6 +395,7 @@ async function assertExport (pipeline, expectedBackend) {
   assert.deepStrictEqual(received.body.subarray(0, zstdMagic.length), zstdMagic)
   if (zstdDecompressSync) {
     const body = JSON.parse(zstdDecompressSync(received.body).toString())
+    assert.strictEqual(body.traces[0].runtimeID, 'runtime-id')
     assert.strictEqual(body.traces[0].spans[0].name, 'operation')
     assert.strictEqual(body.traces[0].spans[0].service, 'service')
   }
@@ -377,6 +436,39 @@ function createExporter (pipeline, server, options = {}) {
     languageInterpreter: 'v8',
     ...options,
   })
+}
+
+function exporterOptions () {
+  return {
+    endpoint: 'http://example.test/api/v2/spans',
+    apiKey: 'test-api-key',
+    tracerVersion: '0.1.0',
+    languageVersion: process.version,
+    languageInterpreter: 'v8',
+  }
+}
+
+function testLog () {
+  const errors = []
+  return {
+    errors,
+    error (...args) {
+      errors.push(args)
+    },
+  }
+}
+
+/**
+ * @param {{ sendV04: (payload: Uint8Array, done: () => void, log: ReturnType<typeof testLog>) => void }} exporter
+ * @param {ReturnType<typeof testLog>} [log]
+ */
+function sendExport (exporter, log = testLog()) {
+  let result
+  const completed = new Promise((resolve) => {
+    result = exporter.sendV04(tracePayload(), resolve, log)
+  })
+  assert.strictEqual(result, undefined)
+  return completed
 }
 
 async function withIntake (send) {

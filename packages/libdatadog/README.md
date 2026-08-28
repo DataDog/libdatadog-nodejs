@@ -20,7 +20,8 @@ shipping another TLS stack in native packages and keeps networking behavior
 consistent across the NAPI and WASM backends.
 
 The package accepts Datadog v0.4 MessagePack payloads and exports them to an
-agentless intake.
+agentless intake. `sendV04()` reports completion through a callback and sends
+delivery failures to the supplied logger. It does not return a promise.
 
 The package tries a platform-native napi-rs backend first and falls back to the
 napi-rs WASM build of the same bindings. The WebAssembly module, generated
