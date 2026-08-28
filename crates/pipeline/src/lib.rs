@@ -205,6 +205,10 @@ pub struct WasmSpanState {
     /// config. Only takes effect if set before the first send
     /// (when the exporter is built).
     telemetry_config: Cell<Option<TelemetryConfig>>,
+    /// Set by `shutdown`. Terminal: the exporter (and the builder, if the
+    /// exporter was never built) is dropped, so later sends must fail fast
+    /// instead of lazily building a fresh exporter behind the caller's back.
+    shut_down: Cell<bool>,
     /// Latched message from a failed lazy `build_async`. Building is one-shot and
     /// a failure is fatal (bad config), so once set every send returns it (as a
     /// distinguishable error) instead of a misleading "builder already consumed",
@@ -301,6 +305,7 @@ impl WasmSpanState {
             otlp_protocol: Cell::new(None),
             otlp_headers: Cell::new(Vec::new()),
             telemetry_config: Cell::new(None),
+            shut_down: Cell::new(false),
             build_error: RefCell::new(None),
         })
     }
@@ -468,6 +473,11 @@ impl WasmSpanState {
         if self.sending.get() {
             return Err(JsValue::from_str("sendPreparedChunk is already in flight"));
         }
+        if self.shut_down.get() {
+            return Err(JsValue::from_str(
+                "sendPreparedChunk: exporter has been shut down",
+            ));
+        }
         self.sending.set(true);
         let _in_flight = InFlightGuard(&self.sending);
 
@@ -491,9 +501,11 @@ impl WasmSpanState {
             // First send: build the exporter asynchronously. `build` is not
             // available on wasm (it needs a blocking runtime), so we drive
             // `build_async` here where we already have an async context.
+            // Unreachable in practice: the builder is only taken here (after
+            // which the exporter exists) or by `shutdown` (rejected above).
             let mut builder = unsafe { &mut *self.builder.get() }
                 .take()
-                .ok_or_else(|| JsValue::from_str("exporter builder already consumed"))?;
+                .ok_or_else(|| JsValue::from_str("exporter builder unavailable"))?;
             // Output format is decided here, at first build, and then fixed.
             // v0.5 drops meta_struct/span_events/span_links by design (the v0.5
             // schema has no slots for them); dd-trace-js only enables this after
@@ -522,7 +534,7 @@ impl WasmSpanState {
                 Err(e) => {
                     // Latch the failure: the builder is now consumed and the
                     // config won't change, so every later send must fail fast.
-                    let msg = format!("native exporter build failed: {e:?}");
+                    let msg = format!("native exporter build failed: {e}");
                     *self.build_error.borrow_mut() = Some(msg.clone());
                     return Err(build_failure_error(&msg));
                 }
@@ -541,7 +553,7 @@ impl WasmSpanState {
 
         response_str
             .map(|s| JsValue::from_str(&s))
-            .map_err(|e| JsValue::from_str(&format!("{:?}", e)))
+            .map_err(|e| JsValue::from_str(&e.to_string()))
     }
 
     /// Flush the queued change-buffer operations. On success always returns
@@ -558,7 +570,9 @@ impl WasmSpanState {
 
     /// Gracefully shut down the exporter and stop the background workers.
     /// Should be awaited during tracer shutdown to avoid losing in-flight
-    /// data. Consumes the exporter — subsequent sends will error.
+    /// data. Terminal and idempotent: it consumes the exporter (and the
+    /// builder, if the exporter was never built), so later sends error out
+    /// rather than silently starting a new exporter.
     ///
     /// `timeoutMs` bounds the wait; on timeout returns an error and workers
     /// may still be finishing. `None` waits indefinitely.
@@ -571,9 +585,14 @@ impl WasmSpanState {
         }
         self.sending.set(true);
         let _in_flight = InFlightGuard(&self.sending);
+        self.shut_down.set(true);
 
         // SAFETY: `sending` guard prevents overlapping access; WASM is single-threaded.
         let exporter_slot = unsafe { &mut *self.exporter.get() };
+        // Drop the builder too: without it a shutdown that happens before the
+        // first send would leave the lazy build path armed, and the next send
+        // would quietly spin up a fresh exporter after shutdown.
+        unsafe { &mut *self.builder.get() }.take();
         // Idempotent: never-built or already-shut-down state is not an error.
         let Some(exporter) = exporter_slot.take() else {
             return Ok(());
@@ -582,7 +601,7 @@ impl WasmSpanState {
         exporter
             .shutdown_async(timeout)
             .await
-            .map_err(|e| JsValue::from_str(&format!("shutdown: {e:?}")))
+            .map_err(|e| JsValue::from_str(&format!("shutdown: {e}")))
     }
 
     /// Set default meta tags applied to every new span.
