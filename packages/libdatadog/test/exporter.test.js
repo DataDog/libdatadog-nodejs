@@ -40,7 +40,7 @@ test('inline-WASM backend compresses agentless v0.4 exports with Zstandard', {
   )
 })
 
-test('inline-WASM backend validates optional values', {
+test('inline-WASM backend rejects invalid optional values', {
   skip: !fs.existsSync(wasmArtifact),
 }, async () => {
   const pipeline = require('../wasm')
@@ -52,17 +52,10 @@ test('inline-WASM backend validates optional values', {
     languageInterpreter: 'v8',
   }
 
-  const exporter = pipeline.createAgentlessExporter({
-    ...options,
-    hostname: null,
-    env: null,
-    service: null,
-    version: null,
-    runtimeId: null,
-    containerId: null,
-    timeoutMs: null,
-  })
-  await exporter.close()
+  assert.throws(
+    () => pipeline.createAgentlessExporter({ ...options, timeoutMs: null }),
+    /timeoutMs must be an unsigned integer/,
+  )
 
   assert.throws(
     () => pipeline.createAgentlessExporter({ ...options, timeoutMs: 1.5 }),
@@ -272,6 +265,7 @@ async function assertExport (pipeline, expectedBackend) {
       tracerVersion: '0.1.0',
       languageVersion: process.version,
       languageInterpreter: 'v8',
+      runtimeId: 'runtime-id',
       service: 'service',
       containerId: 'container-id',
     })
@@ -291,6 +285,7 @@ async function assertExport (pipeline, expectedBackend) {
   assert.deepStrictEqual(received.body.subarray(0, zstdMagic.length), zstdMagic)
   if (zstdDecompressSync) {
     const body = JSON.parse(zstdDecompressSync(received.body).toString())
+    assert.strictEqual(body.traces[0].runtimeID, 'runtime-id')
     assert.strictEqual(body.traces[0].spans[0].name, 'operation')
     assert.strictEqual(body.traces[0].spans[0].service, 'service')
   }

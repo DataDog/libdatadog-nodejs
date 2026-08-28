@@ -11,14 +11,12 @@ class AgentlessExporter {
 
   constructor (binding, options) {
     validateOptions(options)
-    const runtimeId = options.runtimeId ?? randomUUID()
-    const normalized = Object.fromEntries(
-      Object.entries({ ...options, runtimeId })
-        .filter(([, value]) => value !== null),
-    )
+    const bindingOptions = options.runtimeId === undefined
+      ? { ...options, runtimeId: randomUUID() }
+      : options
     const transport = createHostTransport()
     this.#binding = new binding.AgentlessExporter(
-      normalized,
+      bindingOptions,
       transport.request,
       transport.cancelRequest,
       transport.sleep,
@@ -54,7 +52,7 @@ class AgentlessExporter {
 
 function validateOptions (options) {
   const { timeoutMs } = options
-  if (timeoutMs !== undefined && timeoutMs !== null && (
+  if (timeoutMs !== undefined && (
     !Number.isInteger(timeoutMs)
     || timeoutMs < 0
     || timeoutMs > 4_294_967_295
