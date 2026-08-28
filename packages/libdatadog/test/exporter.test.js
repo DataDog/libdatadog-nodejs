@@ -18,6 +18,24 @@ const nativeArtifact = fs.existsSync(nativeDirectory)
   : undefined
 const wasmArtifact = path.join(packageRoot, 'wasm', 'dist', 'libdatadog_wasm.js')
 
+test('package entry points defer unused agentless modules', {
+  skip: !fs.existsSync(wasmArtifact),
+}, () => {
+  const agentlessPath = require.resolve('../lib/agentless')
+  const wasmBindingPath = require.resolve('@datadog/libdatadog-wasm')
+
+  if (nativeArtifact) {
+    loadNativePipeline()
+    assert.strictEqual(require.cache[wasmBindingPath], undefined)
+  } else {
+    require('..')
+  }
+  assert.strictEqual(require.cache[agentlessPath], undefined)
+
+  require('../wasm')
+  assert.strictEqual(require.cache[agentlessPath], undefined)
+})
+
 test('universal entry point uses WASM for agentless v0.4 exports with a native backend', {
   skip: !nativeArtifact || !fs.existsSync(wasmArtifact),
 }, async () => {

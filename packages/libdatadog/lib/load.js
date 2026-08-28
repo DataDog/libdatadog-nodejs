@@ -15,5 +15,5 @@ module.exports = {
 
 /** @param {import('../index').AgentlessExporterOptions} options */
 function createAgentlessExporter (options) {
-  return require('./agentless').createAgentlessExporter(options)
+  return require('./wasm').createAgentlessExporter(options)
 }
