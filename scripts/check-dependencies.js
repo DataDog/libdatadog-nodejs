@@ -4,9 +4,7 @@ const path = require('node:path')
 const { execFileSync } = require('node:child_process')
 
 const repositoryRoot = path.join(__dirname, '..')
-const packageJson = require('../packages/libdatadog/package.json')
 const trees = [
-  ...packageJson.napi.targets.map(target => ({ package: 'libdatadog', target })),
   { package: 'libdatadog-wasm', target: 'wasm32-unknown-unknown' },
 ]
 
@@ -46,19 +44,18 @@ function findDuplicateVersions (dependencies) {
   return failures
 }
 
-function findForbiddenDependencies (dependencies, tree) {
+/**
+ * @template {{ name: string }} Dependency
+ * @param {Dependency[]} dependencies
+ * @returns {Dependency[]}
+ */
+function findForbiddenDependencies (dependencies) {
   const failures = []
 
   for (const dependency of dependencies) {
     const isTokio = dependency.name === 'tokio'
     const isTokioCompanion = dependency.name.startsWith('tokio-')
-    if (!isTokio && !isTokioCompanion) continue
-
-    const parent = dependency.path.at(-2)
-    const allowedNapiBridge = tree.package === 'libdatadog'
-      && isTokio
-      && parent === 'napi'
-    if (!allowedNapiBridge) failures.push(dependency)
+    if (isTokio || isTokioCompanion) failures.push(dependency)
   }
 
   return failures
@@ -86,7 +83,7 @@ function checkTrees () {
     for (const failure of findDuplicateVersions(dependencies)) {
       duplicateFailures.push({ ...failure, ...tree })
     }
-    for (const failure of findForbiddenDependencies(dependencies, tree)) {
+    for (const failure of findForbiddenDependencies(dependencies)) {
       forbiddenFailures.push({ ...failure, ...tree })
     }
   }
@@ -112,7 +109,7 @@ function checkTrees () {
       )
     }
   } else {
-    console.log('Tokio is limited to the NAPI async bridge and absent from WASM.')
+    console.log('Tokio is absent from WASM.')
   }
 
   if (duplicateFailures.length > 0 || forbiddenFailures.length > 0) {
