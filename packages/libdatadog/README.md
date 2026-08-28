@@ -5,13 +5,15 @@
 > applications or other libraries. Its API, behavior, and distribution may
 > change without notice.
 
-Universal Node.js bindings for libdatadog. Matching native and WASM bindings
-are maintained in the root `crates/libdatadog` and `crates/libdatadog-wasm`
-workspace crates. Optional libdatadog functionality is published separately as
+Universal Node.js bindings for libdatadog. Native and WASM bindings for
+Zstandard compression and DDSketch are maintained in the root
+`crates/libdatadog` and `crates/libdatadog-wasm` workspace crates. Optional
+libdatadog functionality is published separately as
 `@datadog/libdatadog-extras`.
 
-Both backends expose the agentless data pipeline, Zstandard compression, and
-DDSketch from a single native or WASM artifact.
+The agentless data pipeline always uses the WASM backend. Zstandard compression
+and DDSketch use the native backend when it is available, with WASM as the
+fallback.
 
 The package accepts Datadog v0.4 MessagePack payloads and exports them to an
 agentless intake.

@@ -17,9 +17,9 @@ published as two packages with different availability guarantees.
 ## `@datadog/libdatadog`
 
 The universal package is maintained under
-[`packages/libdatadog`](packages/libdatadog). Its matching native and WASM
-backends expose the agentless data pipeline, Zstandard compression, and
-DDSketch from a single native or WASM artifact.
+[`packages/libdatadog`](packages/libdatadog). Zstandard compression and
+DDSketch use the native backend when it is available, with WASM as the
+fallback. The agentless data pipeline always uses the WASM backend.
 
 The package tries a platform-native napi-rs backend first. Native artifacts are
 published as optional dependencies using napi-rs-compatible package names such

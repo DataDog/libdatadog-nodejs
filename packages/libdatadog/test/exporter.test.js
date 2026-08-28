@@ -1,12 +1,10 @@
 'use strict'
 
 const assert = require('node:assert/strict')
-const { spawnSync } = require('node:child_process')
 const fs = require('node:fs')
 const http = require('node:http')
 const path = require('node:path')
 const { test } = require('node:test')
-const { Worker } = require('node:worker_threads')
 const { zstdDecompressSync } = require('node:zlib')
 
 const { encode } = require('@msgpack/msgpack')
@@ -20,15 +18,10 @@ const nativeArtifact = fs.existsSync(nativeDirectory)
   : undefined
 const wasmArtifact = path.join(packageRoot, 'wasm', 'dist', 'libdatadog_wasm.js')
 
-test('native backend compresses agentless v0.4 exports with Zstandard', {
-  skip: !nativeArtifact,
+test('native entry point uses WASM for agentless v0.4 exports', {
+  skip: !nativeArtifact || !fs.existsSync(wasmArtifact),
 }, async () => {
-  process.env.DD_LIBDATADOG_NATIVE_PATH = path.join(nativeDirectory, nativeArtifact)
-  await assertExport(
-    require('../lib/native'),
-    'native',
-  )
-  delete process.env.DD_LIBDATADOG_NATIVE_PATH
+  await assertExport(loadNativePipeline(), 'native')
 })
 
 test('inline-WASM backend compresses agentless v0.4 exports with Zstandard', {
@@ -70,155 +63,56 @@ test('inline-WASM backend validates optional values', {
   )
 })
 
-const backends = [
-  {
-    name: 'native',
-    skip: !nativeArtifact,
-    load: loadNativePipeline,
-  },
-  {
-    name: 'inline-WASM',
-    skip: !fs.existsSync(wasmArtifact),
-    load: () => require('../wasm'),
-  },
-]
-
-for (const backend of backends) {
-  test(`${backend.name} retries in Rust until the third attempt succeeds`, {
-    skip: backend.skip,
-  }, async () => {
-    const pipeline = backend.load()
-    let requests = 0
-    const server = http.createServer((incoming, response) => {
-      incoming.resume()
-      incoming.once('end', () => {
-        requests++
-        response.writeHead(requests < 3 ? 500 : 202)
-        response.end()
-      })
-    })
-
-    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
-    const exporter = createExporter(pipeline, server)
-    try {
-      await exporter.sendV04(tracePayload())
-      assert.strictEqual(requests, 3)
-    } finally {
-      await exporter.close()
-      await new Promise(resolve => server.close(resolve))
-    }
-  })
-
-  test(`${backend.name} applies Rust timeouts and retry policy`, {
-    skip: backend.skip,
-  }, async () => {
-    const pipeline = backend.load()
-    let requests = 0
-    const server = http.createServer((incoming) => {
+test('agentless exporter retries in Rust until the third attempt succeeds', {
+  skip: !fs.existsSync(wasmArtifact),
+}, async () => {
+  const pipeline = require('../wasm')
+  let requests = 0
+  const server = http.createServer((incoming, response) => {
+    incoming.resume()
+    incoming.once('end', () => {
       requests++
-      incoming.resume()
+      response.writeHead(requests < 3 ? 500 : 202)
+      response.end()
     })
-
-    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
-    const exporter = createExporter(pipeline, server, { timeoutMs: 100 })
-    try {
-      await assert.rejects(exporter.sendV04(tracePayload()), /Request timed out/)
-      assert.strictEqual(requests, 3)
-    } finally {
-      await exporter.close()
-      await new Promise(resolve => server.close(resolve))
-    }
   })
 
-  test(`${backend.name} close cancels an active HTTP request`, {
-    skip: backend.skip,
-  }, async () => {
-    const pipeline = backend.load()
-    let resolveRequest
-    const request = new Promise((resolve) => {
-      resolveRequest = resolve
-    })
-    const server = http.createServer((incoming) => {
-      incoming.resume()
-      incoming.once('end', resolveRequest)
-    })
-
-    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
-    const exporter = createExporter(pipeline, server)
-    try {
-      const send = exporter.sendV04(tracePayload())
-      await request
-      await exporter.close()
-      await assert.rejects(send, /export was cancelled/)
-    } finally {
-      await exporter.close()
-      await new Promise(resolve => server.close(resolve))
-    }
-  })
-
-  test(`${backend.name} close cancels retry backoff`, {
-    skip: backend.skip,
-  }, async () => {
-    const pipeline = backend.load()
-    let requests = 0
-    let resolveResponse
-    const responseSent = new Promise((resolve) => {
-      resolveResponse = resolve
-    })
-    const server = http.createServer((incoming, response) => {
-      incoming.resume()
-      incoming.once('end', () => {
-        requests++
-        response.writeHead(500)
-        response.end(resolveResponse)
-      })
-    })
-
-    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
-    const exporter = createExporter(pipeline, server)
-    try {
-      const send = exporter.sendV04(tracePayload())
-      await responseSent
-      await new Promise(resolve => setTimeout(resolve, 50))
-      await exporter.close()
-      await assert.rejects(send, /export was cancelled/)
-      await new Promise(resolve => setTimeout(resolve, 1100))
-      assert.strictEqual(requests, 1)
-    } finally {
-      await exporter.close()
-      await new Promise(resolve => server.close(resolve))
-    }
-  })
-}
-
-test('an idle NAPI exporter does not keep Node alive', {
-  skip: !nativeArtifact,
-}, () => {
-  const nativePath = path.join(nativeDirectory, nativeArtifact)
-  const modulePath = path.join(packageRoot, 'lib', 'native.js')
-  const script = `
-    const pipeline = require(${JSON.stringify(modulePath)})
-    pipeline.createAgentlessExporter({
-      endpoint: 'http://127.0.0.1:1/api/v2/spans',
-      apiKey: 'test-api-key',
-      tracerVersion: '0.1.0',
-      languageVersion: process.version,
-      languageInterpreter: 'v8',
-    })
-  `
-  const result = spawnSync(process.execPath, ['-e', script], {
-    env: { ...process.env, DD_LIBDATADOG_NATIVE_PATH: nativePath },
-    encoding: 'utf8',
-    timeout: 3000,
-  })
-
-  assert.notStrictEqual(result.error?.code, 'ETIMEDOUT')
-  assert.strictEqual(result.status, 0, result.stderr)
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  const exporter = createExporter(pipeline, server)
+  try {
+    await exporter.sendV04(tracePayload())
+    assert.strictEqual(requests, 3)
+  } finally {
+    await exporter.close()
+    await new Promise(resolve => server.close(resolve))
+  }
 })
 
-test('NAPI exporter survives worker teardown during an HTTP request', {
-  skip: !nativeArtifact,
+test('agentless exporter applies Rust timeouts and retry policy', {
+  skip: !fs.existsSync(wasmArtifact),
 }, async () => {
+  const pipeline = require('../wasm')
+  let requests = 0
+  const server = http.createServer((incoming) => {
+    requests++
+    incoming.resume()
+  })
+
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  const exporter = createExporter(pipeline, server, { timeoutMs: 100 })
+  try {
+    await assert.rejects(exporter.sendV04(tracePayload()), /Request timed out/)
+    assert.strictEqual(requests, 3)
+  } finally {
+    await exporter.close()
+    await new Promise(resolve => server.close(resolve))
+  }
+})
+
+test('agentless exporter close cancels an active HTTP request', {
+  skip: !fs.existsSync(wasmArtifact),
+}, async () => {
+  const pipeline = require('../wasm')
   let resolveRequest
   const request = new Promise((resolve) => {
     resolveRequest = resolve
@@ -227,39 +121,50 @@ test('NAPI exporter survives worker teardown during an HTTP request', {
     incoming.resume()
     incoming.once('end', resolveRequest)
   })
+
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
-  const { port } = server.address()
-  const worker = new Worker(`
-    const { workerData } = require('node:worker_threads')
-    process.env.DD_LIBDATADOG_NATIVE_PATH = workerData.nativePath
-    const pipeline = require(workerData.modulePath)
-    const exporter = pipeline.createAgentlessExporter({
-      endpoint: workerData.endpoint,
-      apiKey: 'test-api-key',
-      tracerVersion: '0.1.0',
-      languageVersion: process.version,
-      languageInterpreter: 'v8',
-    })
-    exporter.sendV04(Buffer.from(workerData.payload)).catch(() => {})
-  `, {
-    eval: true,
-    workerData: {
-      nativePath: path.join(nativeDirectory, nativeArtifact),
-      modulePath: path.join(packageRoot, 'lib', 'native.js'),
-      endpoint: `http://127.0.0.1:${port}/api/v2/spans`,
-      payload: tracePayload(),
-    },
+  const exporter = createExporter(pipeline, server)
+  try {
+    const send = exporter.sendV04(tracePayload())
+    await request
+    await exporter.close()
+    await assert.rejects(send, /export was cancelled/)
+  } finally {
+    await exporter.close()
+    await new Promise(resolve => server.close(resolve))
+  }
+})
+
+test('agentless exporter close cancels retry backoff', {
+  skip: !fs.existsSync(wasmArtifact),
+}, async () => {
+  const pipeline = require('../wasm')
+  let requests = 0
+  let resolveResponse
+  const responseSent = new Promise((resolve) => {
+    resolveResponse = resolve
   })
-  const workerError = new Promise((_, reject) => {
-    worker.once('error', reject)
+  const server = http.createServer((incoming, response) => {
+    incoming.resume()
+    incoming.once('end', () => {
+      requests++
+      response.writeHead(500)
+      response.end(resolveResponse)
+    })
   })
 
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  const exporter = createExporter(pipeline, server)
   try {
-    await Promise.race([request, workerError])
-    const exitCode = await worker.terminate()
-    assert.strictEqual(exitCode, 1)
+    const send = exporter.sendV04(tracePayload())
+    await responseSent
+    await new Promise(resolve => setTimeout(resolve, 50))
+    await exporter.close()
+    await assert.rejects(send, /export was cancelled/)
+    await new Promise(resolve => setTimeout(resolve, 1100))
+    assert.strictEqual(requests, 1)
   } finally {
-    await worker.terminate()
+    await exporter.close()
     await new Promise(resolve => server.close(resolve))
   }
 })

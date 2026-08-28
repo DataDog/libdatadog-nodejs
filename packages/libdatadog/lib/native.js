@@ -47,6 +47,6 @@ function loadBinding (target) {
 module.exports = {
   backend: () => 'native',
   DDSketch: binding.DDSketch,
-  createAgentlessExporter: options => createAgentlessExporter(binding, options),
+  createAgentlessExporter,
   zstd_compress: binding.zstd_compress,
 }

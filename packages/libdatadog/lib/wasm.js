@@ -7,6 +7,6 @@ const { createAgentlessExporter } = require('./agentless')
 module.exports = {
   backend: () => 'wasm',
   DDSketch: binding.DDSketch,
-  createAgentlessExporter: options => createAgentlessExporter(binding, options),
+  createAgentlessExporter,
   zstd_compress: binding.zstd_compress,
 }
