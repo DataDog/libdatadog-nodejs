@@ -40,6 +40,13 @@ test('published packages contain only the intended artifacts', () => {
     `packages must not contain standalone WASM files: ${standaloneWasm.join(', ')}`)
   assert(wasmNames.includes('dist/libdatadog_wasm.js'),
     'WASM package must contain the inline-WASM JavaScript fallback')
+  assert(wasmNames.includes('dist/remote-config/remote_config.js'),
+    'WASM package must contain the dedicated remote config artifact')
+  assert(wasmNames.includes('remote-config.js'))
+  assert(wasmNames.includes('remote-config.d.ts'))
+  assert(names.includes('remote-config.js'))
+  assert(names.includes('remote-config.mjs'))
+  assert(names.includes('remote-config.d.ts'))
   assert.strictEqual(libdatadogWasm.name, '@datadog/libdatadog-wasm')
   assert.strictEqual(
     metapackageJson.dependencies['@datadog/libdatadog-wasm'],
@@ -93,6 +100,10 @@ test('installed package uses its WASM dependency', () => {
     const libdatadog = requireInstalled('@datadog/libdatadog')
     const explicitWasm = requireInstalled('@datadog/libdatadog/wasm')
 
+    assert.strictEqual(libdatadog.RemoteConfigFetcher, undefined)
+    assert.strictEqual(explicitWasm.RemoteConfigFetcher, undefined)
+    const remoteConfig = requireInstalled('@datadog/libdatadog/remote-config')
+    assert.strictEqual(typeof remoteConfig.RemoteConfigFetcher, 'function')
     assert.strictEqual(libdatadog.backend(), 'wasm')
     assert.strictEqual(explicitWasm.backend(), 'wasm')
     assert(libdatadog.zstd_compress(Buffer.alloc(16), 3) instanceof Uint8Array)
@@ -122,7 +133,15 @@ function assertEsmImports (installRoot, environment) {
       DDSketch as WasmDDSketch,
       zstd_compress as wasmCompress,
     } from '@datadog/libdatadog/wasm'
+    import remoteConfig, {
+      RemoteConfigFetcher,
+      setStorage,
+    } from '@datadog/libdatadog/remote-config'
 
+    assert.strictEqual(libdatadog.RemoteConfigFetcher, undefined)
+    assert.strictEqual(wasm.RemoteConfigFetcher, undefined)
+    assert.strictEqual(remoteConfig.RemoteConfigFetcher, RemoteConfigFetcher)
+    assert.strictEqual(remoteConfig.setStorage, setStorage)
     assert.strictEqual(backend(), 'wasm')
     assert.strictEqual(libdatadog.backend, backend)
     assert.strictEqual(libdatadog.createAgentlessExporter, createAgentlessExporter)

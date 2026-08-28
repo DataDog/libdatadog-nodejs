@@ -1,6 +1,7 @@
 'use strict'
 
 const assert = require('node:assert/strict')
+const { spawnSync } = require('node:child_process')
 const fs = require('node:fs')
 const path = require('node:path')
 const { brotliDecompressSync } = require('node:zlib')
@@ -14,6 +15,7 @@ test('publishes the universal libdatadog package', () => {
 
   assert.strictEqual(packageJson.name, '@datadog/libdatadog')
   assert.strictEqual(packageJson.exports['./wasm'].require, './wasm.js')
+  assert.strictEqual(packageJson.exports['./remote-config'].require, './remote-config.js')
 })
 
 test('uses the libdatadog release version', () => {
@@ -38,17 +40,49 @@ test('root entry point uses the WASM backend', () => {
 })
 
 test('embeds a Brotli-compressed WASM fallback below the size budgets', () => {
-  const gluePath = path.join(
+  const { glue, wasm } = readInlineWasm(path.join(
     packageRoot,
     'wasm',
     'dist',
     'libdatadog_wasm.js',
-  )
+  ))
+
+  assert.ok(Buffer.byteLength(glue) < 200 * 1024)
+  assert.ok(wasm.length < 500 * 1024)
+})
+
+test('embeds dedicated remote config WASM below the size budgets', () => {
+  const { glue, wasm } = readInlineWasm(path.join(
+    packageRoot,
+    'wasm',
+    'dist',
+    'remote-config',
+    'remote_config.js',
+  ))
+
+  assert.ok(Buffer.byteLength(glue) < 450 * 1024)
+  assert.ok(wasm.length < 1024 * 1024)
+})
+
+test('requires an artifact name and output directory when inlining WASM', () => {
+  const result = spawnSync(process.execPath, [
+    path.join(packageRoot, 'scripts', 'inline-wasm.js'),
+  ])
+
+  assert.notStrictEqual(result.status, 0)
+  assert.match(result.stderr.toString(), /usage: node scripts\/inline-wasm\.js/)
+})
+
+/**
+ * @param {string} gluePath
+ */
+function readInlineWasm (gluePath) {
   const glue = fs.readFileSync(gluePath, 'utf8')
   const encodedWasm = glue.match(/brotliDecompressSync\(Buffer\.from\('([^']+)', 'base64'\)\)/)?.[1]
 
   assert.ok(encodedWasm, 'WASM must be embedded as a Brotli-compressed base64 string')
-  const compressedWasm = Buffer.from(encodedWasm, 'base64')
-  assert.ok(Buffer.byteLength(glue) < 200 * 1024)
-  assert.ok(brotliDecompressSync(compressedWasm).length < 500 * 1024)
-})
+  return {
+    glue,
+    wasm: brotliDecompressSync(Buffer.from(encodedWasm, 'base64')),
+  }
+}

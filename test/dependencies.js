@@ -62,6 +62,25 @@ test('dependency validation reports forbidden packages from Cargo', () => {
   }
 })
 
+test('dependency validation allows Tokio only through remote config', () => {
+  const dependencies = parseCargoTree([
+    '0remote-config v0.1.0',
+    '1libdd-remote-config v3.0.0',
+    '2tokio v1.53.1',
+    '3tokio-macros v2.7.2',
+    '2tokio-util v0.7.19',
+    '1tokio v1.53.1',
+  ].join('\n'))
+  const tree = { package: 'remote-config' }
+  const names = []
+
+  for (const { name } of findForbiddenDependencies(dependencies, tree)) {
+    names.push(name)
+  }
+
+  assert.deepStrictEqual(names, ['tokio'])
+})
+
 test('dependency validation still finds multiple versions in one artifact tree', () => {
   const dependencies = parseCargoTree([
     '0libdatadog v0.1.0',
@@ -74,4 +93,50 @@ test('dependency validation still finds multiple versions in one artifact tree',
     name: 'bytes',
     versions: ['1.10.0', '1.11.0'],
   }])
+})
+
+test('dependency validation scopes duplicate exceptions to remote config', () => {
+  const dependencies = parseCargoTree([
+    '0remote-config v0.1.0',
+    '1syn v2.0.119',
+    '1libdd-remote-config v3.0.0',
+    '2syn v3.0.4',
+  ].join('\n'))
+  const unexpectedVersion = parseCargoTree([
+    '0remote-config v0.1.0',
+    '1syn v2.0.119',
+    '1libdd-remote-config v3.0.0',
+    '2syn v3.0.4',
+    '2other-dependency v1.0.0',
+    '3syn v1.0.109',
+  ].join('\n'))
+  const replacementVersion = parseCargoTree([
+    '0remote-config v0.1.0',
+    '1syn v2.0.119',
+    '1libdd-remote-config v3.0.0',
+    '2syn v1.0.109',
+  ].join('\n'))
+
+  assert.deepStrictEqual(
+    findDuplicateVersions(dependencies, { package: 'remote-config' }),
+    [],
+  )
+  assert.deepStrictEqual(findDuplicateVersions(dependencies), [{
+    name: 'syn',
+    versions: ['2.0.119', '3.0.4'],
+  }])
+  assert.deepStrictEqual(
+    findDuplicateVersions(unexpectedVersion, { package: 'remote-config' }),
+    [{
+      name: 'syn',
+      versions: ['2.0.119', '3.0.4', '1.0.109'],
+    }],
+  )
+  assert.deepStrictEqual(
+    findDuplicateVersions(replacementVersion, { package: 'remote-config' }),
+    [{
+      name: 'syn',
+      versions: ['2.0.119', '1.0.109'],
+    }],
+  )
 })

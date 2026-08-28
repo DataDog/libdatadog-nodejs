@@ -7,7 +7,9 @@
   "main": "dist/libdatadog_wasm.js",
   "types": "dist/libdatadog_wasm.d.ts",
   "files": [
-    "dist/"
+    "dist/",
+    "remote-config.js",
+    "remote-config.d.ts"
   ],
   "engines": {
     "node": ">=18"
