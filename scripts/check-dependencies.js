@@ -8,7 +8,7 @@ const trees = [
   { package: 'libdatadog-wasm', target: 'wasm32-unknown-unknown' },
   { package: 'remote-config', target: 'wasm32-unknown-unknown' },
 ]
-// TODO: Remove these exceptions when libdd-remote-config aligns its TUF dependency versions.
+// libdd-tuf 0.3.1 uses older dependency majors. Exact sets keep unrelated duplicates failing validation.
 const remoteConfigDuplicatePackages = new Map([
   ['http', new Set(['0.2.12', '1.5.0'])],
   ['itoa', new Set(['0.4.8', '1.0.18'])],

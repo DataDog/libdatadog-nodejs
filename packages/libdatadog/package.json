@@ -21,7 +21,7 @@
     },
     "./remote-config": {
       "types": "./remote-config.d.ts",
-      "import": "./remote-config.mjs",
+      "import": "./remote-config.js",
       "require": "./remote-config.js",
       "default": "./remote-config.js"
     }
@@ -31,7 +31,6 @@
     "index.js",
     "index.mjs",
     "remote-config.js",
-    "remote-config.mjs",
     "remote-config.d.ts",
     "wasm.js",
     "wasm.mjs",

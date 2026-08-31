@@ -93,7 +93,6 @@ module.exports = [
       'packages/libdatadog/remote-config.js',
       'packages/libdatadog/test/bundlers.test.js',
       'packages/libdatadog/test/exporter.test.js',
-      'packages/libdatadog/wasm/remote-config.js',
     ],
     rules: {
       'n/no-missing-require': 'off',

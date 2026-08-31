@@ -140,3 +140,33 @@ test('dependency validation scopes duplicate exceptions to remote config', () =>
     }],
   )
 })
+
+test('dependency validation reports unexpected remote config duplicate versions', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'libdatadog-cargo-'))
+  const cargoPath = path.join(directory, 'cargo')
+
+  try {
+    fs.writeFileSync(cargoPath, [
+      '#!/usr/bin/env node',
+      `const output = process.argv.includes('remote-config')`,
+      String.raw`  ? '0remote-config v0.1.0\n1syn v2.0.119\n1syn v3.0.4\n1syn v1.0.109\n'`,
+      String.raw`  : '0fixture v1.0.0\n'`,
+      'process.stdout.write(output)',
+    ].join('\n'), { mode: 0o755 })
+
+    const result = spawnSync(process.execPath, [
+      path.join(__dirname, '..', 'scripts', 'check-dependencies.js'),
+    ], {
+      env: {
+        ...process.env,
+        PATH: `${directory}${path.delimiter}${process.env.PATH}`,
+      },
+    })
+
+    assert.strictEqual(result.status, 1)
+    assert.match(result.stderr.toString(), /Dependencies with multiple versions found:/)
+    assert.match(result.stderr.toString(), /syn 2\.0\.119, 3\.0\.4, 1\.0\.109/)
+  } finally {
+    fs.rmSync(directory, { force: true, recursive: true })
+  }
+})

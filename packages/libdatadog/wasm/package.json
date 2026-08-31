@@ -6,9 +6,23 @@
   "type": "commonjs",
   "main": "dist/libdatadog_wasm.js",
   "types": "dist/libdatadog_wasm.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/libdatadog_wasm.d.ts",
+      "import": "./dist/libdatadog_wasm.js",
+      "require": "./dist/libdatadog_wasm.js",
+      "default": "./dist/libdatadog_wasm.js"
+    },
+    "./remote-config": {
+      "types": "./remote-config.d.ts",
+      "import": "./dist/remote-config/remote_config.js",
+      "require": "./dist/remote-config/remote_config.js",
+      "default": "./dist/remote-config/remote_config.js"
+    },
+    "./*": "./*"
+  },
   "files": [
     "dist/",
-    "remote-config.js",
     "remote-config.d.ts"
   ],
   "engines": {
