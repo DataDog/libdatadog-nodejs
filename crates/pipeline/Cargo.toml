@@ -16,7 +16,7 @@ serde_json = "1"
 libdatadog-nodejs-capabilities = { path = "../capabilities" }
 libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", rev = "966f921c226b63a1ba84c2e53e3d0f4625f90c75" }
 libdd-common = { git = "https://github.com/DataDog/libdatadog.git", rev = "966f921c226b63a1ba84c2e53e3d0f4625f90c75", default-features = false }
-libdd-data-pipeline = { git = "https://github.com/DataDog/libdatadog.git", rev = "966f921c226b63a1ba84c2e53e3d0f4625f90c75", default-features = false, features = ["telemetry"] }
+libdd-data-pipeline = { git = "https://github.com/DataDog/libdatadog.git", rev = "9fb27ea309363bb4852d093a8e5c85b1c0b9a7d0", default-features = false, features = ["telemetry"] }
 libdd-trace-utils = { git = "https://github.com/DataDog/libdatadog.git", rev = "966f921c226b63a1ba84c2e53e3d0f4625f90c75", default-features = false, features = ["change-buffer"] }
 libdd-trace-stats = { git = "https://github.com/DataDog/libdatadog.git", rev = "966f921c226b63a1ba84c2e53e3d0f4625f90c75", default-features = false }
 libdd-trace-protobuf = { git = "https://github.com/DataDog/libdatadog.git", rev = "966f921c226b63a1ba84c2e53e3d0f4625f90c75", default-features = false }
