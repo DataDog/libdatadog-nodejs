@@ -4,9 +4,15 @@ const fs = require('node:fs')
 const path = require('node:path')
 const { constants, brotliCompressSync } = require('node:zlib')
 
-const outputDirectory = path.join(__dirname, '..', 'wasm', 'dist')
-const gluePath = path.join(outputDirectory, 'libdatadog_wasm.js')
-const wasmPath = path.join(outputDirectory, 'libdatadog_wasm_bg.wasm')
+const [moduleName, relativeOutputDirectory] = process.argv.slice(2)
+
+if (!moduleName || !relativeOutputDirectory) {
+  throw new Error('usage: node scripts/inline-wasm.js <module-name> <output-directory>')
+}
+
+const outputDirectory = path.join(__dirname, '..', relativeOutputDirectory)
+const gluePath = path.join(outputDirectory, `${moduleName}.js`)
+const wasmPath = path.join(outputDirectory, `${moduleName}_bg.wasm`)
 const glue = fs.readFileSync(gluePath, 'utf8')
 const wasm = fs.readFileSync(wasmPath)
 const encodedWasm = brotliCompressSync(wasm, {
@@ -15,7 +21,7 @@ const encodedWasm = brotliCompressSync(wasm, {
   },
 }).toString('base64')
 const loader = [
-  'const wasmPath = `${__dirname}/libdatadog_wasm_bg.wasm`;',
+  `const wasmPath = \`\${__dirname}/${moduleName}_bg.wasm\`;`,
   'const wasmBytes = require(\'fs\').readFileSync(wasmPath);',
 ].join('\n')
 
