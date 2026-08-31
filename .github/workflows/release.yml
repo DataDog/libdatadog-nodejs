@@ -174,15 +174,18 @@ jobs:
       - name: Publish libdatadog WASM
         env:
           NPM_TAG: ${{ needs.versions.outputs.npm-tag }}
-        run: npm publish packages/libdatadog/wasm --access public --tag "$NPM_TAG"
+          VERSION: ${{ needs.versions.outputs.version }}
+        run: bash scripts/npm-publish.sh packages/libdatadog/wasm "$VERSION" "$NPM_TAG"
       - name: Publish libdatadog
         env:
           NPM_TAG: ${{ needs.versions.outputs.npm-tag }}
-        run: npm publish packages/libdatadog --access public --tag "$NPM_TAG"
+          VERSION: ${{ needs.versions.outputs.version }}
+        run: bash scripts/npm-publish.sh packages/libdatadog "$VERSION" "$NPM_TAG"
       - name: Publish libdatadog extras
         env:
           NPM_TAG: ${{ needs.versions.outputs.npm-tag }}
-        run: npm publish --access public --tag "$NPM_TAG"
+          VERSION: ${{ needs.versions.outputs.version }}
+        run: bash scripts/npm-publish.sh . "$VERSION" "$NPM_TAG"
       - name: Tag release
         if: github.event_name == 'push'
         env:
