@@ -304,6 +304,46 @@ describe('http_transport connection pooling', () => {
   })
 })
 
+describe('http_transport request body lifetime', () => {
+  it('copies the request body before queued writes can observe detached wasm memory', async () => {
+    const received = []
+    const body = Buffer.from('wasm-backed request body')
+    const server = http.createServer((req, res) => {
+      req.on('data', chunk => received.push(chunk))
+      req.on('end', () => res.end(RESPONSE_BODY))
+    })
+
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+    try {
+      const port = server.address().port
+      const head = Buffer.from(
+        `POST /v0.4/traces HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\n`
+        + `Content-Length: ${body.length}\r\nConnection: close\r\n\r\n`,
+        'utf8',
+      )
+      const memory = new WebAssembly.Memory({ initial: 1 })
+      const bytes = new Uint8Array(memory.buffer)
+      bytes.set(head, 0)
+      bytes.set(body, head.length)
+
+      const result = transport.httpRequest(
+        '127.0.0.1', port, false, '', true, 0, head.length, head.length, body.length, memory,
+      )
+      // Old behavior passed a live wasm-memory view to req.write(). If the memory
+      // grew before Node assigned a socket and flushed its queued output, Node
+      // threw `Cannot perform Construct on a detached ArrayBuffer` from
+      // ClientRequest._flushOutput, outside httpRequest's try/catch retry path.
+      memory.grow(1)
+
+      const [status] = await result
+      assert.strictEqual(status, 200)
+      assert.strictEqual(Buffer.concat(received).toString('utf8'), body.toString('utf8'))
+    } finally {
+      await new Promise(resolve => server.close(resolve))
+    }
+  })
+})
+
 // Entity-header injection: container-id / entity-id / external-env detection
 // (Node reads /proc + env; libdatadog's own detection is inert on wasm) and the
 // rewrite of the Rust-rendered request head that carries them.
