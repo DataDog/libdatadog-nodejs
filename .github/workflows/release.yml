@@ -88,60 +88,6 @@ jobs:
           name: libdatadog-wasm
           path: packages/libdatadog/wasm/dist
 
-  build-libdatadog-platform:
-    name: Build libdatadog (${{ matrix.package-target }})
-    needs: versions
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - rust-target: aarch64-apple-darwin
-            package-target: darwin-arm64
-            runner: macos-15
-          - rust-target: x86_64-apple-darwin
-            package-target: darwin-x64
-            runner: macos-15-intel
-          - rust-target: aarch64-unknown-linux-gnu
-            package-target: linux-arm64-gnu
-            runner: ubuntu-24.04-arm
-          - rust-target: aarch64-unknown-linux-musl
-            package-target: linux-arm64-musl
-            runner: ubuntu-24.04-arm
-            install-musl: true
-          - rust-target: x86_64-unknown-linux-gnu
-            package-target: linux-x64-gnu
-            runner: ubuntu-latest
-          - rust-target: x86_64-unknown-linux-musl
-            package-target: linux-x64-musl
-            runner: ubuntu-latest
-            install-musl: true
-    runs-on: ${{ matrix.runner }}
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: 24
-      - name: Install musl toolchain
-        if: matrix.install-musl
-        run: sudo apt-get update && sudo apt-get install -y musl-tools
-      - name: Add Rust target
-        run: rustup target add '${{ matrix.rust-target }}'
-      - run: npm ci --prefix packages/libdatadog
-      - name: Set package version
-        run: node packages/libdatadog/scripts/set-version.js '${{ needs.versions.outputs.version }}'
-      - name: Build native extension
-        run: npm run build:native --prefix packages/libdatadog -- --target '${{ matrix.rust-target }}'
-      - run: npm run package:native --prefix packages/libdatadog
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: libdatadog-binding-${{ matrix.package-target }}
-          path: packages/libdatadog/dist/native/*.node
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: libdatadog-platform-${{ matrix.package-target }}
-          path: packages/libdatadog/dist/packages
-
   test-libdatadog-wasm:
     needs: build-libdatadog-wasm
     runs-on: ubuntu-latest
@@ -161,95 +107,6 @@ jobs:
           path: packages/libdatadog/wasm/dist
       - run: npm test --prefix packages/libdatadog
 
-  test-libdatadog-platform:
-    name: Test libdatadog (${{ matrix.platform.package_target }}, Node ${{ matrix.node }})
-    needs:
-      - build-libdatadog-platform
-      - build-libdatadog-wasm
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - package_target: darwin-arm64
-            runner: macos-15
-          - package_target: darwin-x64
-            runner: macos-15-intel
-          - package_target: linux-arm64-gnu
-            runner: ubuntu-24.04-arm
-          - package_target: linux-x64-gnu
-            runner: ubuntu-latest
-        node: [18, 24]
-    runs-on: ${{ matrix.platform.runner }}
-    env:
-      DD_LIBDATADOG_EXPECTED_BACKEND: native
-      LIBDATADOG_TARGET: ${{ matrix.platform.package_target }}
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: ${{ matrix.node }}
-      - run: npm ci --prefix packages/libdatadog
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: libdatadog-binding-${{ matrix.platform.package_target }}
-          path: packages/libdatadog/dist/native
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: libdatadog-platform-${{ matrix.platform.package_target }}
-          path: packages/libdatadog/dist/packages
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: libdatadog-wasm
-          path: packages/libdatadog/wasm/dist
-      - run: npm test --prefix packages/libdatadog
-
-  test-libdatadog-platform-musl:
-    name: Test libdatadog (${{ matrix.platform.package_target }}, Node ${{ matrix.node }})
-    needs:
-      - build-libdatadog-platform
-      - build-libdatadog-wasm
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - package_target: linux-arm64-musl
-            runner: ubuntu-24.04-arm
-          - package_target: linux-x64-musl
-            runner: ubuntu-latest
-        node: [18, 24]
-    runs-on: ${{ matrix.platform.runner }}
-    env:
-      DD_LIBDATADOG_EXPECTED_BACKEND: native
-      LIBDATADOG_TARGET: ${{ matrix.platform.package_target }}
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: libdatadog-binding-${{ matrix.platform.package_target }}
-          path: packages/libdatadog/dist/native
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: libdatadog-platform-${{ matrix.platform.package_target }}
-          path: packages/libdatadog/dist/packages
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: libdatadog-wasm
-          path: packages/libdatadog/wasm/dist
-      - name: Test in Alpine
-        run: |
-          docker run --rm \
-            --env DD_LIBDATADOG_EXPECTED_BACKEND \
-            --env LIBDATADOG_TARGET \
-            --volume "${GITHUB_WORKSPACE}:/workspace" \
-            --workdir /workspace \
-            "node:${{ matrix.node }}-alpine" \
-            sh -c '
-              apk add --no-cache git
-              npm ci --prefix packages/libdatadog
-              npm test --prefix packages/libdatadog
-            '
-
   test-libdatadog-windows:
     name: Test libdatadog WASM (Windows, Node ${{ matrix.node }})
     needs: build-libdatadog-wasm
@@ -258,8 +115,6 @@ jobs:
       fail-fast: false
       matrix:
         node: [18, 24]
-    env:
-      DD_LIBDATADOG_EXPECTED_BACKEND: wasm
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Setup Node.js
@@ -277,10 +132,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - build-libdatadog-extras
-      - build-libdatadog-platform
       - build-libdatadog-wasm
-      - test-libdatadog-platform
-      - test-libdatadog-platform-musl
       - test-libdatadog-wasm
       - test-libdatadog-windows
       - versions
@@ -313,11 +165,6 @@ jobs:
         with:
           name: libdatadog-wasm
           path: packages/libdatadog/wasm/dist
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          pattern: libdatadog-platform-*
-          path: packages/libdatadog/dist/packages
-          merge-multiple: true
       - name: Set package versions
         run: |
           npm pkg set 'version=${{ needs.versions.outputs.version }}'
@@ -328,13 +175,6 @@ jobs:
         env:
           NPM_TAG: ${{ needs.versions.outputs.npm-tag }}
         run: npm publish packages/libdatadog/wasm --access public --tag "$NPM_TAG"
-      - name: Publish libdatadog platform packages
-        env:
-          NPM_TAG: ${{ needs.versions.outputs.npm-tag }}
-        run: |
-          for package in packages/libdatadog/dist/packages/*; do
-            npm publish "$package" --access public --tag "$NPM_TAG"
-          done
       - name: Publish libdatadog
         env:
           NPM_TAG: ${{ needs.versions.outputs.npm-tag }}

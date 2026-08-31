@@ -16,23 +16,6 @@ test('publishes the universal libdatadog package', () => {
   assert.strictEqual(packageJson.exports['./wasm'].require, './wasm.js')
 })
 
-test('uses napi-rs platform package names', () => {
-  const packageJson = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json')))
-  const targets = [
-    'darwin-arm64',
-    'darwin-x64',
-    'linux-arm64-gnu',
-    'linux-arm64-musl',
-    'linux-x64-gnu',
-    'linux-x64-musl',
-  ]
-
-  assert.deepStrictEqual(
-    Object.keys(packageJson.optionalDependencies),
-    targets.map(target => `${packageJson.name}-${target}`),
-  )
-})
-
 test('uses the libdatadog release version', () => {
   const packageJson = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json')))
   const wasmPackageJson = JSON.parse(fs.readFileSync(
@@ -46,18 +29,12 @@ test('uses the libdatadog release version', () => {
     packageJson.dependencies['@datadog/libdatadog-wasm'],
     repositoryPackageJson.version,
   )
-  for (const version of Object.values(packageJson.optionalDependencies)) {
-    assert.strictEqual(version, repositoryPackageJson.version)
-  }
 })
 
-test('root entry point uses the expected backend', () => {
+test('root entry point uses the WASM backend', () => {
   const libdatadog = require('..')
-  const nativeArtifact = getNativeArtifact()
-  const expected = process.env.DD_LIBDATADOG_EXPECTED_BACKEND
-    ?? (nativeArtifact ? 'native' : 'wasm')
 
-  assert.strictEqual(libdatadog.backend(), expected)
+  assert.strictEqual(libdatadog.backend(), 'wasm')
 })
 
 test('embeds a Brotli-compressed WASM fallback below the size budgets', () => {
@@ -75,12 +52,3 @@ test('embeds a Brotli-compressed WASM fallback below the size budgets', () => {
   assert.ok(Buffer.byteLength(glue) < 200 * 1024)
   assert.ok(brotliDecompressSync(compressedWasm).length < 500 * 1024)
 })
-
-function getNativeArtifact () {
-  const nativeDirectory = path.join(packageRoot, 'dist', 'native')
-
-  if (!fs.existsSync(nativeDirectory)) return
-
-  return fs.readdirSync(nativeDirectory)
-    .find(file => /^libdatadog\..+\.node$/.test(file))
-}

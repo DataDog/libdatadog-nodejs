@@ -32,10 +32,7 @@ jobs:
         run: npm run check:dependencies
       - run: npm ci --prefix packages/libdatadog
       - run: cargo install wasm-pack --version 0.14.0 --locked
-      - run: cargo install cargo-bloat --version 0.12.1 --locked
       - run: npm run build --prefix packages/libdatadog
-      - name: Report N-API binary size
-        run: npm run report:napi-size --prefix packages/libdatadog
       - name: Build symbolized WASM for size attribution
         run: npm run size:profile --prefix packages/libdatadog
       - name: Report and validate WASM binary size
@@ -46,80 +43,6 @@ jobs:
         with:
           name: libdatadog-wasm
           path: packages/libdatadog/wasm/dist
-
-  build-libdatadog-platform:
-    name: Build libdatadog (${{ matrix.package-target }})
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - rust-target: aarch64-apple-darwin
-            package-target: darwin-arm64
-            runner: macos-15
-          - rust-target: x86_64-apple-darwin
-            package-target: darwin-x64
-            runner: macos-15-intel
-          - rust-target: aarch64-unknown-linux-gnu
-            package-target: linux-arm64-gnu
-            runner: ubuntu-24.04-arm
-          - rust-target: aarch64-unknown-linux-musl
-            package-target: linux-arm64-musl
-            runner: ubuntu-24.04-arm
-            build_args: --cross-compile
-            zig_arch: aarch64
-            zig_sha256: 958ed7d1e00d0ea76590d27666efbf7a932281b3d7ba0c6b01b0ff26498f667f
-          - rust-target: x86_64-unknown-linux-gnu
-            package-target: linux-x64-gnu
-            runner: ubuntu-latest
-          - rust-target: x86_64-unknown-linux-musl
-            package-target: linux-x64-musl
-            runner: ubuntu-latest
-            build_args: --cross-compile
-            zig_arch: x86_64
-            zig_sha256: 02aa270f183da276e5b5920b1dac44a63f1a49e55050ebde3aecc9eb82f93239
-    runs-on: ${{ matrix.runner }}
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: 24
-      - name: Install Zig
-        if: matrix.zig_arch
-        env:
-          ZIG_ARCH: ${{ matrix.zig_arch }}
-          ZIG_SHA256: ${{ matrix.zig_sha256 }}
-          ZIG_VERSION: 0.15.2
-        run: |
-          ZIG_ARCHIVE="${RUNNER_TEMP}/zig.tar.xz"
-          ZIG_DIRECTORY="${RUNNER_TEMP}/zig"
-          curl --fail --location --silent --show-error \
-            --output "${ZIG_ARCHIVE}" \
-            "https://ziglang.org/download/${ZIG_VERSION}/zig-${ZIG_ARCH}-linux-${ZIG_VERSION}.tar.xz"
-          echo "${ZIG_SHA256}  ${ZIG_ARCHIVE}" | sha256sum --check
-          mkdir -p "${ZIG_DIRECTORY}"
-          tar --extract --xz --file "${ZIG_ARCHIVE}" \
-            --directory "${ZIG_DIRECTORY}" --strip-components=1
-          echo "${ZIG_DIRECTORY}" >> "${GITHUB_PATH}"
-      - name: Install cargo-zigbuild
-        if: matrix.build_args
-        run: cargo install --locked cargo-zigbuild --version 0.23.0
-      - name: Add Rust target
-        run: rustup target add '${{ matrix.rust-target }}'
-      - run: npm ci --prefix packages/libdatadog
-      - name: Build native extension
-        run: >-
-          npm run build:native --prefix packages/libdatadog --
-          --target '${{ matrix.rust-target }}' ${{ matrix.build_args }}
-      - run: npm run package:native --prefix packages/libdatadog
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: libdatadog-binding-${{ matrix.package-target }}
-          path: packages/libdatadog/dist/native/*.node
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: libdatadog-platform-${{ matrix.package-target }}
-          path: packages/libdatadog/dist/packages
 
   test-libdatadog:
     needs: build-libdatadog
@@ -140,95 +63,6 @@ jobs:
           path: packages/libdatadog/wasm/dist
       - run: npm test --prefix packages/libdatadog
 
-  test-libdatadog-platform:
-    name: Test libdatadog (${{ matrix.platform.package_target }}, Node ${{ matrix.node }})
-    needs:
-      - build-libdatadog
-      - build-libdatadog-platform
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - package_target: darwin-arm64
-            runner: macos-15
-          - package_target: darwin-x64
-            runner: macos-15-intel
-          - package_target: linux-arm64-gnu
-            runner: ubuntu-24.04-arm
-          - package_target: linux-x64-gnu
-            runner: ubuntu-latest
-        node: [18, 24]
-    runs-on: ${{ matrix.platform.runner }}
-    env:
-      DD_LIBDATADOG_EXPECTED_BACKEND: native
-      LIBDATADOG_TARGET: ${{ matrix.platform.package_target }}
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: ${{ matrix.node }}
-      - run: npm ci --prefix packages/libdatadog
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: libdatadog-binding-${{ matrix.platform.package_target }}
-          path: packages/libdatadog/dist/native
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: libdatadog-platform-${{ matrix.platform.package_target }}
-          path: packages/libdatadog/dist/packages
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: libdatadog-wasm
-          path: packages/libdatadog/wasm/dist
-      - run: npm test --prefix packages/libdatadog
-
-  test-libdatadog-platform-musl:
-    name: Test libdatadog (${{ matrix.platform.package_target }}, Node ${{ matrix.node }})
-    needs:
-      - build-libdatadog
-      - build-libdatadog-platform
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - package_target: linux-arm64-musl
-            runner: ubuntu-24.04-arm
-          - package_target: linux-x64-musl
-            runner: ubuntu-latest
-        node: [18, 24]
-    runs-on: ${{ matrix.platform.runner }}
-    env:
-      DD_LIBDATADOG_EXPECTED_BACKEND: native
-      LIBDATADOG_TARGET: ${{ matrix.platform.package_target }}
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: libdatadog-binding-${{ matrix.platform.package_target }}
-          path: packages/libdatadog/dist/native
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: libdatadog-platform-${{ matrix.platform.package_target }}
-          path: packages/libdatadog/dist/packages
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: libdatadog-wasm
-          path: packages/libdatadog/wasm/dist
-      - name: Test in Alpine
-        run: |
-          docker run --rm \
-            --env DD_LIBDATADOG_EXPECTED_BACKEND \
-            --env LIBDATADOG_TARGET \
-            --volume "${GITHUB_WORKSPACE}:/workspace" \
-            --workdir /workspace \
-            "node:${{ matrix.node }}-alpine" \
-            sh -c '
-              apk add --no-cache git
-              npm ci --prefix packages/libdatadog
-              npm test --prefix packages/libdatadog
-            '
-
   test-libdatadog-windows:
     name: Test libdatadog WASM (Windows, Node ${{ matrix.node }})
     needs: build-libdatadog
@@ -237,8 +71,6 @@ jobs:
       fail-fast: false
       matrix:
         node: [18, 24]
-    env:
-      DD_LIBDATADOG_EXPECTED_BACKEND: wasm
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Setup Node.js
