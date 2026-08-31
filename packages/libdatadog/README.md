@@ -10,10 +10,14 @@ DDSketch, and the agentless data pipeline are maintained in the root
 `crates/libdatadog-wasm` workspace crate. Optional libdatadog functionality is
 published separately as `@datadog/libdatadog-extras`.
 
+Remote configuration is available from `@datadog/libdatadog/remote-config`.
+It uses a dedicated wasm-bindgen artifact that loads only with this entry point.
+
 The package accepts Datadog v0.4 MessagePack payloads and exports them to an
 agentless intake.
 
 The package uses a wasm-bindgen backend with the WebAssembly bytes embedded in
 JavaScript. The canonical inlined output is published as the regular
-`@datadog/libdatadog-wasm` dependency from the `wasm` workspace. No raw `.wasm`
-asset or native extension is published.
+`@datadog/libdatadog-wasm` dependency from the `wasm` workspace. The WASM
+package also contains the separate remote configuration artifact. No raw
+`.wasm` asset or native extension is published.
