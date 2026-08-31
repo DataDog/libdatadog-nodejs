@@ -18,12 +18,20 @@
       "import": "./wasm.mjs",
       "require": "./wasm.js",
       "default": "./wasm.js"
+    },
+    "./remote-config": {
+      "types": "./remote-config.d.ts",
+      "import": "./remote-config.js",
+      "require": "./remote-config.js",
+      "default": "./remote-config.js"
     }
   },
   "files": [
     "README.md",
     "index.js",
     "index.mjs",
+    "remote-config.js",
+    "remote-config.d.ts",
     "wasm.js",
     "wasm.mjs",
     "index.d.ts",
@@ -36,10 +44,12 @@
     "node": ">=18"
   },
   "scripts": {
-    "build:wasm": "npm run build:wasm:binary && npm run inline:wasm",
+    "build:wasm": "npm run build:wasm:binary && npm run build:remote-config:binary && npm run inline:wasm && npm run inline:remote-config",
     "build:wasm:binary": "node ../../scripts/build-wasm.js ../../crates/libdatadog-wasm wasm/dist",
+    "build:remote-config:binary": "node ../../scripts/build-wasm.js ../../crates/remote_config wasm/dist/remote-config",
     "size:profile": "node ../../scripts/build-wasm.js ../../crates/libdatadog-wasm ../../target/size --profiling",
-    "inline:wasm": "node scripts/inline-wasm.js",
+    "inline:wasm": "node scripts/inline-wasm.js libdatadog_wasm wasm/dist",
+    "inline:remote-config": "node scripts/inline-wasm.js remote_config wasm/dist/remote-config",
     "report:wasm-size": "node scripts/report-wasm-size.js",
     "build": "npm run build:wasm",
     "test": "node scripts/run-tests.js && npm run test:types",
