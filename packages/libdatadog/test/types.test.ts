@@ -5,7 +5,7 @@ import {
 } from '@datadog/libdatadog'
 import * as wasm from '@datadog/libdatadog/wasm'
 
-const selectedBackend: 'native' | 'wasm' = backend()
+const selectedBackend: 'wasm' = backend()
 const compressed: Uint8Array = zstd_compress(new Uint8Array(16), 3)
 const sketch = new DDSketch()
 

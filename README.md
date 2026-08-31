@@ -9,25 +9,17 @@ published as two packages with different availability guarantees.
 > libraries. Their APIs, behavior, and distribution may change without notice.
 
 - `@datadog/libdatadog` provides functionality required in every environment
-  through optional native platform packages with an inlined WASM fallback.
+  through inlined WASM.
 - `@datadog/libdatadog-extras` provides additional functionality that is not
   available or needed everywhere through native prebuilds and standalone WASM
   modules.
 
 ## `@datadog/libdatadog`
 
-The universal package is maintained under
-[`packages/libdatadog`](packages/libdatadog). Zstandard compression and
-DDSketch use the native backend when it is available, with WASM as the
-fallback. The agentless data pipeline always uses the WASM backend.
-
-The package tries a platform-native napi-rs backend first. Native artifacts are
-published as optional dependencies using napi-rs-compatible package names such
-as `@datadog/libdatadog-linux-x64-gnu`. If the platform package cannot be
-loaded, the package falls back to a wasm-bindgen backend whose WebAssembly bytes
-are embedded in JavaScript. This fallback is always part of the metapackage, so
-it also works when native extensions are unavailable, omitted by a bundler, or
-moved to another platform.
+The package is maintained under [`packages/libdatadog`](packages/libdatadog).
+Zstandard compression, DDSketch, and the agentless data pipeline use a
+wasm-bindgen backend whose WebAssembly bytes are embedded in JavaScript. No raw
+`.wasm` asset or native extension is published.
 
 See the [package README](packages/libdatadog/README.md) for implementation and
 packaging details.
