@@ -42,6 +42,25 @@ test('uses the libdatadog release version', () => {
   )
 })
 
+test('carries the repository metadata npm provenance verifies against', () => {
+  // npm publishes these packages with provenance under OIDC trusted publishing,
+  // and sigstore rejects the upload unless `repository.url` matches the source
+  // repository recorded in the attestation. A package.json without the field
+  // fails at publish time with `E422 ... "repository.url" is ""`, which is only
+  // reachable from a real release, so assert it here instead.
+  const expectedUrl = 'git+https://github.com/DataDog/libdatadog-nodejs.git'
+
+  for (const manifestPath of [
+    path.join(repositoryRoot, 'package.json'),
+    path.join(packageRoot, 'package.json'),
+    path.join(packageRoot, 'wasm', 'package.json'),
+  ]) {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath))
+
+    assert.strictEqual(manifest.repository?.url, expectedUrl, `${manifest.name} repository.url`)
+  }
+})
+
 test('root entry point uses the WASM backend', () => {
   const libdatadog = require('..')
 
