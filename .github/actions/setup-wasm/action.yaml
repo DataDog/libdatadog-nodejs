@@ -22,6 +22,18 @@ runs:
           wasm-${{ runner.os }}-${{
           hashFiles('Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml') }}-
     - name: Install wasm-pack
-      uses: taiki-e/install-action@6c6fd71fe4fb72c3697d269963d0e15df8adedad # v2.85.10
-      with:
-        tool: wasm-pack@0.14.0
+      env:
+        WASM_PACK_SHA256: 278a8d668085821f4d1a637bd864f1713f872b0ae3a118c77562a308c0abfe8d
+        WASM_PACK_VERSION: 0.14.0
+      run: |
+        archive="wasm-pack-v${WASM_PACK_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+        install_directory="$RUNNER_TEMP/wasm-pack"
+        curl --fail --location --silent --show-error \
+          --output "$RUNNER_TEMP/$archive" \
+          "https://github.com/wasm-bindgen/wasm-pack/releases/download/v${WASM_PACK_VERSION}/$archive"
+        echo "$WASM_PACK_SHA256  $RUNNER_TEMP/$archive" | sha256sum --check
+        mkdir --parents "$install_directory"
+        tar --extract --gzip --file "$RUNNER_TEMP/$archive" --directory "$install_directory" --strip-components=1
+        echo "$install_directory" >> "$GITHUB_PATH"
+        "$install_directory/wasm-pack" --version
+      shell: bash
