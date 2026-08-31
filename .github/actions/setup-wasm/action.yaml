@@ -1,0 +1,27 @@
+name: Setup WASM build
+description: Restore the Cargo cache and install the pinned WASM toolchain
+runs:
+  using: composite
+  steps:
+    - name: Add WASM target
+      run: rustup target add wasm32-unknown-unknown
+      shell: bash
+    - name: Restore Cargo build cache
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      with:
+        path: |
+          ~/.cargo/git/checkouts
+          ~/.cargo/git/db
+          ~/.cargo/registry/cache
+          ~/.cargo/registry/index
+          target
+        key: >-
+          wasm-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml') }}-${{
+          hashFiles('Cargo.toml', 'crates/**/Cargo.toml', 'crates/**/*.rs') }}
+        restore-keys: >-
+          wasm-${{ runner.os }}-${{
+          hashFiles('Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml') }}-
+    - name: Install wasm-pack
+      uses: taiki-e/install-action@6c6fd71fe4fb72c3697d269963d0e15df8adedad # v2.85.10
+      with:
+        tool: wasm-pack@0.14.0
