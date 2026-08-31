@@ -3,6 +3,15 @@
   "version": "0.1.0-pre",
   "description": "WASM fallback for @datadog/libdatadog",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DataDog/libdatadog-nodejs.git",
+    "directory": "packages/libdatadog/wasm"
+  },
+  "homepage": "https://github.com/DataDog/libdatadog-nodejs#readme",
+  "bugs": {
+    "url": "https://github.com/DataDog/libdatadog-nodejs/issues"
+  },
   "type": "commonjs",
   "main": "dist/libdatadog_wasm.js",
   "types": "dist/libdatadog_wasm.d.ts",
