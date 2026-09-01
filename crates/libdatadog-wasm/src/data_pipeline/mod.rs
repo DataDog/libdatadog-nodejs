@@ -1,5 +1,5 @@
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::rc::Rc;
 use std::time::Duration;
@@ -12,6 +12,13 @@ use libdatadog_data_pipeline::{
     TracerMetadata, DEFAULT_AGENTLESS_TIMEOUT,
 };
 use libdd_capabilities::{HttpClientCapability, HttpError, SleepCapability};
+use libdd_common::regex_engine::{Regex, Replacer};
+use libdd_trace_obfuscation::json::JsonObfuscator;
+use libdd_trace_obfuscation::obfuscation_config::{
+    CreditCardConfig, HttpConfig, JsonObfuscatorConfig, MemcachedConfig, RedisConfig,
+};
+use libdd_trace_obfuscation::replacer::ReplaceRule;
+use libdd_trace_obfuscation::sql::{SqlObfuscateConfig, SqlObfuscationMode};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 
@@ -356,8 +363,188 @@ fn optional_obfuscation_config(value: &JsValue, key: &str) -> Result<Obfuscation
     if value.is_null() || value.is_undefined() {
         return Ok(ObfuscationConfig::default());
     }
-    serde_wasm_bindgen::from_value(value)
-        .map_err(|error| JsValue::from_str(&format!("{key} is invalid: {error}")))
+    Ok(ObfuscationConfig {
+        tag_replace_rules: optional_replace_rules(&value, "tag_replace_rules")?,
+        http: optional_http_config(&value, "http")?,
+        memcached: optional_memcached_config(&value, "memcached")?,
+        redis: optional_redis_config(&value, "redis")?,
+        valkey: optional_redis_config(&value, "valkey")?,
+        credit_cards: optional_credit_card_config(&value, "credit_cards")?,
+        sql: optional_sql_config(&value, "sql")?,
+        elasticsearch: optional_json_obfuscator(&value, "elasticsearch")?,
+        opensearch: optional_json_obfuscator(&value, "opensearch")?,
+        mongodb: optional_json_obfuscator(&value, "mongodb")?,
+    })
+}
+
+fn field_bool(object: &JsValue, key: &str, default: bool) -> Result<bool, JsValue> {
+    let value = Reflect::get(object, &JsValue::from_str(key))?;
+    if value.is_null() || value.is_undefined() {
+        return Ok(default);
+    }
+    value
+        .as_bool()
+        .ok_or_else(|| JsValue::from_str(&format!("{key} must be a boolean")))
+}
+
+fn field_string_set(object: &JsValue, key: &str) -> Result<HashSet<String>, JsValue> {
+    let value = Reflect::get(object, &JsValue::from_str(key))?;
+    if value.is_null() || value.is_undefined() {
+        return Ok(HashSet::new());
+    }
+    if !Array::is_array(&value) {
+        return Err(JsValue::from_str(&format!(
+            "{key} must be an array of strings"
+        )));
+    }
+    let array = Array::from(&value);
+    let mut set = HashSet::with_capacity(array.length() as usize);
+    for item in array.iter() {
+        let item = item
+            .as_string()
+            .ok_or_else(|| JsValue::from_str(&format!("{key} must be an array of strings")))?;
+        set.insert(item);
+    }
+    Ok(set)
+}
+
+fn optional_http_config(object: &JsValue, key: &str) -> Result<HttpConfig, JsValue> {
+    let value = Reflect::get(object, &JsValue::from_str(key))?;
+    if value.is_null() || value.is_undefined() {
+        return Ok(HttpConfig::default());
+    }
+    Ok(HttpConfig {
+        remove_query_string: field_bool(&value, "remove_query_string", false)?,
+        remove_paths_with_digits: field_bool(&value, "remove_paths_with_digits", false)?,
+    })
+}
+
+fn optional_memcached_config(object: &JsValue, key: &str) -> Result<MemcachedConfig, JsValue> {
+    let default = MemcachedConfig::default();
+    let value = Reflect::get(object, &JsValue::from_str(key))?;
+    if value.is_null() || value.is_undefined() {
+        return Ok(default);
+    }
+    Ok(MemcachedConfig {
+        enabled: field_bool(&value, "enabled", default.enabled)?,
+        keep_command: field_bool(&value, "keep_command", default.keep_command)?,
+    })
+}
+
+fn optional_redis_config(object: &JsValue, key: &str) -> Result<RedisConfig, JsValue> {
+    let default = RedisConfig::default();
+    let value = Reflect::get(object, &JsValue::from_str(key))?;
+    if value.is_null() || value.is_undefined() {
+        return Ok(default);
+    }
+    Ok(RedisConfig {
+        enabled: field_bool(&value, "enabled", default.enabled)?,
+        remove_all_args: field_bool(&value, "remove_all_args", default.remove_all_args)?,
+    })
+}
+
+fn optional_credit_card_config(object: &JsValue, key: &str) -> Result<CreditCardConfig, JsValue> {
+    let default = CreditCardConfig::default();
+    let value = Reflect::get(object, &JsValue::from_str(key))?;
+    if value.is_null() || value.is_undefined() {
+        return Ok(default);
+    }
+    Ok(CreditCardConfig {
+        enabled: field_bool(&value, "enabled", default.enabled)?,
+        luhn: field_bool(&value, "luhn", default.luhn)?,
+        keep_values: field_string_set(&value, "keep_values")?,
+    })
+}
+
+#[allow(deprecated)]
+fn field_sql_obfuscation_mode(object: &JsValue, key: &str) -> Result<SqlObfuscationMode, JsValue> {
+    let value = Reflect::get(object, &JsValue::from_str(key))?;
+    if value.is_null() || value.is_undefined() {
+        return Ok(SqlObfuscationMode::default());
+    }
+    let mode = value
+        .as_string()
+        .ok_or_else(|| JsValue::from_str(&format!("{key} must be a string")))?;
+    match mode.as_str() {
+        "unspecified" | "" => Ok(SqlObfuscationMode::Unspecified),
+        "normalize_only" => Ok(SqlObfuscationMode::NormalizeOnly),
+        "obfuscate_only" => Ok(SqlObfuscationMode::ObfuscateOnly),
+        "obfuscate_and_normalize" => Ok(SqlObfuscationMode::ObfuscateAndNormalize),
+        _ => Err(JsValue::from_str(&format!(
+            "{key} must be one of: unspecified, normalize_only, obfuscate_only, obfuscate_and_normalize"
+        ))),
+    }
+}
+
+fn optional_sql_config(object: &JsValue, key: &str) -> Result<SqlObfuscateConfig, JsValue> {
+    let value = Reflect::get(object, &JsValue::from_str(key))?;
+    if value.is_null() || value.is_undefined() {
+        return Ok(SqlObfuscateConfig::default());
+    }
+    Ok(SqlObfuscateConfig {
+        replace_digits: field_bool(&value, "replace_digits", false)?,
+        keep_sql_alias: field_bool(&value, "keep_sql_alias", false)?,
+        dollar_quoted_func: field_bool(&value, "dollar_quoted_func", false)?,
+        keep_null: field_bool(&value, "keep_null", false)?,
+        keep_boolean: field_bool(&value, "keep_boolean", false)?,
+        keep_positional_parameter: field_bool(&value, "keep_positional_parameter", false)?,
+        keep_trailing_semicolon: field_bool(&value, "keep_trailing_semicolon", false)?,
+        keep_identifier_quotation: field_bool(&value, "keep_identifier_quotation", false)?,
+        replace_bind_parameter: field_bool(&value, "replace_bind_parameter", false)?,
+        remove_space_between_parentheses: field_bool(
+            &value,
+            "remove_space_between_parentheses",
+            false,
+        )?,
+        keep_json_path: field_bool(&value, "keep_json_path", false)?,
+        obfuscation_mode: field_sql_obfuscation_mode(&value, "obfuscation_mode")?,
+    })
+}
+
+fn optional_json_obfuscator(object: &JsValue, key: &str) -> Result<JsonObfuscator, JsValue> {
+    let value = Reflect::get(object, &JsValue::from_str(key))?;
+    if value.is_null() || value.is_undefined() {
+        return Ok(JsonObfuscator::new(JsonObfuscatorConfig::default()));
+    }
+    Ok(JsonObfuscator::new(JsonObfuscatorConfig {
+        enabled: field_bool(&value, "enabled", true)?,
+        keep_keys: field_string_set(&value, "keep_keys")?,
+        ..JsonObfuscatorConfig::default()
+    }))
+}
+
+fn optional_replace_rules(
+    object: &JsValue,
+    key: &str,
+) -> Result<Option<Vec<ReplaceRule>>, JsValue> {
+    let value = Reflect::get(object, &JsValue::from_str(key))?;
+    if value.is_null() || value.is_undefined() {
+        return Ok(None);
+    }
+    if !Array::is_array(&value) {
+        return Err(JsValue::from_str(&format!("{key} must be an array")));
+    }
+    let array = Array::from(&value);
+    let mut rules = Vec::with_capacity(array.length() as usize);
+    for item in array.iter() {
+        rules.push(replace_rule(&item)?);
+    }
+    Ok(Some(rules))
+}
+
+fn replace_rule(value: &JsValue) -> Result<ReplaceRule, JsValue> {
+    let name = required_string(value, "name")?;
+    let pattern = required_string(value, "pattern")?;
+    let repl = required_string(value, "repl")?;
+    let re = Regex::new(&pattern)
+        .map_err(|error| JsValue::from_str(&format!("pattern is invalid: {error}")))?;
+    let no_expansion = Replacer::no_expansion(&mut repl.as_str()).is_some();
+    Ok(ReplaceRule {
+        name,
+        re,
+        repl,
+        no_expansion,
+    })
 }
 
 fn required_number(value: &JsValue, key: &str) -> Result<u32, HttpError> {
