@@ -22,7 +22,12 @@ git = "https://github.com/DataDog/libdatadog.git"
 tag = "v43.0.0"
 default-features = false
 
+[dependencies.libdd-trace-obfuscation]
+git = "https://github.com/DataDog/libdatadog.git"
+tag = "v43.0.0"
+default-features = false
+
 [features]
 default = []
 compression = ["libdd-data-pipeline-core/compression"]
-regex-lite = ["libdd-data-pipeline-core/regex-lite"]
+regex-lite = ["libdd-data-pipeline-core/regex-lite", "libdd-trace-obfuscation/regex-lite"]

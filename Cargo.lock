@@ -1204,6 +1204,7 @@ version = "0.1.0"
 dependencies = [
  "libdd-capabilities",
  "libdd-data-pipeline-core",
+ "libdd-trace-obfuscation",
  "libdd-trace-utils",
  "thiserror 1.0.69",
 ]
@@ -1236,6 +1237,8 @@ dependencies = [
  "libdatadog-data-pipeline",
  "libdd-capabilities",
  "libdd-ddsketch 1.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde",
+ "serde-wasm-bindgen",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "zrip",

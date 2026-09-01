@@ -21,6 +21,8 @@ http = "1"
 libdd-ddsketch = "1.1.1"
 # Keep this aligned with the pure-Rust WASM encoder used by libdatadog.
 zrip = { version = "=0.6.0", default-features = false, features = ["alloc"] }
+serde = "1.0"
+serde-wasm-bindgen = "0.4"
 
 [dependencies.libdd-capabilities]
 git = "https://github.com/DataDog/libdatadog.git"

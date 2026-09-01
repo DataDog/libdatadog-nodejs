@@ -8,14 +8,13 @@ use bytes::Bytes;
 use futures::future::{AbortHandle, Abortable};
 use js_sys::{Array, Function, Object, Promise, Reflect, Uint8Array};
 use libdatadog_data_pipeline::{
-    send_agentless_v04, AgentlessTraceConfig, SendAgentlessV04Error, TracerMetadata,
-    DEFAULT_AGENTLESS_TIMEOUT,
+    send_agentless_v04, AgentlessTraceConfig, ObfuscationConfig, SendAgentlessV04Error,
+    TracerMetadata, DEFAULT_AGENTLESS_TIMEOUT,
 };
 use libdd_capabilities::{HttpClientCapability, HttpError, SleepCapability};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 
-#[derive(Clone)]
 struct AgentlessExporterOptions {
     endpoint: String,
     api_key: String,
@@ -29,6 +28,7 @@ struct AgentlessExporterOptions {
     language_version: String,
     language_interpreter: String,
     timeout_ms: Option<u32>,
+    obfuscation_config: ObfuscationConfig,
 }
 
 #[derive(Clone)]
@@ -171,6 +171,7 @@ impl AgentlessExporter {
             language_version: required_string(&value, "languageVersion")?,
             language_interpreter: required_string(&value, "languageInterpreter")?,
             timeout_ms: optional_number(&value, "timeoutMs")?,
+            obfuscation_config: optional_obfuscation_config(&value, "obfuscation")?,
         };
         let metadata = TracerMetadata {
             hostname: options.hostname.unwrap_or_default(),
@@ -193,6 +194,7 @@ impl AgentlessExporter {
             endpoint_url: options.endpoint,
             api_key: options.api_key,
             timeout,
+            obfuscation_config: options.obfuscation_config,
         };
         let capabilities = HostCapabilities {
             request,
@@ -221,7 +223,8 @@ impl AgentlessExporter {
             id: operation_id,
             in_flight: self.in_flight.clone(),
         };
-        let send = send_agentless_v04(&self.capabilities, payload, &self.metadata, &self.config);
+        let send =
+            send_agentless_v04(&self.capabilities, payload, &self.metadata, &self.config, false);
 
         match Abortable::new(send, registration).await {
             Ok(Ok(_)) => Ok(()),
@@ -346,6 +349,15 @@ fn optional_number(value: &JsValue, key: &str) -> Result<Option<u32>, JsValue> {
     Ok(Some(u32::try_from(number as u64).map_err(|_| {
         JsValue::from_str(&format!("{key} must be an unsigned integer"))
     })?))
+}
+
+fn optional_obfuscation_config(value: &JsValue, key: &str) -> Result<ObfuscationConfig, JsValue> {
+    let value = Reflect::get(value, &JsValue::from_str(key))?;
+    if value.is_null() || value.is_undefined() {
+        return Ok(ObfuscationConfig::default());
+    }
+    serde_wasm_bindgen::from_value(value)
+        .map_err(|error| JsValue::from_str(&format!("{key} is invalid: {error}")))
 }
 
 fn required_number(value: &JsValue, key: &str) -> Result<u32, HttpError> {
