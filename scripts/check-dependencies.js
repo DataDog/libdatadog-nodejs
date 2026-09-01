@@ -17,6 +17,15 @@ const remoteConfigDuplicatePackages = new Map([
   ['thiserror-impl', new Set(['1.0.69', '2.0.20'])],
   ['untrusted', new Set(['0.7.1', '0.9.0'])],
 ])
+// async-trait pulled in via libdd-shared-runtime now depends on syn 3, while
+// pin-project (via libdd-common) still depends on syn 2. Both majors coexist.
+const libdatadogWasmDuplicatePackages = new Map([
+  ['syn', new Set(['2.0.119', '3.0.4'])],
+])
+const allowedDuplicatePackagesByTree = new Map([
+  ['remote-config', remoteConfigDuplicatePackages],
+  ['libdatadog-wasm', libdatadogWasmDuplicatePackages],
+])
 const remoteConfigTokioPackages = new Set(['tokio', 'tokio-macros', 'tokio-util'])
 
 /**
@@ -64,12 +73,12 @@ function findDuplicateVersions (dependencies, tree = {}) {
     versionsByPackage.set(name, versions)
   }
 
+  const allowedDuplicatePackages = allowedDuplicatePackagesByTree.get(tree.package)
   for (const [name, versions] of versionsByPackage) {
-    const allowedVersions = remoteConfigDuplicatePackages.get(name)
-    const allowedRemoteConfigDuplicate = tree.package === 'remote-config'
-      && allowedVersions !== undefined
+    const allowedVersions = allowedDuplicatePackages?.get(name)
+    const isAllowedDuplicate = allowedVersions !== undefined
       && setsEqual(versions, allowedVersions)
-    if (versions.size > 1 && !allowedRemoteConfigDuplicate) {
+    if (versions.size > 1 && !isAllowedDuplicate) {
       failures.push({ name, versions: [...versions] })
     }
   }
