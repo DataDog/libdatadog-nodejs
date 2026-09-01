@@ -102,7 +102,7 @@ jobs:
     needs: build-test-wasm
     with:
       package-manager: 'yarn'
-      cache: false
+      cache: true
       min-node-version: 18
       rust: true
       only: darwin-arm64,darwin-x64,linux-arm64,linux-x64
