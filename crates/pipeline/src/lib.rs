@@ -18,8 +18,6 @@ mod span_bytes;
 mod trace_data;
 use trace_data::*;
 
-mod stats;
-
 use libdd_trace_utils::change_buffer::{ChangeBuffer, ChangeBufferState};
 use libdd_trace_utils::span::v04::{AttributeAnyValue, AttributeArrayValue, SpanEvent};
 use span_string::SpanString;
@@ -170,7 +168,6 @@ pub struct WasmSpanState {
     exporter: UnsafeCell<Option<TraceExporter<WasmCapabilities, LocalRuntime>>>,
     builder: UnsafeCell<Option<TraceExporterBuilder<LocalRuntime>>>,
     cbs: RefCell<ChangeBufferState<WasmTraceData>>,
-    stats_collector: RefCell<Option<stats::StatsCollector>>,
     /// Chunks staged by `prepareChunk`, one per trace (segment), sent together by
     /// `sendPreparedChunk` as a single multi-trace request. The exporter groups a
     /// flush batch by trace and calls `prepareChunk` once per trace so each chunk
@@ -208,6 +205,10 @@ pub struct WasmSpanState {
     /// config. Only takes effect if set before the first send
     /// (when the exporter is built).
     telemetry_config: Cell<Option<TelemetryConfig>>,
+    /// Set by `shutdown`. Terminal: the exporter (and the builder, if the
+    /// exporter was never built) is dropped, so later sends must fail fast
+    /// instead of lazily building a fresh exporter behind the caller's back.
+    shut_down: Cell<bool>,
     /// Latched message from a failed lazy `build_async`. Building is one-shot and
     /// a failure is fatal (bad config), so once set every send returns it (as a
     /// distinguishable error) instead of a misleading "builder already consumed",
@@ -222,21 +223,6 @@ impl Drop for InFlightGuard<'_> {
     fn drop(&mut self) {
         self.0.set(false);
     }
-}
-
-fn stats_flush_result(sent: bool, collapsed_spans: u64) -> Result<JsValue, JsValue> {
-    let result = js_sys::Object::new();
-    js_sys::Reflect::set(
-        &result,
-        &JsValue::from_str("sent"),
-        &JsValue::from_bool(sent),
-    )?;
-    js_sys::Reflect::set(
-        &result,
-        &JsValue::from_str("collapsedSpans"),
-        &JsValue::from_f64(collapsed_spans as f64),
-    )?;
-    Ok(result.into())
 }
 
 #[wasm_bindgen]
@@ -259,6 +245,12 @@ impl WasmSpanState {
         runtime_id: &str,
         client_computed_stats: bool,
     ) -> Result<WasmSpanState, JsValue> {
+        if stats_enabled && client_computed_stats {
+            return Err(JsValue::from_str(
+                "WasmSpanState: statsEnabled and clientComputedStats are mutually exclusive",
+            ));
+        }
+
         let mut builder = TraceExporterBuilder::<LocalRuntime>::new();
         builder
             .set_url(url)
@@ -267,10 +259,7 @@ impl WasmSpanState {
             .set_language_version(lang_version)
             .set_language_interpreter(lang_interpreter)
             .set_otlp_instrumentation_scope("dd-trace-js", tracer_version)
-            // Populate the payload-level TracerMetadata (service/env/hostname/
-            // app_version) the agent receives. These values are already passed
-            // in for the stats collector; without these calls the trace
-            // payload's tracer metadata is sent empty.
+            // Without these setters the payload-level TracerMetadata is empty.
             .set_service(tracer_service)
             .set_env(env)
             .set_hostname(hostname)
@@ -278,16 +267,9 @@ impl WasmSpanState {
             .set_runtime_id(runtime_id)
             .enable_agent_rates_payload_version();
 
-        // Advertise `Datadog-Client-Computed-Stats` so the agent skips its own
-        // APM stats/sampling for these traces. This is required in two cases:
-        //  - `stats_enabled`: we build a StatsCollector and send client-side
-        //    stats, so the agent MUST NOT also compute them (double counting);
-        //  - `client_computed_stats`: set independently for APM-standalone
-        //    (apmTracingEnabled=false), where the agent should skip APM stats
-        //    even though we don't compute them client-side.
-        // Enabling stats therefore always implies the header, so OR the flags
-        // rather than relying on the caller to keep them in sync.
-        if client_computed_stats || stats_enabled {
+        if stats_enabled {
+            builder.enable_stats(Duration::from_secs(10));
+        } else if client_computed_stats {
             builder.set_client_computed_stats();
         }
 
@@ -311,31 +293,12 @@ impl WasmSpanState {
             pid,
         );
 
-        let stats_collector = if stats_enabled {
-            Some(stats::StatsCollector::new(
-                Duration::from_secs(10),
-                url.to_string(),
-                stats::StatsMeta {
-                    hostname: hostname.to_string(),
-                    env: env.to_string(),
-                    version: app_version.to_string(),
-                    lang: lang.to_string(),
-                    tracer_version: tracer_version.to_string(),
-                    runtime_id: runtime_id.to_string(),
-                    service: tracer_service.to_string(),
-                },
-            ))
-        } else {
-            None
-        };
-
         Ok(WasmSpanState {
             change_queue,
             string_table_input: vec![0u8; string_table_input_size as usize],
             exporter: UnsafeCell::new(None),
             builder: UnsafeCell::new(Some(builder)),
             cbs: RefCell::new(change_buffer_state),
-            stats_collector: RefCell::new(stats_collector),
             prepared_spans: RefCell::new(Vec::new()),
             sending: Cell::new(false),
             use_v05: Cell::new(false),
@@ -343,6 +306,7 @@ impl WasmSpanState {
             otlp_protocol: Cell::new(None),
             otlp_headers: Cell::new(Vec::new()),
             telemetry_config: Cell::new(None),
+            shut_down: Cell::new(false),
             build_error: RefCell::new(None),
         })
     }
@@ -439,8 +403,8 @@ impl WasmSpanState {
         self.string_table_input.len() as u32
     }
 
-    /// Prepare a chunk of spans for sending. Flushes the change buffer,
-    /// extracts spans, feeds stats. Returns `true` if a chunk was prepared
+    /// Prepare a chunk of spans for sending. Flushes the change buffer and
+    /// extracts spans. Returns `true` if a chunk was prepared
     /// (there are spans to send) and `false` if there was nothing to send.
     /// Must be followed by `sendPreparedChunk()` to actually send.
     #[wasm_bindgen(js_name = "prepareChunk")]
@@ -450,6 +414,11 @@ impl WasmSpanState {
         first_is_local_root: bool,
         chunk: &[u8],
     ) -> Result<bool, JsValue> {
+        if self.shut_down.get() {
+            return Err(JsValue::from_str(
+                "prepareChunk: exporter has been shut down",
+            ));
+        }
         // Validate the JS-supplied count against the actual buffer size before
         // doing any work: each span id is a u64 (8 bytes). This prevents an
         // out-of-bounds read panic (and a huge `Vec::with_capacity`) when the
@@ -486,10 +455,6 @@ impl WasmSpanState {
             .flush_chunk(&span_ids, first_is_local_root)
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
-        if let Some(collector) = self.stats_collector.borrow_mut().as_mut() {
-            collector.add_spans(&spans_vec);
-        }
-
         // Stage this trace's chunk for the subsequent sendPreparedChunk call.
         // Multiple prepareChunk calls (one per trace) accumulate here and are
         // sent together as one multi-trace request. An empty result (e.g. every
@@ -514,6 +479,11 @@ impl WasmSpanState {
         if self.sending.get() {
             return Err(JsValue::from_str("sendPreparedChunk is already in flight"));
         }
+        if self.shut_down.get() {
+            return Err(JsValue::from_str(
+                "sendPreparedChunk: exporter has been shut down",
+            ));
+        }
         self.sending.set(true);
         let _in_flight = InFlightGuard(&self.sending);
 
@@ -537,9 +507,11 @@ impl WasmSpanState {
             // First send: build the exporter asynchronously. `build` is not
             // available on wasm (it needs a blocking runtime), so we drive
             // `build_async` here where we already have an async context.
+            // Unreachable in practice: the builder is only taken here (after
+            // which the exporter exists) or by `shutdown` (rejected above).
             let mut builder = unsafe { &mut *self.builder.get() }
                 .take()
-                .ok_or_else(|| JsValue::from_str("exporter builder already consumed"))?;
+                .ok_or_else(|| JsValue::from_str("exporter builder unavailable"))?;
             // Output format is decided here, at first build, and then fixed.
             // v0.5 drops meta_struct/span_events/span_links by design (the v0.5
             // schema has no slots for them); dd-trace-js only enables this after
@@ -568,7 +540,7 @@ impl WasmSpanState {
                 Err(e) => {
                     // Latch the failure: the builder is now consumed and the
                     // config won't change, so every later send must fail fast.
-                    let msg = format!("native exporter build failed: {e:?}");
+                    let msg = format!("native exporter build failed: {e}");
                     *self.build_error.borrow_mut() = Some(msg.clone());
                     return Err(build_failure_error(&msg));
                 }
@@ -587,44 +559,7 @@ impl WasmSpanState {
 
         response_str
             .map(|s| JsValue::from_str(&s))
-            .map_err(|e| JsValue::from_str(&format!("{:?}", e)))
-    }
-
-    /// Flush aggregated stats to the agent's /v0.6/stats endpoint.
-    ///
-    /// Should be called periodically (e.g. every 10s) from JS, and with
-    /// `force=true` on shutdown. Returns `{ sent, collapsedSpans }` so JS can
-    /// emit the same collapsed-span health metric as libdd-trace-stats's native
-    /// exporter.
-    #[wasm_bindgen(js_name = "flushStats")]
-    pub async fn flush_stats(&self, force: bool) -> Result<JsValue, JsValue> {
-        // Build the stats request under a brief *synchronous* borrow, then drop
-        // the borrow BEFORE the async send. The collector therefore stays in
-        // `stats_collector`, so a concurrent `prepareChunk` during the in-flight
-        // send still reaches `add_spans` and those spans are counted. (Taking
-        // the collector out for the whole await would silently drop them from
-        // client-side stats.) No borrow is held across the await, so there is
-        // no double-borrow hazard from overlapping calls.
-        let prepared = {
-            let mut guard = self.stats_collector.borrow_mut();
-            match guard.as_mut() {
-                Some(collector) => collector
-                    .prepare_request(force)
-                    .map_err(|e| JsValue::from_str(&e))?,
-                None => return stats_flush_result(false, 0),
-            }
-        };
-        let sent = match prepared.request {
-            Some(req) => {
-                stats::StatsCollector::send_request(req)
-                    .await
-                    .map_err(|e| JsValue::from_str(&e))?;
-                true
-            }
-            None => false,
-        };
-
-        stats_flush_result(sent, prepared.collapsed_spans)
+            .map_err(|e| JsValue::from_str(&e.to_string()))
     }
 
     /// Flush the queued change-buffer operations. On success always returns
@@ -637,6 +572,45 @@ impl WasmSpanState {
             .flush_change_buffer()
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         Ok(true)
+    }
+
+    /// Gracefully shut down the exporter and stop the background workers.
+    /// Should be awaited during tracer shutdown to avoid losing in-flight
+    /// data. Terminal and idempotent: it consumes the exporter (and the
+    /// builder, if the exporter was never built), so later sends error out
+    /// rather than silently starting a new exporter. Staged-but-unsent chunks
+    /// are dropped and `prepareChunk` errors afterwards, so flush before
+    /// shutting down.
+    ///
+    /// `timeoutMs` bounds the wait; on timeout returns an error and workers
+    /// may still be finishing. `None` waits indefinitely.
+    #[wasm_bindgen(js_name = "shutdown")]
+    pub async fn shutdown(&self, timeout_ms: Option<u32>) -> Result<(), JsValue> {
+        // `sendPreparedChunk` holds an `&mut` on the exporter across awaits;
+        // taking it out from under an in-flight send would alias.
+        if self.sending.get() {
+            return Err(JsValue::from_str("shutdown: sendPreparedChunk in flight"));
+        }
+        self.sending.set(true);
+        let _in_flight = InFlightGuard(&self.sending);
+        self.shut_down.set(true);
+        self.prepared_spans.borrow_mut().clear();
+
+        // SAFETY: `sending` guard prevents overlapping access; WASM is single-threaded.
+        let exporter_slot = unsafe { &mut *self.exporter.get() };
+        // Drop the builder too: without it a shutdown that happens before the
+        // first send would leave the lazy build path armed, and the next send
+        // would quietly spin up a fresh exporter after shutdown.
+        unsafe { &mut *self.builder.get() }.take();
+        // Idempotent: never-built or already-shut-down state is not an error.
+        let Some(exporter) = exporter_slot.take() else {
+            return Ok(());
+        };
+        let timeout = timeout_ms.map(|ms| Duration::from_millis(u64::from(ms)));
+        exporter
+            .shutdown_async(timeout)
+            .await
+            .map_err(|e| JsValue::from_str(&format!("shutdown: {e}")))
     }
 
     /// Set default meta tags applied to every new span.
