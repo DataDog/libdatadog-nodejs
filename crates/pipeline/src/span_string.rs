@@ -25,6 +25,10 @@ impl SpanText for SpanString {
     fn from_static_str(value: &'static str) -> Self {
         SpanString(Arc::from(value))
     }
+
+    fn from_owned(value: String) -> Self {
+        SpanString(Arc::from(value))
+    }
 }
 
 impl From<String> for SpanString {

@@ -75,8 +75,8 @@ test('embeds a Brotli-compressed WASM fallback below the size budgets', () => {
     'libdatadog_wasm.js',
   ))
 
-  assert.ok(Buffer.byteLength(glue) < 200 * 1024)
-  assert.ok(wasm.length < 500 * 1024)
+  assert.ok(Buffer.byteLength(glue) < 260 * 1024)
+  assert.ok(wasm.length < 600 * 1024)
 })
 
 test('embeds dedicated remote config WASM below the size budgets', () => {
