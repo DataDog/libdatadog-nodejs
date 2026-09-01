@@ -1081,174 +1081,11 @@ describe('pipeline', { skip }, () => {
       assert.strictEqual(header, undefined)
     })
 
-    it('sends the header when stats are enabled (client-side stats imply it)', async () => {
-      // Enabling client-side stats without clientComputedStats must still send
-      // the header, otherwise the agent double-counts APM stats.
-      const { header, sawTraces } = await captureTraceHeader({ statsEnabled: true, clientComputedStats: false })
-      assert.ok(sawTraces, 'expected a POST to /v0.4/traces')
-      assert.strictEqual(header, 'true')
-    })
-  })
-
-  describe('client-side stats', () => {
-    it('aggregates and flushes stats to /v0.6/stats', async () => {
-      const http = require('node:http')
-      const seen = []
-      const server = http.createServer((req, res) => {
-        const chunks = []
-        req.on('data', c => chunks.push(c))
-        req.on('end', () => {
-          seen.push({ method: req.method, url: req.url, len: Buffer.concat(chunks).length })
-          res.writeHead(200, { 'content-type': 'application/json' })
-          res.end('{}')
-        })
-      })
-      await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
-      const { port } = server.address()
-
-      // statsEnabled:true builds the StatsCollector; prepareChunk feeds spans
-      // into it, and flushStats(true) force-flushes to /v0.6/stats.
-      const ns = new NativeSpansInterface({ agentUrl: `http://127.0.0.1:${port}`, statsEnabled: true })
-      const span = ns.createSpan()
-      span.name = 'stats-span'
-      span.service = 'stats-svc'
-      span.resource = '/stats'
-      span.type = 'web'
-      span.duration = 5_000_000n
-
-      try {
-        await ns.flushSpans(span)
-        const result = await ns.state.flushStats(true)
-        assert.deepStrictEqual(result, { sent: true, collapsedSpans: 0 }, 'flushStats reported a send')
-        const statsReq = seen.find(r => r.url === '/v0.6/stats')
-        assert.ok(statsReq, 'agent received a /v0.6/stats request')
-        assert.strictEqual(statsReq.method, 'PUT')
-        assert.ok(statsReq.len > 0, 'stats payload is non-empty')
-
-        // Nothing new aggregated -> a second forced flush is a no-op.
-        assert.deepStrictEqual(await ns.state.flushStats(true), { sent: false, collapsedSpans: 0 }, 'second flush has nothing to send')
-      } finally {
-        server.closeAllConnections?.()
-        server.close()
-      }
-    })
-
-    it('returns collapsed span count when stats cardinality overflows', async () => {
-      // The resource field has its own cardinality limit (1024) and collapses to a placeholder long
-      // before the whole-key limit (~7000) is reached, so varying it no longer overflows the key at all.
-      // `service` has no per-field limit, so distinct services still overflow the whole key -- which is
-      // what `collapsedSpans` counts.
-      const http = require('node:http')
-      const seen = []
-      const server = http.createServer((req, res) => {
-        const chunks = []
-        req.on('data', c => chunks.push(c))
-        req.on('end', () => {
-          seen.push({ method: req.method, url: req.url, len: Buffer.concat(chunks).length })
-          res.writeHead(200, { 'content-type': 'application/json' })
-          res.end('{}')
-        })
-      })
-      await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
-      const { port } = server.address()
-
-      const ns = new NativeSpansInterface({ agentUrl: `http://127.0.0.1:${port}`, statsEnabled: true })
-      let batch = []
-
-      try {
-        for (let i = 0; i < 15_000; i++) {
-          const span = ns.createSpan()
-          span.name = 'stats-span'
-          span.service = `stats-svc-${i}`
-          span.resource = '/stats'
-          span.type = 'web'
-          span.setTag('span.kind', 'server')
-          span.duration = 5_000_000n
-          ns.flushChangeQueue()
-          batch.push(span)
-          if (batch.length === 500) {
-            await ns.flushSpans(...batch)
-            batch = []
-          }
-        }
-        if (batch.length > 0) {
-          await ns.flushSpans(...batch)
-        }
-
-        const result = await ns.state.flushStats(true)
-        assert.strictEqual(result.sent, true)
-        assert.ok(result.collapsedSpans > 0, 'stats cardinality overflow reported collapsed spans')
-        assert.ok(seen.some(r => r.url === '/v0.6/stats'), 'agent received a /v0.6/stats request')
-      } finally {
-        server.closeAllConnections?.()
-        server.close()
-      }
-    })
-
-    it('flushStats reports no send when stats are disabled', async () => {
-      const ns = new NativeSpansInterface({ statsEnabled: false })
-      assert.deepStrictEqual(await ns.state.flushStats(true), { sent: false, collapsedSpans: 0 })
-    })
-
-    it('flushes stats to /v0.6/stats over a Unix domain socket', { skip: process.platform === 'win32' }, async () => {
-      // A `unix://` agent URL must route /v0.6/stats over the socket, like
-      // traces do. parse_uri hex-encodes the socket path into the URI authority
-      // (which the transport's decode_socket_path reverses); a raw parse would
-      // leave the path in the URI path and never reach the socket.
-      const http = require('node:http')
-      const os = require('node:os')
-      const fs = require('node:fs')
-      const nodePath = require('node:path')
-      // Keep the path short — AF_UNIX paths are capped (~104 bytes on macOS).
-      const sockPath = nodePath.join(os.tmpdir(), `dd-st-${process.pid}.sock`)
-      try {
-        fs.unlinkSync(sockPath)
-      } catch {
-        // not present
-      }
-      const seen = []
-      const server = http.createServer((req, res) => {
-        const chunks = []
-        req.on('data', c => chunks.push(c))
-        req.on('end', () => {
-          seen.push({ method: req.method, url: req.url, len: Buffer.concat(chunks).length })
-          res.writeHead(200, { 'content-type': 'application/json' })
-          res.end('{}')
-        })
-      })
-      await new Promise((resolve, reject) => {
-        server.once('error', reject)
-        server.listen(sockPath, resolve)
-      })
-
-      const ns = new NativeSpansInterface({ agentUrl: `unix://${sockPath}`, statsEnabled: true })
-      const span = ns.createSpan()
-      span.name = 'stats-span'
-      span.service = 'stats-svc'
-      span.resource = '/stats'
-      span.type = 'web'
-      span.duration = 5_000_000n
-
-      try {
-        await ns.flushSpans(span)
-        const result = await ns.state.flushStats(true)
-        assert.deepStrictEqual(
-          result,
-          { sent: true, collapsedSpans: 0 },
-          'flushStats reported a send over the socket',
-        )
-        const statsReq = seen.find(r => r.url === '/v0.6/stats')
-        assert.ok(statsReq, 'agent received a /v0.6/stats request over the socket')
-        assert.ok(statsReq.len > 0, 'stats payload is non-empty')
-      } finally {
-        server.closeAllConnections?.()
-        server.close()
-        try {
-          fs.unlinkSync(sockPath)
-        } catch {
-          // already gone
-        }
-      }
+    it('rejects statsEnabled together with clientComputedStats', () => {
+      assert.throws(
+        () => new NativeSpansInterface({ statsEnabled: true, clientComputedStats: true }),
+        /mutually exclusive/,
+      )
     })
   })
 
@@ -1288,6 +1125,189 @@ describe('pipeline', { skip }, () => {
       } finally {
         server.closeAllConnections?.()
         server.close()
+      }
+    })
+  })
+
+  // Minimal agent stub: records every request and advertises the /info
+  // capabilities libdatadog gates client-side stats on (`client_drop_p0s` plus
+  // a `/v0.6/stats` endpoint). Without those the stats worker stays disabled.
+  //
+  // Every response carries `Datadog-Agent-State`: the info cache is a process
+  // global shared by every exporter built in this test file, so an earlier test
+  // may already have populated it from its own stub. The state header makes the
+  // exporter re-fetch `/info` from *this* stub instead of trusting that cache.
+  async function startAgentStub () {
+    const http = require('node:http')
+    const seen = []
+    const state = `state-${process.hrtime.bigint()}`
+    const info = JSON.stringify({
+      version: '7.60.0',
+      client_drop_p0s: true,
+      endpoints: ['/v0.4/traces', '/v0.5/traces', '/v0.6/stats', '/info'],
+      peer_tags: [],
+      span_kinds_stats_computed: ['server', 'consumer', 'client', 'producer'],
+    })
+    const server = http.createServer((req, res) => {
+      const chunks = []
+      req.on('data', c => chunks.push(c))
+      req.on('end', () => {
+        seen.push({
+          method: req.method,
+          url: req.url,
+          len: Buffer.concat(chunks).length,
+          headers: req.headers,
+        })
+        const headers = { 'content-type': 'application/json', 'datadog-agent-state': state }
+        res.writeHead(200, headers)
+        res.end(req.url === '/info' ? info : '{}')
+      })
+    })
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+    return {
+      seen,
+      url: `http://127.0.0.1:${server.address().port}`,
+      close () {
+        server.closeAllConnections?.()
+        server.close()
+      },
+    }
+  }
+
+  function makeSpan (ns, resource) {
+    const span = ns.createSpan()
+    span.name = 'stats-span'
+    span.service = 'stats-svc'
+    span.resource = resource
+    span.type = 'web'
+    span.setTag('span.kind', 'server')
+    span.duration = 5_000_000n
+    return span
+  }
+
+  describe('client-side stats', () => {
+    it('computes stats natively and flushes them to /v0.6/stats on shutdown', async () => {
+      const agent = await startAgentStub()
+      const ns = new NativeSpansInterface({ agentUrl: agent.url, statsEnabled: true })
+
+      try {
+        // Stats only start once the /info fetcher has confirmed the agent
+        // supports them, which happens asynchronously after the exporter is
+        // built on the first send. Keep sending until libdatadog stamps the
+        // client-computed-stats header, which it only does once the
+        // concentrator is actually running.
+        let tracesWithStatsHeader
+        for (let i = 0; i < 50; i++) {
+          await ns.flushSpans(makeSpan(ns, `/stats/${i}`))
+          tracesWithStatsHeader = agent.seen.filter(
+            r => r.url === '/v0.4/traces' && r.headers['datadog-client-computed-stats'],
+          )
+          if (tracesWithStatsHeader.length > 0) break
+          await new Promise(resolve => setTimeout(resolve, 20))
+        }
+        assert.ok(agent.seen.some(r => r.url === '/info'), 'exporter polled /info')
+        assert.ok(
+          tracesWithStatsHeader.length > 0,
+          'traces carry Datadog-Client-Computed-Stats once stats are running',
+        )
+
+        // The worker only flushes on its bucket interval; shutdown forces the
+        // last bucket out, which is the point of the binding.
+        assert.ok(!agent.seen.some(r => r.url === '/v0.6/stats'), 'no stats sent before shutdown')
+        await ns.state.shutdown(10_000)
+
+        const statsReq = agent.seen.find(r => r.url === '/v0.6/stats')
+        assert.ok(statsReq, 'agent received a /v0.6/stats request')
+        assert.strictEqual(statsReq.method, 'POST')
+        assert.ok(statsReq.len > 0, 'stats payload is non-empty')
+      } finally {
+        agent.close()
+      }
+    })
+
+    it('does not send stats when stats are disabled', async () => {
+      const agent = await startAgentStub()
+      const ns = new NativeSpansInterface({ agentUrl: agent.url, statsEnabled: false })
+
+      try {
+        await ns.flushSpans(makeSpan(ns, '/no-stats'))
+        await ns.state.shutdown(10_000)
+        assert.ok(!agent.seen.some(r => r.url === '/v0.6/stats'), 'no /v0.6/stats request')
+      } finally {
+        agent.close()
+      }
+    })
+  })
+
+  describe('shutdown', () => {
+    it('is a no-op when the exporter was never built', async () => {
+      const ns = new NativeSpansInterface({ agentUrl: 'http://127.0.0.1:1' })
+      await ns.state.shutdown(1000)
+    })
+
+    it('is idempotent', async () => {
+      const agent = await startAgentStub()
+      const ns = new NativeSpansInterface({ agentUrl: agent.url })
+      try {
+        await ns.flushSpans(makeSpan(ns, '/shutdown'))
+        await ns.state.shutdown(10_000)
+        await ns.state.shutdown(10_000)
+      } finally {
+        agent.close()
+      }
+    })
+
+    it('rejects flushes after shutdown, including before the first send', async () => {
+      const agent = await startAgentStub()
+      try {
+        // Shutting down before anything was sent must also consume the builder,
+        // otherwise the next send would lazily build a brand new exporter.
+        const early = new NativeSpansInterface({ agentUrl: agent.url })
+        await early.state.shutdown(1000)
+        await assert.rejects(
+          early.flushSpans(makeSpan(early, '/after-shutdown')),
+          /prepareChunk: exporter has been shut down/,
+        )
+
+        const used = new NativeSpansInterface({ agentUrl: agent.url })
+        await used.flushSpans(makeSpan(used, '/before-shutdown'))
+        await used.state.shutdown(10_000)
+        await assert.rejects(
+          used.flushSpans(makeSpan(used, '/after-shutdown')),
+          /prepareChunk: exporter has been shut down/,
+        )
+      } finally {
+        agent.close()
+      }
+    })
+
+    it('rejects sendPreparedChunk directly after shutdown', async () => {
+      const agent = await startAgentStub()
+      const ns = new NativeSpansInterface({ agentUrl: agent.url })
+      try {
+        await ns.state.shutdown(1000)
+        await assert.rejects(
+          ns.state.sendPreparedChunk(),
+          /sendPreparedChunk: exporter has been shut down/,
+        )
+      } finally {
+        agent.close()
+      }
+    })
+
+    it('does not accumulate staged chunks once shut down', async () => {
+      const agent = await startAgentStub()
+      const ns = new NativeSpansInterface({ agentUrl: agent.url })
+      try {
+        await ns.state.shutdown(1000)
+        for (let i = 0; i < 3; i++) {
+          assert.throws(
+            () => ns.state.prepareChunk(1, true, ns.flushBuffer),
+            /prepareChunk: exporter has been shut down/,
+          )
+        }
+      } finally {
+        agent.close()
       }
     })
   })
