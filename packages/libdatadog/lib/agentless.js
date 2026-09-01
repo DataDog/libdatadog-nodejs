@@ -1,6 +1,5 @@
 'use strict'
 
-const { AsyncResource } = require('node:async_hooks')
 const { randomUUID } = require('node:crypto')
 
 const { createHostTransport } = require('./agentless-transport')
@@ -47,7 +46,7 @@ class AgentlessExporter {
     }
 
     /** @param {unknown} error */
-    const complete = AsyncResource.bind((error) => {
+    const complete = (error) => {
       if (error !== undefined) {
         const message = errorMessage(error)
         if (!this.#closed || message !== canceledError) {
@@ -55,7 +54,7 @@ class AgentlessExporter {
         }
       }
       done()
-    }, 'libdatadog:AgentlessExporter.sendV04')
+    }
 
     try {
       this.#binding.sendV04(payload, complete)

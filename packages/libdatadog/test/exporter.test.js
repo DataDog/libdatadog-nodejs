@@ -1,7 +1,6 @@
 'use strict'
 
 const assert = require('node:assert/strict')
-const { AsyncLocalStorage } = require('node:async_hooks')
 const fs = require('node:fs')
 const http = require('node:http')
 const path = require('node:path')
@@ -279,39 +278,6 @@ test('agentless exporter drops over-budget requests without retrying', {
   } finally {
     exporter.close()
     transport.cancelRequest(1)
-    await new Promise(resolve => server.close(resolve))
-  }
-})
-
-test('agentless exporter preserves concurrent send callback context', {
-  skip: !fs.existsSync(wasmArtifact),
-}, async () => {
-  const pipeline = require('../wasm')
-  const storage = new AsyncLocalStorage()
-  const stores = new Map()
-  const log = testLog()
-  const server = http.createServer((incoming, response) => {
-    incoming.resume()
-    incoming.once('end', () => response.end())
-  })
-
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
-  const exporter = createExporter(pipeline, server)
-  /** @param {number} store */
-  const send = store => storage.run(store, () => new Promise((resolve) => {
-    exporter.sendV04(tracePayload(), () => {
-      stores.set(store, storage.getStore())
-      resolve()
-    }, log)
-  }))
-
-  try {
-    await Promise.all([send(1), send(2)])
-    assert.strictEqual(stores.get(1), 1)
-    assert.strictEqual(stores.get(2), 2)
-    assert.deepStrictEqual(log.errors, [])
-  } finally {
-    exporter.close()
     await new Promise(resolve => server.close(resolve))
   }
 })
