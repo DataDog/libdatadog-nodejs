@@ -312,7 +312,7 @@ fn network_error(error: JsValue) -> HttpError {
 }
 
 fn send_error(error: SendAgentlessV04Error) -> JsValue {
-    JsValue::from_str(&format!("failed to send data-pipeline export: {error}"))
+    JsValue::from_str(&error.to_string())
 }
 
 fn js_error_message(value: JsValue) -> String {

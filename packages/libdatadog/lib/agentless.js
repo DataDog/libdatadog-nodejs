@@ -5,22 +5,27 @@ const { randomUUID } = require('node:crypto')
 const { createHostTransport } = require('./agentless-transport')
 
 /** @typedef {import('../index').AgentlessExporterOptions} AgentlessExporterOptions */
+/** @typedef {import('../index').AgentlessLogger} AgentlessLogger */
 /** @typedef {typeof import('@datadog/libdatadog-wasm')} AgentlessBinding */
+
+const canceledError = 'data-pipeline export was cancelled'
 
 class AgentlessExporter {
   #binding
   #closed = false
-  #inFlight = new Set()
 
   /**
    * @param {AgentlessBinding} binding
    * @param {AgentlessExporterOptions} options
    */
   constructor (binding, options) {
-    const runtimeId = options.runtimeId ?? randomUUID()
+    const { runtimeId } = options
+    const bindingOptions = runtimeId === undefined || runtimeId === null
+      ? { ...options, runtimeId: randomUUID() }
+      : options
     const transport = createHostTransport()
     this.#binding = new binding.AgentlessExporter(
-      { ...options, runtimeId },
+      bindingOptions,
       transport.request,
       transport.cancelRequest,
       transport.sleep,
@@ -28,30 +33,51 @@ class AgentlessExporter {
     )
   }
 
-  sendV04 (payload) {
+  /**
+   * @param {Uint8Array} payload
+   * @param {() => void} done
+   * @param {AgentlessLogger} log
+   */
+  sendV04 (payload, done, log) {
     if (this.#closed) {
-      return Promise.reject(new Error('data-pipeline exporter is closed'))
+      log.error('Cannot send data-pipeline export after the exporter is closed')
+      done()
+      return
     }
 
     let operation
     try {
       operation = this.#binding.sendV04(payload)
     } catch (error) {
-      operation = Promise.reject(error)
+      log.error('Failed to send data-pipeline export: %s', errorMessage(error))
+      done()
+      return
     }
-    this.#inFlight.add(operation)
+
     operation.then(
-      () => this.#inFlight.delete(operation),
-      () => this.#inFlight.delete(operation),
+      done,
+      (error) => {
+        const message = errorMessage(error)
+        if (!this.#closed || message !== canceledError) {
+          log.error('Failed to send data-pipeline export: %s', message)
+        }
+        done()
+      },
     )
-    return operation
   }
 
-  async close () {
+  close () {
     this.#closed = true
     this.#binding.cancelAll()
-    await Promise.allSettled(this.#inFlight)
   }
+}
+
+/**
+ * @param {unknown} error
+ * @returns {string}
+ */
+function errorMessage (error) {
+  return error instanceof Error ? error.message : String(error)
 }
 
 /**
