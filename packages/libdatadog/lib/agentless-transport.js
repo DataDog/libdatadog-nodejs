@@ -1,6 +1,6 @@
 'use strict'
 
-const maxActiveBufferSize = 64 * 1024 * 1024
+const maxActiveBufferSize = 16 * 1024 * 1024
 
 let activeBufferSize = 0
 

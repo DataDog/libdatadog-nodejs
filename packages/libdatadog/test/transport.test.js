@@ -96,7 +96,7 @@ test('host transport bounds active request buffers', async () => {
 
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
   const { port } = server.address()
-  const atLimitBody = Buffer.alloc(64 * 1024 * 1024)
+  const atLimitBody = Buffer.alloc(16 * 1024 * 1024)
   const firstRequest = transport.request({
     id: 4,
     url: `http://127.0.0.1:${port}`,
