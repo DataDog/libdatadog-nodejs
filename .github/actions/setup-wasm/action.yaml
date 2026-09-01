@@ -1,0 +1,39 @@
+name: Setup WASM build
+description: Restore the Cargo cache and install the pinned WASM toolchain
+runs:
+  using: composite
+  steps:
+    - name: Add WASM target
+      run: rustup target add wasm32-unknown-unknown
+      shell: bash
+    - name: Restore Cargo build cache
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      with:
+        path: |
+          ~/.cargo/git/checkouts
+          ~/.cargo/git/db
+          ~/.cargo/registry/cache
+          ~/.cargo/registry/index
+          target
+        key: >-
+          wasm-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml') }}-${{
+          hashFiles('Cargo.toml', 'crates/**/Cargo.toml', 'crates/**/*.rs') }}
+        restore-keys: >-
+          wasm-${{ runner.os }}-${{
+          hashFiles('Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml') }}-
+    - name: Install wasm-pack
+      env:
+        WASM_PACK_SHA256: 278a8d668085821f4d1a637bd864f1713f872b0ae3a118c77562a308c0abfe8d
+        WASM_PACK_VERSION: 0.14.0
+      run: |
+        archive="wasm-pack-v${WASM_PACK_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+        install_directory="$RUNNER_TEMP/wasm-pack"
+        curl --fail --location --silent --show-error \
+          --output "$RUNNER_TEMP/$archive" \
+          "https://github.com/wasm-bindgen/wasm-pack/releases/download/v${WASM_PACK_VERSION}/$archive"
+        echo "$WASM_PACK_SHA256  $RUNNER_TEMP/$archive" | sha256sum --check
+        mkdir --parents "$install_directory"
+        tar --extract --gzip --file "$RUNNER_TEMP/$archive" --directory "$install_directory" --strip-components=1
+        echo "$install_directory" >> "$GITHUB_PATH"
+        "$install_directory/wasm-pack" --version
+      shell: bash
