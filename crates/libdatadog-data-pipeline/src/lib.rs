@@ -7,6 +7,7 @@ use thiserror::Error;
 pub use libdd_data_pipeline_core::{
     AgentlessTraceConfig, TracerMetadata, DEFAULT_AGENTLESS_TIMEOUT,
 };
+pub use libdd_trace_obfuscation::obfuscation_config::ObfuscationConfig;
 
 #[derive(Debug, Error)]
 pub enum SendAgentlessV04Error {
@@ -21,12 +22,20 @@ pub async fn send_agentless_v04<C>(
     payload: &[u8],
     metadata: &TracerMetadata,
     config: &AgentlessTraceConfig,
+    client_side_stats: bool,
 ) -> Result<(), SendAgentlessV04Error>
 where
     C: HttpClientCapability + SleepCapability,
 {
     let (traces, _) = libdd_trace_utils::msgpack_decoder::v04::from_slice(payload)
         .map_err(SendAgentlessV04Error::Deserialization)?;
-    libdd_data_pipeline_core::send_agentless_traces(capabilities, traces, metadata, config).await?;
+    libdd_data_pipeline_core::send_agentless_traces(
+        capabilities,
+        traces,
+        metadata,
+        config,
+        client_side_stats,
+    )
+    .await?;
     Ok(())
 }
