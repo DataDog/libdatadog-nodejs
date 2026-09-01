@@ -48,19 +48,50 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      artifact-name: ${{ steps.candidate.outputs.artifact-name }}
       run-id: ${{ steps.candidate.outputs.run-id }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 24
       - id: candidate
         env:
-          GITHUB_TOKEN: ${{ github.token }}
-          RELEASE_TREE: ${{ needs.versions.outputs.tree }}
-        run: node scripts/release-candidate.js
+          ARTIFACT_NAME: release-candidate-${{ needs.versions.outputs.tree }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PULL=$(
+            gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '
+              [ .[] | select(
+                  .state == "closed" and
+                  .merged_at != null and
+                  .base.ref == "v0.x"
+                )
+              ]
+              | if length == 1 then .[0] else error("expected one merged v0.x pull request") end
+              | [.merge_commit_sha, .head.sha, .head.repo.full_name]
+              | @tsv
+            '
+          )
+          IFS=$'\t' read -r MERGE_SHA HEAD_SHA HEAD_REPOSITORY <<< "$PULL"
+
+          test "$MERGE_SHA" = "$GITHUB_SHA"
+          test "$HEAD_REPOSITORY" = "$GITHUB_REPOSITORY"
+
+          RUN_ID=$(
+            gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --workflow build.yml \
+              --event pull_request \
+              --commit "$HEAD_SHA" \
+              --status success \
+              --limit 1 \
+              --json databaseId \
+              --jq '.[0].databaseId'
+          )
+          test -n "$RUN_ID"
+
+          gh run download "$RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "$ARTIFACT_NAME" \
+            --dir "$RUNNER_TEMP/release-candidate"
+
+          echo "run-id=$RUN_ID" >> "$GITHUB_OUTPUT"
 
   build-test-wasm:
     if: github.event_name == 'workflow_dispatch'
@@ -200,7 +231,15 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         if: github.event_name == 'push'
         with:
-          name: ${{ needs.resolve-release-candidate.outputs.artifact-name }}
+          name: prebuilds
+          path: prebuilds
+          github-token: ${{ github.token }}
+          run-id: ${{ needs.resolve-release-candidate.outputs.run-id }}
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        if: github.event_name == 'push'
+        with:
+          name: libdatadog-wasm
+          path: packages/libdatadog/wasm/dist
           github-token: ${{ github.token }}
           run-id: ${{ needs.resolve-release-candidate.outputs.run-id }}
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
