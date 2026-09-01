@@ -4,7 +4,7 @@ function createHostTransport () {
   const requests = new Map()
   const timers = new Map()
 
-  async function request ({ id, url, method, headers: headerList, body }) {
+  function request ({ id, url, method, headers: headerList, body }) {
     const target = new URL(url)
     const client = target.protocol === 'https:' ? require('node:https') : require('node:http')
     const headers = Object.fromEntries(headerList.map(({ name, value }) => [name, value]))

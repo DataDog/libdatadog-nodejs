@@ -14,8 +14,12 @@ export interface AgentlessExporterOptions {
 }
 
 export interface AgentlessExporter {
-  sendV04(payload: Uint8Array): Promise<void>
-  close(): void | Promise<void>
+  sendV04(payload: Uint8Array, done: () => void, log: AgentlessLogger): void
+  close(): void
+}
+
+export interface AgentlessLogger {
+  error(message: string, ...args: unknown[]): void
 }
 
 export function createAgentlessExporter(options: AgentlessExporterOptions): AgentlessExporter
