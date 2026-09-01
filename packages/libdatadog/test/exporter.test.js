@@ -26,6 +26,149 @@ test('package entry points defer unused agentless modules', {
   assert.strictEqual(require.cache[agentlessPath], undefined)
 })
 
+test('agentless exporter reports completion through its callback', async () => {
+  class BindingExporter {
+    sendV04 () {
+      return Promise.resolve()
+    }
+
+    cancelAll () {}
+  }
+
+  const exporter = createTestExporter(BindingExporter)
+  const log = { error: assert.fail }
+  let completed = 0
+  let result
+
+  await new Promise((resolve) => {
+    result = exporter.sendV04(Buffer.alloc(0), () => {
+      completed++
+      resolve()
+    }, log)
+  })
+
+  assert.strictEqual(result, undefined)
+  assert.strictEqual(completed, 1)
+})
+
+test('agentless exporter logs asynchronous failures before reporting completion', async () => {
+  class BindingExporter {
+    sendV04 () {
+      return Promise.reject('intake unavailable')
+    }
+
+    cancelAll () {}
+  }
+
+  const exporter = createTestExporter(BindingExporter)
+  const log = testLog()
+  let completed = 0
+
+  await new Promise((resolve) => {
+    exporter.sendV04(Buffer.alloc(0), () => {
+      completed++
+      assert.strictEqual(log.errors.length, 1)
+      resolve()
+    }, log)
+  })
+
+  assert.strictEqual(completed, 1)
+  assert.deepStrictEqual(log.errors, [[
+    'Failed to send data-pipeline export: %s',
+    'intake unavailable',
+  ]])
+})
+
+test('agentless exporter logs synchronous failures before reporting completion', () => {
+  class BindingExporter {
+    sendV04 () {
+      throw new Error('binding unavailable')
+    }
+
+    cancelAll () {}
+  }
+
+  const exporter = createTestExporter(BindingExporter)
+  const log = testLog()
+  let completed = 0
+
+  exporter.sendV04(Buffer.alloc(0), () => {
+    completed++
+    assert.strictEqual(log.errors.length, 1)
+  }, log)
+
+  assert.strictEqual(completed, 1)
+  assert.deepStrictEqual(log.errors, [[
+    'Failed to send data-pipeline export: %s',
+    'binding unavailable',
+  ]])
+})
+
+test('agentless exporter logs failures settled before close', async () => {
+  let rejectSend
+
+  class BindingExporter {
+    sendV04 () {
+      return new Promise((resolve, reject) => {
+        rejectSend = reject
+      })
+    }
+
+    cancelAll () {}
+  }
+
+  const exporter = createTestExporter(BindingExporter)
+  const log = testLog()
+  let completed = 0
+  const send = new Promise((resolve) => {
+    exporter.sendV04(Buffer.alloc(0), () => {
+      completed++
+      resolve()
+    }, log)
+  })
+
+  rejectSend('intake unavailable')
+  exporter.close()
+  await send
+
+  assert.strictEqual(completed, 1)
+  assert.deepStrictEqual(log.errors, [[
+    'Failed to send data-pipeline export: %s',
+    'intake unavailable',
+  ]])
+})
+
+test('agentless exporter reports sends after close without calling the binding', () => {
+  let cancellations = 0
+  let sends = 0
+
+  class BindingExporter {
+    sendV04 () {
+      sends++
+      return Promise.resolve()
+    }
+
+    cancelAll () {
+      cancellations++
+    }
+  }
+
+  const exporter = createTestExporter(BindingExporter)
+  const log = testLog()
+  let completed = 0
+
+  const result = exporter.close()
+  exporter.sendV04(Buffer.alloc(0), () => completed++, log)
+
+  assert.strictEqual(result, undefined)
+  assert.strictEqual(cancellations, 1)
+  assert.strictEqual(completed, 1)
+  assert.strictEqual(sends, 0)
+  assert.deepStrictEqual(log.errors, [[
+    'Cannot send data-pipeline export after the exporter is closed',
+  ]])
+})
+
 test('package entry point compresses agentless v0.4 exports with Zstandard', {
   skip: !fs.existsSync(wasmArtifact),
 }, async () => {
@@ -54,7 +197,7 @@ test('inline-WASM backend validates optional values', {
     containerId: null,
     timeoutMs: null,
   })
-  await exporter.close()
+  exporter.close()
 
   assert.throws(
     () => pipeline.createAgentlessExporter({ ...options, timeoutMs: 1.5 }),
@@ -79,10 +222,10 @@ test('agentless exporter retries in Rust until the third attempt succeeds', {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
   const exporter = createExporter(pipeline, server)
   try {
-    await exporter.sendV04(tracePayload())
+    await sendExport(exporter)
     assert.strictEqual(requests, 3)
   } finally {
-    await exporter.close()
+    exporter.close()
     await new Promise(resolve => server.close(resolve))
   }
 })
@@ -100,10 +243,15 @@ test('agentless exporter applies Rust timeouts and retry policy', {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
   const exporter = createExporter(pipeline, server, { timeoutMs: 100 })
   try {
-    await assert.rejects(exporter.sendV04(tracePayload()), /Request timed out/)
+    const log = testLog()
+    await sendExport(exporter, log)
     assert.strictEqual(requests, 3)
+    assert.strictEqual(log.errors.length, 1)
+    assert.strictEqual(log.errors[0][0], 'Failed to send data-pipeline export: %s')
+    assert.match(log.errors[0][1], /Request timed out/)
+    assert.doesNotMatch(log.errors[0][1], /data-pipeline export/)
   } finally {
-    await exporter.close()
+    exporter.close()
     await new Promise(resolve => server.close(resolve))
   }
 })
@@ -124,12 +272,14 @@ test('agentless exporter close cancels an active HTTP request', {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
   const exporter = createExporter(pipeline, server)
   try {
-    const send = exporter.sendV04(tracePayload())
+    const log = testLog()
+    const send = sendExport(exporter, log)
     await request
-    await exporter.close()
-    await assert.rejects(send, /export was cancelled/)
+    exporter.close()
+    await send
+    assert.deepStrictEqual(log.errors, [])
   } finally {
-    await exporter.close()
+    exporter.close()
     await new Promise(resolve => server.close(resolve))
   }
 })
@@ -155,15 +305,17 @@ test('agentless exporter close cancels retry backoff', {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
   const exporter = createExporter(pipeline, server)
   try {
-    const send = exporter.sendV04(tracePayload())
+    const log = testLog()
+    const send = sendExport(exporter, log)
     await responseSent
     await new Promise(resolve => setTimeout(resolve, 50))
-    await exporter.close()
-    await assert.rejects(send, /export was cancelled/)
+    exporter.close()
+    await send
+    assert.deepStrictEqual(log.errors, [])
     await new Promise(resolve => setTimeout(resolve, 1100))
     assert.strictEqual(requests, 1)
   } finally {
-    await exporter.close()
+    exporter.close()
     await new Promise(resolve => server.close(resolve))
   }
 })
@@ -179,14 +331,15 @@ async function assertExport (pipeline) {
       tracerVersion: '0.1.0',
       languageVersion: process.version,
       languageInterpreter: 'v8',
+      runtimeId: 'runtime-id',
       service: 'service',
       containerId: 'container-id',
     })
 
     try {
-      await exporter.sendV04(tracePayload())
+      await sendExport(exporter)
     } finally {
-      await exporter.close()
+      exporter.close()
     }
   })
 
@@ -198,6 +351,7 @@ async function assertExport (pipeline) {
   assert.deepStrictEqual(received.body.subarray(0, zstdMagic.length), zstdMagic)
   if (zstdDecompressSync) {
     const body = JSON.parse(zstdDecompressSync(received.body).toString())
+    assert.strictEqual(body.traces[0].runtimeID, 'runtime-id')
     assert.strictEqual(body.traces[0].spans[0].name, 'operation')
     assert.strictEqual(body.traces[0].spans[0].service, 'service')
   }
@@ -229,6 +383,53 @@ function createExporter (pipeline, server, options = {}) {
     languageInterpreter: 'v8',
     ...options,
   })
+}
+
+function exporterOptions () {
+  return {
+    endpoint: 'http://example.test/api/v2/spans',
+    apiKey: 'test-api-key',
+    tracerVersion: '0.1.0',
+    languageVersion: process.version,
+    languageInterpreter: 'v8',
+  }
+}
+
+/**
+ * @typedef {object} TestBindingExporter
+ * @property {(payload: Uint8Array) => Promise<void>} sendV04
+ * @property {() => void} cancelAll
+ */
+
+/**
+ * @param {new (...args: unknown[]) => TestBindingExporter} BindingExporter
+ */
+function createTestExporter (BindingExporter) {
+  const { createAgentlessExporter } = require('../lib/agentless')
+  return createAgentlessExporter({ AgentlessExporter: BindingExporter }, exporterOptions())
+}
+
+function testLog () {
+  const errors = []
+  return {
+    errors,
+    error (...args) {
+      errors.push(args)
+    },
+  }
+}
+
+/**
+ * @param {{ sendV04: (payload: Uint8Array, done: () => void, log: ReturnType<typeof testLog>) => void }} exporter
+ * @param {ReturnType<typeof testLog>} [log]
+ */
+function sendExport (exporter, log = testLog()) {
+  let result
+  const completed = new Promise((resolve) => {
+    result = exporter.sendV04(tracePayload(), resolve, log)
+  })
+  assert.strictEqual(result, undefined)
+  return completed
 }
 
 async function withIntake (send) {

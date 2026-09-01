@@ -14,7 +14,8 @@ Remote configuration is available from `@datadog/libdatadog/remote-config`.
 It uses a dedicated wasm-bindgen artifact that loads only with this entry point.
 
 The package accepts Datadog v0.4 MessagePack payloads and exports them to an
-agentless intake.
+agentless intake. `sendV04()` reports completion through a callback and sends
+delivery failures to the supplied logger. It does not return a promise.
 
 The package uses a wasm-bindgen backend with the WebAssembly bytes embedded in
 JavaScript. The canonical inlined output is published as the regular
