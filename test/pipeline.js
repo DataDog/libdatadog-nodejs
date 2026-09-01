@@ -1080,6 +1080,13 @@ describe('pipeline', { skip }, () => {
       assert.ok(sawTraces, 'expected a POST to /v0.4/traces')
       assert.strictEqual(header, undefined)
     })
+
+    it('rejects statsEnabled together with clientComputedStats', () => {
+      assert.throws(
+        () => new NativeSpansInterface({ statsEnabled: true, clientComputedStats: true }),
+        /mutually exclusive/,
+      )
+    })
   })
 
   describe('send re-entrancy', () => {

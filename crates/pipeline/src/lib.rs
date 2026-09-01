@@ -245,6 +245,12 @@ impl WasmSpanState {
         runtime_id: &str,
         client_computed_stats: bool,
     ) -> Result<WasmSpanState, JsValue> {
+        if stats_enabled && client_computed_stats {
+            return Err(JsValue::from_str(
+                "WasmSpanState: statsEnabled and clientComputedStats are mutually exclusive",
+            ));
+        }
+
         let mut builder = TraceExporterBuilder::<LocalRuntime>::new();
         builder
             .set_url(url)
@@ -261,11 +267,6 @@ impl WasmSpanState {
             .set_runtime_id(runtime_id)
             .enable_agent_rates_payload_version();
 
-        // `enable_stats` makes libdatadog stamp the client-computed-stats
-        // header itself when stats run, so the two flags are disjoint:
-        // `set_client_computed_stats` is only for APM-standalone
-        // (`apmTracingEnabled=false`), where the header is advertised
-        // without any stats actually being computed.
         if stats_enabled {
             builder.enable_stats(Duration::from_secs(10));
         } else if client_computed_stats {
