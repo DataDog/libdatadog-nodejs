@@ -1,5 +1,9 @@
 'use strict'
 
+const maxActiveBufferSize = 64 * 1024 * 1024
+
+let activeBufferSize = 0
+
 function createHostTransport () {
   const requests = new Map()
   const timers = new Map()
@@ -8,6 +12,11 @@ function createHostTransport () {
     const target = new URL(url)
     const client = target.protocol === 'https:' ? require('node:https') : require('node:http')
     const headers = Object.fromEntries(headerList.map(({ name, value }) => [name, value]))
+    const bodySize = body.byteLength
+
+    if (activeBufferSize + bodySize > maxActiveBufferSize) {
+      return Promise.reject(new Error('Maximum active agentless request buffer size reached: payload is discarded.'))
+    }
 
     return new Promise((resolve, reject) => {
       let settled = false
@@ -15,6 +24,7 @@ function createHostTransport () {
         if (settled) return
         settled = true
         requests.delete(id)
+        activeBufferSize -= bodySize
         callback(value)
       }
       const outgoing = client.request(target, {
@@ -31,6 +41,7 @@ function createHostTransport () {
           body: Buffer.concat(chunks),
         }))
       })
+      activeBufferSize += bodySize
 
       requests.set(id, {
         cancel: () => {
