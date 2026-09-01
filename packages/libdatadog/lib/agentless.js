@@ -1,5 +1,6 @@
 'use strict'
 
+const { AsyncResource } = require('node:async_hooks')
 const { randomUUID } = require('node:crypto')
 
 const { createHostTransport } = require('./agentless-transport')
@@ -45,25 +46,23 @@ class AgentlessExporter {
       return
     }
 
-    let operation
-    try {
-      operation = this.#binding.sendV04(payload)
-    } catch (error) {
-      log.error('Failed to send data-pipeline export: %s', errorMessage(error))
-      done()
-      return
-    }
-
-    operation.then(
-      done,
-      (error) => {
+    /** @param {unknown} error */
+    const complete = AsyncResource.bind((error) => {
+      if (error !== undefined) {
         const message = errorMessage(error)
         if (!this.#closed || message !== canceledError) {
           log.error('Failed to send data-pipeline export: %s', message)
         }
-        done()
-      },
-    )
+      }
+      done()
+    }, 'libdatadog:AgentlessExporter.sendV04')
+
+    try {
+      this.#binding.sendV04(payload, complete)
+    } catch (error) {
+      log.error('Failed to send data-pipeline export: %s', errorMessage(error))
+      done()
+    }
   }
 
   close () {
