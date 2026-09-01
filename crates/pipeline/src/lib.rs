@@ -414,6 +414,11 @@ impl WasmSpanState {
         first_is_local_root: bool,
         chunk: &[u8],
     ) -> Result<bool, JsValue> {
+        if self.shut_down.get() {
+            return Err(JsValue::from_str(
+                "prepareChunk: exporter has been shut down",
+            ));
+        }
         // Validate the JS-supplied count against the actual buffer size before
         // doing any work: each span id is a u64 (8 bytes). This prevents an
         // out-of-bounds read panic (and a huge `Vec::with_capacity`) when the
@@ -573,7 +578,9 @@ impl WasmSpanState {
     /// Should be awaited during tracer shutdown to avoid losing in-flight
     /// data. Terminal and idempotent: it consumes the exporter (and the
     /// builder, if the exporter was never built), so later sends error out
-    /// rather than silently starting a new exporter.
+    /// rather than silently starting a new exporter. Staged-but-unsent chunks
+    /// are dropped and `prepareChunk` errors afterwards, so flush before
+    /// shutting down.
     ///
     /// `timeoutMs` bounds the wait; on timeout returns an error and workers
     /// may still be finishing. `None` waits indefinitely.
@@ -587,6 +594,7 @@ impl WasmSpanState {
         self.sending.set(true);
         let _in_flight = InFlightGuard(&self.sending);
         self.shut_down.set(true);
+        self.prepared_spans.borrow_mut().clear();
 
         // SAFETY: `sending` guard prevents overlapping access; WASM is single-threaded.
         let exporter_slot = unsafe { &mut *self.exporter.get() };

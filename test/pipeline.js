@@ -1257,7 +1257,7 @@ describe('pipeline', { skip }, () => {
       }
     })
 
-    it('rejects sends after shutdown, including before the first send', async () => {
+    it('rejects flushes after shutdown, including before the first send', async () => {
       const agent = await startAgentStub()
       try {
         // Shutting down before anything was sent must also consume the builder,
@@ -1266,7 +1266,7 @@ describe('pipeline', { skip }, () => {
         await early.state.shutdown(1000)
         await assert.rejects(
           early.flushSpans(makeSpan(early, '/after-shutdown')),
-          /shut down/,
+          /prepareChunk: exporter has been shut down/,
         )
 
         const used = new NativeSpansInterface({ agentUrl: agent.url })
@@ -1274,8 +1274,38 @@ describe('pipeline', { skip }, () => {
         await used.state.shutdown(10_000)
         await assert.rejects(
           used.flushSpans(makeSpan(used, '/after-shutdown')),
-          /shut down/,
+          /prepareChunk: exporter has been shut down/,
         )
+      } finally {
+        agent.close()
+      }
+    })
+
+    it('rejects sendPreparedChunk directly after shutdown', async () => {
+      const agent = await startAgentStub()
+      const ns = new NativeSpansInterface({ agentUrl: agent.url })
+      try {
+        await ns.state.shutdown(1000)
+        await assert.rejects(
+          ns.state.sendPreparedChunk(),
+          /sendPreparedChunk: exporter has been shut down/,
+        )
+      } finally {
+        agent.close()
+      }
+    })
+
+    it('does not accumulate staged chunks once shut down', async () => {
+      const agent = await startAgentStub()
+      const ns = new NativeSpansInterface({ agentUrl: agent.url })
+      try {
+        await ns.state.shutdown(1000)
+        for (let i = 0; i < 3; i++) {
+          assert.throws(
+            () => ns.state.prepareChunk(1, true, ns.flushBuffer),
+            /prepareChunk: exporter has been shut down/,
+          )
+        }
       } finally {
         agent.close()
       }
