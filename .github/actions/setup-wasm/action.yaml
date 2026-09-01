@@ -1,5 +1,10 @@
 name: Setup WASM build
 description: Restore the Cargo cache and install the pinned WASM toolchain
+inputs:
+  cache-key:
+    description: Cache namespace for the WASM build
+    required: false
+    default: wasm
 runs:
   using: composite
   steps:
@@ -16,10 +21,11 @@ runs:
           ~/.cargo/registry/index
           target
         key: >-
-          wasm-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml') }}-${{
+          ${{ inputs.cache-key }}-${{ runner.os }}-${{
+          hashFiles('Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml') }}-${{
           hashFiles('Cargo.toml', 'crates/**/Cargo.toml', 'crates/**/*.rs') }}
         restore-keys: >-
-          wasm-${{ runner.os }}-${{
+          ${{ inputs.cache-key }}-${{ runner.os }}-${{
           hashFiles('Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml') }}-
     - name: Install wasm-pack
       env:
