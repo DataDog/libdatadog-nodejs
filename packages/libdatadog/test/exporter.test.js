@@ -1,5 +1,7 @@
 'use strict'
 
+/* eslint-disable unicorn/prefer-event-target -- Node stream mocks use EventEmitter. */
+
 const assert = require('node:assert/strict')
 const { AsyncLocalStorage } = require('node:async_hooks')
 const { EventEmitter } = require('node:events')
