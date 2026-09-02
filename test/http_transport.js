@@ -322,6 +322,7 @@ describe('http_transport request body lifetime', () => {
         'utf8',
       )
       const memory = new WebAssembly.Memory({ initial: 1 })
+      // eslint-disable-next-line unicorn/no-unsafe-buffer-conversion -- WebAssembly.Memory.buffer is the full buffer.
       const bytes = new Uint8Array(memory.buffer)
       bytes.set(head, 0)
       bytes.set(body, head.length)

@@ -24,7 +24,8 @@ let storage = f => f()
 // The second alternative is the PCF / Garden regexp; no suffix ($) to avoid
 // matching pod UIDs. See
 // https://github.com/DataDog/datadog-agent/blob/7.40.x/pkg/util/cgroups/reader.go#L50
-const uuidSource = String.raw`[0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{12}|[0-9a-f]{8}(?:-[0-9a-f]{4}){4}$`
+const uuidSource = '[0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{12}|'
+  + '[0-9a-f]{8}(?:-[0-9a-f]{4}){4}$'
 const containerSource = '[0-9a-f]{64}'
 const taskSource = String.raw`[0-9a-f]{32}-\d+`
 const lineReg = /^(\d+):([^:]*):(.+)$/m

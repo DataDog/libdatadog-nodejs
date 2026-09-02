@@ -11,7 +11,7 @@ const packageRoot = path.join(__dirname, '..')
 const repositoryRoot = path.join(packageRoot, '..', '..')
 
 test('publishes the universal libdatadog package', () => {
-  const packageJson = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json')))
+  const packageJson = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8'))
 
   assert.strictEqual(packageJson.name, '@datadog/libdatadog')
   assert.strictEqual(packageJson.exports['./wasm'].require, './wasm.js')
@@ -20,6 +20,7 @@ test('publishes the universal libdatadog package', () => {
 
   const wasmPackageJson = JSON.parse(fs.readFileSync(
     path.join(packageRoot, 'wasm', 'package.json'),
+    'utf8',
   ))
   assert.strictEqual(
     wasmPackageJson.exports['./remote-config'].require,
@@ -28,11 +29,12 @@ test('publishes the universal libdatadog package', () => {
 })
 
 test('uses the libdatadog release version', () => {
-  const packageJson = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json')))
+  const packageJson = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8'))
   const wasmPackageJson = JSON.parse(fs.readFileSync(
     path.join(packageRoot, 'wasm', 'package.json'),
+    'utf8',
   ))
-  const repositoryPackageJson = JSON.parse(fs.readFileSync(path.join(repositoryRoot, 'package.json')))
+  const repositoryPackageJson = JSON.parse(fs.readFileSync(path.join(repositoryRoot, 'package.json'), 'utf8'))
 
   assert.strictEqual(packageJson.version, repositoryPackageJson.version)
   assert.strictEqual(wasmPackageJson.version, repositoryPackageJson.version)
@@ -55,7 +57,7 @@ test('carries the repository metadata npm provenance verifies against', () => {
     path.join(packageRoot, 'package.json'),
     path.join(packageRoot, 'wasm', 'package.json'),
   ]) {
-    const manifest = JSON.parse(fs.readFileSync(manifestPath))
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
 
     assert.strictEqual(manifest.repository?.url, expectedUrl, `${manifest.name} repository.url`)
   }
