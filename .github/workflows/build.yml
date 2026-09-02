@@ -127,3 +127,37 @@ jobs:
         uses: qard/heaviest-objects-in-the-universe@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  release-candidate:
+    if: github.event_name == 'pull_request' && github.base_ref == 'v0.x'
+    needs:
+      - lint
+      - package-size
+      - test-libdatadog
+      - test-libdatadog-windows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: prebuilds
+          path: prebuilds
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: libdatadog-wasm
+          path: packages/libdatadog/wasm/dist
+      - id: candidate
+        run: |
+          TREE=$(git rev-parse 'HEAD^{tree}')
+          echo "$TREE" > release-candidate
+          echo "artifact-name=release-candidate-$TREE" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.candidate.outputs.artifact-name }}
+          path: |
+            prebuilds
+            packages/libdatadog/wasm/dist
+            release-candidate
+          if-no-files-found: error
