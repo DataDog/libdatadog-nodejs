@@ -1,4 +1,4 @@
-use napi::{Env, JsUnknown};
+use napi::{Env, Unknown};
 use napi_derive::napi;
 
 mod unhandled_exception;
@@ -22,9 +22,9 @@ fn apply_default_signals(
 #[napi]
 pub fn init(
     env: Env,
-    config: JsUnknown,
-    receiver_config: JsUnknown,
-    metadata: JsUnknown,
+    config: Unknown,
+    receiver_config: Unknown,
+    metadata: Unknown,
 ) -> napi::Result<()> {
     let config: libdd_crashtracker::CrashtrackerConfiguration = env.from_js_value(config)?;
     let receiver_config = env.from_js_value(receiver_config)?;
@@ -38,7 +38,7 @@ pub fn init(
 }
 
 #[napi]
-pub fn update_config(env: Env, config: JsUnknown) -> napi::Result<()> {
+pub fn update_config(env: Env, config: Unknown) -> napi::Result<()> {
     let config: libdd_crashtracker::CrashtrackerConfiguration = env.from_js_value(config)?;
 
     let config = apply_default_signals(config);
@@ -49,7 +49,7 @@ pub fn update_config(env: Env, config: JsUnknown) -> napi::Result<()> {
 }
 
 #[napi]
-pub fn update_metadata(env: Env, metadata: JsUnknown) -> napi::Result<()> {
+pub fn update_metadata(env: Env, metadata: Unknown) -> napi::Result<()> {
     let metadata = env.from_js_value(metadata)?;
 
     libdd_crashtracker::update_metadata(metadata).unwrap();
