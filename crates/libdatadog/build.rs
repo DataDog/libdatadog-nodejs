@@ -4,6 +4,7 @@ fn main() {
     napi_build::setup();
 
     if env::var("TARGET").as_deref() == Ok("wasm32-unknown-unknown") {
+        println!("cargo:rustc-link-arg=--import-undefined");
         println!("cargo:rustc-link-arg=--export=malloc");
         println!("cargo:rustc-link-arg=--export=free");
         println!("cargo:rustc-link-arg=--export-table");
