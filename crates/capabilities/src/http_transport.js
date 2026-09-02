@@ -113,8 +113,11 @@ function applyEntityHeaders (headView, entity = getEntityHeaders()) {
 // `req._header`: that internal is undocumented and Bun's `node:http` ignores it,
 // so under Bun the request went out as `POST /` with no headers and the agent
 // dropped it. Header names/values are ASCII (latin1 round-trips losslessly).
-function parseRequestHead (headBuf) {
-  const head = Buffer.from(headBuf).toString('latin1')
+/**
+ * @param {Buffer} headBuffer
+ */
+function parseRequestHead (headBuffer) {
+  const head = headBuffer.toString('latin1')
   const term = head.indexOf('\r\n\r\n')
   const lines = (term === -1 ? head : head.slice(0, term)).split('\r\n')
   // Request line: `METHOD request-target HTTP/1.1` (no spaces in the target).
@@ -230,12 +233,9 @@ module.exports.httpRequest = function (host, port, isHttps, socketPath, connecti
             resolve([
               res.statusCode,
               res.rawHeaders,
-              // Copy the exact body bytes. `body` is a Buffer from Buffer.concat,
-              // which for small payloads is a view into Node's shared pool, so
-              // `body.buffer` is the whole pool — slicing by offset/length (via
-              // the Uint8Array(typedArray) copy ctor) is required to avoid
-              // handing the Rust side unrelated pooled memory.
-              new Uint8Array(body),
+              // Buffer is a Uint8Array with exact byteOffset and byteLength.
+              // Rust copies it into Bytes before this response is released.
+              body,
             ])
           })
         })
