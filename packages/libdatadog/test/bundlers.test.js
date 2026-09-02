@@ -10,9 +10,9 @@ const esbuild = require('esbuild')
 const webpack = require('webpack')
 
 const packageRoot = path.join(__dirname, '..')
-const entry = path.join(packageRoot, 'index.js')
+const entry = path.join(packageRoot, 'wasm.js')
 
-test('esbuild bundles the package entry point without emitting an asset', async () => {
+test('esbuild bundles the WASM entry point without emitting an asset', async () => {
   await assertBundle(async (output) => {
     await esbuild.build({
       bundle: true,
@@ -23,7 +23,7 @@ test('esbuild bundles the package entry point without emitting an asset', async 
   })
 })
 
-test('webpack bundles the package entry point without emitting an asset', async () => {
+test('webpack bundles the WASM entry point without emitting an asset', async () => {
   await assertBundle(output => new Promise((resolve, reject) => {
     webpack({
       entry,

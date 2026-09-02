@@ -1,3 +1,3 @@
 'use strict'
 
-module.exports = require('./lib/wasm')
+module.exports = require('./lib/load')
