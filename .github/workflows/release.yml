@@ -73,23 +73,25 @@ jobs:
           test "$MERGE_SHA" = "$GITHUB_SHA"
           test "$HEAD_REPOSITORY" = "$GITHUB_REPOSITORY"
 
-          RUN_ID=$(
-            gh run list \
-              --repo "$GITHUB_REPOSITORY" \
-              --workflow build.yml \
-              --event pull_request \
-              --commit "$HEAD_SHA" \
-              --status success \
-              --limit 1 \
-              --json databaseId \
-              --jq '.[0].databaseId'
-          )
+          for attempt in {1..90}; do
+            RUN_ID=$(
+              gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$ARTIFACT_NAME" --jq "
+                [
+                  .artifacts[]
+                  | select(
+                      .expired == false and
+                      .workflow_run.head_sha == \"$HEAD_SHA\"
+                    )
+                ]
+                | max_by(.created_at).workflow_run.id // empty
+              "
+            )
+            test -z "$RUN_ID" || break
+            if test "$attempt" -lt 90; then
+              sleep 10
+            fi
+          done
           test -n "$RUN_ID"
-
-          gh run download "$RUN_ID" \
-            --repo "$GITHUB_REPOSITORY" \
-            --name "$ARTIFACT_NAME" \
-            --dir "$RUNNER_TEMP/release-candidate"
 
           echo "run-id=$RUN_ID" >> "$GITHUB_OUTPUT"
 
@@ -231,15 +233,8 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         if: github.event_name == 'push'
         with:
-          name: prebuilds
-          path: prebuilds
-          github-token: ${{ github.token }}
-          run-id: ${{ needs.resolve-release-candidate.outputs.run-id }}
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        if: github.event_name == 'push'
-        with:
-          name: libdatadog-wasm
-          path: packages/libdatadog/wasm/dist
+          name: release-candidate-${{ needs.versions.outputs.tree }}
+          path: .
           github-token: ${{ github.token }}
           run-id: ${{ needs.resolve-release-candidate.outputs.run-id }}
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
