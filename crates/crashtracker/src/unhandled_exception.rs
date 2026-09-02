@@ -1,8 +1,9 @@
-use napi::{Env, JsFunction, JsObject, JsUnknown};
+use napi::bindgen_prelude::{Function, JsObjectValue, Object};
+use napi::{Env, JsValue, Unknown};
 use napi_derive::napi;
 
-fn get_optional_string_property(obj: &JsObject, key: &str) -> napi::Result<Option<String>> {
-    match obj.get_named_property::<JsUnknown>(key) {
+fn get_optional_string_property(obj: &Object, key: &str) -> napi::Result<Option<String>> {
+    match obj.get_named_property::<Unknown>(key) {
         Ok(val) => {
             use napi::ValueType;
             if val.get_type()? == ValueType::String {
@@ -80,21 +81,21 @@ fn parse_location(location: &str, frame: &mut libdd_crashtracker::StackFrame) {
     }
 }
 
-fn is_error_instance(env: &Env, value: &JsUnknown) -> napi::Result<bool> {
+fn is_error_instance(env: &Env, value: &Unknown) -> napi::Result<bool> {
     let global = env.get_global()?;
-    let error_ctor: JsFunction = global.get_named_property("Error")?;
+    let error_ctor: Function<'_, (), Unknown<'_>> = global.get_named_property("Error")?;
     value.instanceof(error_ctor)
 }
 
-fn stringify_js_value(value: JsUnknown) -> napi::Result<String> {
+fn stringify_js_value(value: Unknown) -> napi::Result<String> {
     let s = value.coerce_to_string()?.into_utf8()?;
     Ok(s.as_str()?.to_owned())
 }
 
-fn report_unhandled(env: &Env, error: JsUnknown, fallback_type: &str) -> napi::Result<()> {
+fn report_unhandled(env: &Env, error: Unknown, fallback_type: &str) -> napi::Result<()> {
     let is_error = is_error_instance(env, &error)?;
     let (exception_type, exception_message, stacktrace) = if is_error {
-        let error_obj: JsObject = error.coerce_to_object()?;
+        let error_obj: Object = error.coerce_to_object()?;
         let name = get_optional_string_property(&error_obj, "name")?;
         let message = get_optional_string_property(&error_obj, "message")?;
         let stack_string = get_optional_string_property(&error_obj, "stack")?;
@@ -128,7 +129,7 @@ fn report_unhandled(env: &Env, error: JsUnknown, fallback_type: &str) -> napi::R
 #[napi]
 pub fn report_uncaught_exception_monitor(
     env: Env,
-    error: JsUnknown,
+    error: Unknown,
     origin: String,
 ) -> napi::Result<()> {
     report_unhandled(&env, error, &origin)
