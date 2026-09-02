@@ -3,6 +3,3 @@ rustflags = ["-C", "link-args=-Wl,-undefined,dynamic_lookup"]
 
 [target.aarch64-apple-darwin]
 rustflags = ["-C", "link-args=-Wl,-undefined,dynamic_lookup"]
-
-[target.wasm32-wasip1-threads]
-rustflags = ["--cfg", "tokio_unstable"]

@@ -42,9 +42,11 @@ mod wasm_allocator {
     const _: () = assert!(ALIGNMENT >= align_of::<usize>());
 }
 
-#[cfg(target_arch = "wasm32")]
 #[napi_derive::module_init]
 fn install_async_runtime() {
-    napi_async_runtime::install(Default::default())
-        .expect("failed to install the napi-rs async runtime");
+    let options = napi_async_runtime::RuntimeOptions {
+        flavor: napi_async_runtime::RuntimeFlavor::CurrentThread,
+        ..Default::default()
+    };
+    napi_async_runtime::install(options).expect("failed to install the napi-rs async runtime");
 }

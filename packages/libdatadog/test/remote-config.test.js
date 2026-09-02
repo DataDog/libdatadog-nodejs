@@ -3,6 +3,7 @@
 /* eslint-disable unicorn/prefer-event-target -- Node stream mocks use EventEmitter. */
 
 const assert = require('node:assert/strict')
+const { AsyncLocalStorage } = require('node:async_hooks')
 const { execFileSync } = require('node:child_process')
 const { EventEmitter } = require('node:events')
 const https = require('node:https')
@@ -35,9 +36,10 @@ function fetcherOptions (overrides = {}) {
   }
 }
 
-function mockHttps (context) {
+function mockHttps (context, onRequest = () => {}) {
   const requests = []
   context.mock.method(https, 'request', (url, options, onResponse) => {
+    onRequest()
     const request = new EventEmitter()
     request.destroy = error => request.emit('error', error)
     request.end = (body) => {
@@ -53,6 +55,22 @@ function mockHttps (context) {
   })
   return requests
 }
+
+test('native remote config invokes the transport in the fetch caller context', {
+  skip: selected.backend() !== 'native',
+}, async (context) => {
+  const storage = new AsyncLocalStorage()
+  const stores = []
+  mockHttps(context, () => stores.push(storage.getStore()))
+  const fetcher = new selected.RemoteConfigFetcher(fetcherOptions())
+
+  await storage.run('fetch-context', () => assert.rejects(
+    fetcher.fetchChanges(),
+    /missing config meta/,
+  ))
+  assert.ok(stores.length > 0)
+  assert.deepStrictEqual(new Set(stores), new Set(['fetch-context']))
+})
 
 test('WASM agentless remote config does not require WebCrypto', () => {
   const entryPoint = require.resolve('../wasm')

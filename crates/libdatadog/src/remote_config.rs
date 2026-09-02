@@ -7,7 +7,7 @@ use libdatadog_remote_config::{
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-use crate::data_pipeline::{AgentlessRequest, AgentlessResponse, HostCapabilities};
+use crate::data_pipeline::{AgentlessRequest, AgentlessResponse, HostCallbacks, HostCapabilities};
 
 #[napi(object)]
 pub struct RemoteConfigFetcherOptions {
@@ -74,6 +74,8 @@ impl From<ChangeRecord> for RemoteConfigChange {
 #[napi]
 pub struct RemoteConfigFetcher {
     client: Arc<AsyncMutex<RemoteConfigClient<HostCapabilities>>>,
+    callbacks: HostCallbacks,
+    capabilities: HostCapabilities,
     pending: Arc<Mutex<PendingUpdates>>,
 }
 
@@ -81,31 +83,47 @@ pub struct RemoteConfigFetcher {
 impl RemoteConfigFetcher {
     #[napi(constructor)]
     pub fn new(
+        env: &Env,
         options: RemoteConfigFetcherOptions,
         request: Function<'_, AgentlessRequest, Promise<AgentlessResponse>>,
         cancel_request: Function<'_, u32, ()>,
         sleep: Function<'_, FnArgs<(u32, u32)>, Promise<()>>,
         cancel_sleep: Function<'_, u32, ()>,
     ) -> Result<Self> {
-        let capabilities = HostCapabilities::new(request, cancel_request, sleep, cancel_sleep)?;
-        let client =
-            RemoteConfigClient::new(options.into(), capabilities).map_err(Error::from_reason)?;
+        let callbacks = HostCallbacks::new(request, cancel_request, sleep, cancel_sleep)?;
+        let capabilities = callbacks.capabilities(env)?;
+        let client = RemoteConfigClient::new(options.into(), capabilities.clone())
+            .map_err(Error::from_reason)?;
 
         Ok(Self {
             client: Arc::new(AsyncMutex::new(client)),
+            callbacks,
+            capabilities,
             pending: Arc::new(Mutex::new(PendingUpdates::default())),
         })
     }
 
     #[napi]
-    pub async fn fetch_changes(&self) -> Result<Vec<RemoteConfigChange>> {
-        let updates = std::mem::take(&mut *lock(&self.pending));
-        let mut client = self.client.lock().await;
-        client
-            .fetch_changes(updates)
-            .await
-            .map(|changes| changes.into_iter().map(Into::into).collect())
-            .map_err(|error| Error::from_reason(error.to_string()))
+    pub fn fetch_changes<'env>(
+        &self,
+        env: &'env Env,
+    ) -> Result<PromiseRaw<'env, Vec<RemoteConfigChange>>> {
+        let operation = self.callbacks.capabilities(env)?;
+        let capabilities = self.capabilities.clone();
+        let client = self.client.clone();
+        let pending = self.pending.clone();
+        env.spawn_future(async move {
+            let mut client = client.lock().await;
+            capabilities.replace_functions(&operation);
+            let updates = std::mem::take(&mut *lock(&pending));
+            let result = client
+                .fetch_changes(updates)
+                .await
+                .map(|changes| changes.into_iter().map(Into::into).collect())
+                .map_err(|error| Error::from_reason(error.to_string()));
+            drop(operation);
+            result
+        })
     }
 
     #[napi]

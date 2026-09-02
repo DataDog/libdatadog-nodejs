@@ -1,9 +1,12 @@
 'use strict'
 
 const assert = require('node:assert/strict')
+const { AsyncLocalStorage } = require('node:async_hooks')
+const { EventEmitter } = require('node:events')
 const fs = require('node:fs')
 const http = require('node:http')
 const path = require('node:path')
+const { PassThrough } = require('node:stream')
 const { test } = require('node:test')
 const { zstdDecompressSync } = require('node:zlib')
 
@@ -183,6 +186,33 @@ test('native backend compresses agentless v0.4 exports with Zstandard', {
   skip: !nativeArtifact,
 }, async () => {
   await assertExport(loadNativePipeline(), 'native')
+})
+
+test('native backend invokes the transport in the send caller context', {
+  skip: !nativeArtifact,
+}, async (context) => {
+  const storage = new AsyncLocalStorage()
+  const stores = []
+  context.mock.method(http, 'request', (target, options, onResponse) => {
+    stores.push(storage.getStore())
+    const outgoing = new EventEmitter()
+    outgoing.destroy = error => outgoing.emit('error', error)
+    outgoing.end = () => {
+      const response = new PassThrough()
+      response.statusCode = 200
+      onResponse(response)
+      response.end()
+    }
+    return outgoing
+  })
+
+  const exporter = loadNativePipeline().createAgentlessExporter(exporterOptions())
+  try {
+    await storage.run('send-context', () => sendExport(exporter))
+    assert.deepStrictEqual(stores, ['send-context'])
+  } finally {
+    exporter.close()
+  }
 })
 
 test('inline-WASM backend compresses agentless v0.4 exports with Zstandard', {

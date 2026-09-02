@@ -14,15 +14,16 @@ serde_json = "1"
 
 [dependencies.libdd-capabilities]
 git = "https://github.com/DataDog/libdatadog.git"
-rev = "3fa1d1395022d3f3fcff6215cc8aa22d5df616df"
+tag = "v43.0.0"
+default-features = false
 
 [dependencies.libdd-common]
 git = "https://github.com/DataDog/libdatadog.git"
-rev = "3fa1d1395022d3f3fcff6215cc8aa22d5df616df"
+tag = "v43.0.0"
 default-features = false
 
 [dependencies.libdd-remote-config]
 git = "https://github.com/DataDog/libdatadog.git"
-rev = "3fa1d1395022d3f3fcff6215cc8aa22d5df616df"
+tag = "v43.0.0"
 default-features = false
-features = ["client"]
+features = ["agentless"]

@@ -3,11 +3,20 @@
 const path = require('node:path')
 const os = require('node:os')
 
-const { createAgentlessExporter } = require('./agentless')
 const { remoteConfigFetcher } = require('./remote-config')
 
 const target = getNativeTarget()
 const binding = loadBinding(target)
+installCurrentThreadHost(binding)
+
+function installCurrentThreadHost (binding) {
+  const version = binding.getCurrentThreadTaskHostContractVersion()
+  if (version !== 4) {
+    throw new Error(`unsupported async-runtime host contract version: ${version}`)
+  }
+  const { high, low } = binding.reserveCurrentThreadHostRegistration()
+  binding.registerCurrentThreadTaskHost(high, low)
+}
 
 function getNativeTarget () {
   const platform = os.platform()
@@ -49,6 +58,11 @@ module.exports = {
   backend: () => 'native',
   DDSketch: binding.DDSketch,
   RemoteConfigFetcher: remoteConfigFetcher(binding),
-  createAgentlessExporter: options => createAgentlessExporter(binding, options),
+  createAgentlessExporter,
   zstd_compress: binding.zstd_compress,
+}
+
+/** @param {import('../index').AgentlessExporterOptions} options */
+function createAgentlessExporter (options) {
+  return require('./agentless').createAgentlessExporter(binding, options)
 }
