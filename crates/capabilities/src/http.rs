@@ -6,31 +6,43 @@
 //! The JS transport is imported via `wasm_bindgen(module = ...)` from
 //! `http_transport.js`, which ships alongside the wasm output.
 
-use std::collections::HashMap;
 use std::future::Future;
+use std::io::Write as _;
+use std::sync::LazyLock;
 
 use bytes::Bytes;
-use js_sys;
+use http::{HeaderMap, HeaderName, HeaderValue};
+use js_sys::{self, Array, JsString, Number, Uint8Array};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 
 use libdd_capabilities::http::{HttpClientTrait, HttpError};
 use libdd_capabilities::maybe_send::MaybeSend;
 
+static WASM_MEMORY: LazyLock<JsValue> = LazyLock::new(|| wasm_bindgen::memory());
+
 #[wasm_bindgen(module = "/src/http_transport.js")]
 extern "C" {
     #[wasm_bindgen(js_name = "httpRequest")]
     fn http_request(
-        method: &str,
-        url: &str,
-        headers_json: &str,
-        body: &[u8],
+        host: &str,
+        port: u16,
+        is_https: bool,
+        head_ptr: *const u8,
+        head_len: u32,
+        body_ptr: *const u8,
+        body_len: u32,
+        wasm_memory: &JsValue,
     ) -> js_sys::Promise;
+
+    #[wasm_bindgen(js_name = "setStorage")]
+    pub fn set_storage(new_storage: &JsValue);
 }
 
 /// Wasm [`HttpClientTrait`] implementation that delegates to Node.js HTTP.
 ///
 /// Named `DefaultHttpClient` to match the native version's public API.
+#[derive(Debug, Clone)]
 pub struct DefaultHttpClient;
 
 impl HttpClientTrait for DefaultHttpClient {
@@ -44,77 +56,118 @@ impl HttpClientTrait for DefaultHttpClient {
         req: http::Request<Bytes>,
     ) -> impl Future<Output = Result<http::Response<Bytes>, HttpError>> + MaybeSend {
         async move {
-            let method = req.method().as_str().to_owned();
-            let url = req.uri().to_string();
-            let headers_json = serialize_headers(req.headers())?;
+            let scheme = req.uri().scheme_str().unwrap_or("http");
+            let is_https = scheme == "https";
+            let host = req
+                .uri()
+                .host()
+                .ok_or_else(|| HttpError::InvalidRequest(anyhow::anyhow!("missing host in URI")))?
+                .to_owned();
+            let port = req
+                .uri()
+                .port_u16()
+                .unwrap_or(if is_https { 443 } else { 80 });
+
+            let head = serialize_request_head(&req, &host, port, is_https)?;
             let body = req.into_body();
 
-            let result = JsFuture::from(http_request(&method, &url, &headers_json, &body))
-                .await
-                .map_err(|e| HttpError::Network(anyhow::anyhow!("{:?}", e)))?;
+            let result = JsFuture::from(http_request(
+                &host,
+                port,
+                is_https,
+                head.as_ptr(),
+                head.len() as u32,
+                body.as_ptr(),
+                body.len() as u32,
+                WASM_MEMORY.as_ref(),
+            ))
+            .await
+            .map_err(|e| HttpError::Network(anyhow::anyhow!("{:?}", e)))?;
 
-            let status = js_sys::Reflect::get(&result, &JsValue::from_str("status"))
-                .map_err(|_| HttpError::Other(anyhow::anyhow!("missing status in response")))?
+            let result: js_sys::ArrayTuple<(Number, Array<JsString>, Uint8Array)> =
+                js_sys::ArrayTuple::unchecked_from_js(result);
+
+            let status = result
+                .get0()
                 .as_f64()
                 .ok_or_else(|| HttpError::Other(anyhow::anyhow!("status is not a number")))?
                 as u16;
 
-            let headers = parse_response_headers(&result)?;
+            let headers = parse_response_headers(result.get1())?;
 
-            let body_js = js_sys::Reflect::get(&result, &JsValue::from_str("body"))
-                .map_err(|_| HttpError::Other(anyhow::anyhow!("missing body in response")))?;
-
-            let body = if body_js.is_undefined() || body_js.is_null() {
-                Bytes::new()
-            } else {
-                Bytes::from(js_sys::Uint8Array::new(&body_js).to_vec())
-            };
+            let body = Bytes::from(result.get2().to_vec());
 
             let mut builder = http::Response::builder().status(status);
-            for (name, value) in &headers {
-                builder = builder.header(name.as_str(), value.as_str());
-            }
-            builder
-                .body(body)
-                .map_err(|e| HttpError::Other(e.into()))
+            *builder.headers_mut().unwrap() = headers;
+            builder.body(body).map_err(|e| HttpError::Other(e.into()))
         }
     }
-
 }
 
 /// Parse response headers from a JS object `{ "header-name": "value", ... }`.
 ///
 /// Node.js `res.headers` returns lowercased header names with string values.
-fn parse_response_headers(result: &JsValue) -> Result<Vec<(String, String)>, HttpError> {
-    let headers_js = js_sys::Reflect::get(result, &JsValue::from_str("headers"))
-        .map_err(|_| HttpError::Other(anyhow::anyhow!("missing headers in response")))?;
-
-    if headers_js.is_undefined() || headers_js.is_null() {
-        return Ok(Vec::new());
-    }
-
-    let entries = js_sys::Object::entries(&js_sys::Object::unchecked_from_js(headers_js));
-    let mut headers = Vec::with_capacity(entries.length() as usize);
-    for i in 0..entries.length() {
-        let entry = js_sys::Array::from(&entries.get(i));
-        if let (Some(key), Some(value)) = (entry.get(0).as_string(), entry.get(1).as_string()) {
-            headers.push((key, value));
+fn parse_response_headers(header_js: Array<JsString>) -> Result<HeaderMap, HttpError> {
+    let len = header_js.length() as usize;
+    let mut headers = HeaderMap::with_capacity(len / 2);
+    for i in 0..(len / 2) {
+        let key = header_js.get((i * 2) as u32).as_string();
+        let val = header_js.get((i * 2 + 1) as u32).as_string();
+        if let (Some(key), Some(val)) = (key, val) {
+            headers.insert(
+                HeaderName::from_bytes(key.as_bytes()).unwrap(),
+                HeaderValue::from_maybe_shared(Bytes::from(val)).unwrap(),
+            );
         }
     }
     Ok(headers)
 }
 
-fn serialize_headers(headers: &http::HeaderMap) -> Result<String, HttpError> {
-    let mut map: HashMap<&str, Vec<&str>> = HashMap::new();
-    for (name, value) in headers.iter() {
-        map.entry(name.as_str())
-            .or_default()
-            .push(value.to_str().unwrap_or(""));
+/// Serialize the full HTTP/1.1 request head (request line + Host + Content-Length
+/// + user headers + terminating CRLF) into a contiguous byte buffer.
+///
+/// The buffer is handed to JS by pointer; JS assigns it to
+/// `req._header`, bypassing Node's `_storeHeader` serialization.
+fn serialize_request_head(
+    req: &http::Request<Bytes>,
+    host: &str,
+    port: u16,
+    is_https: bool,
+) -> Result<Vec<u8>, HttpError> {
+    let method = req.method().as_str();
+    let path_and_query = req
+        .uri()
+        .path_and_query()
+        .map(|pq| pq.as_str())
+        .unwrap_or("/");
+    let body_len = req.body().len();
+    let headers = req.headers();
+
+    let mut buf = Vec::with_capacity(256 + headers.len() * 64);
+
+    buf.extend_from_slice(method.as_bytes());
+    buf.push(b' ');
+    buf.extend_from_slice(path_and_query.as_bytes());
+    buf.extend_from_slice(b" HTTP/1.1\r\n");
+
+    buf.extend_from_slice(b"Host: ");
+    buf.extend_from_slice(host.as_bytes());
+    let default_port = if is_https { 443 } else { 80 };
+    if port != default_port {
+        write!(&mut buf, ":{port}").map_err(|e| HttpError::Other(e.into()))?;
     }
-    let flat: HashMap<&str, String> = map
-        .into_iter()
-        .map(|(k, v)| (k, v.join(", ")))
-        .collect();
-    serde_json::to_string(&flat)
-        .map_err(|e| HttpError::InvalidRequest(e.into()))
+    buf.extend_from_slice(b"\r\n");
+
+    write!(&mut buf, "Content-Length: {body_len}\r\n").map_err(|e| HttpError::Other(e.into()))?;
+
+    for (name, value) in headers.iter() {
+        buf.extend_from_slice(name.as_str().as_bytes());
+        buf.extend_from_slice(b": ");
+        buf.extend_from_slice(value.as_bytes());
+        buf.extend_from_slice(b"\r\n");
+    }
+
+    buf.extend_from_slice(b"\r\n");
+
+    Ok(buf)
 }
