@@ -119,7 +119,7 @@ function parseRequestHead (headBuf) {
   const term = head.indexOf('\r\n\r\n')
   const lines = (term === -1 ? head : head.slice(0, term)).split('\r\n')
   // Request line: `METHOD request-target HTTP/1.1` (no spaces in the target).
-  const [method, path] = lines[0].split(' ')
+  const [method, path] = lines[0].split(' ', 2)
   const headers = {}
   for (let i = 1; i < lines.length; i++) {
     const colon = lines[i].indexOf(':')

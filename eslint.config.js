@@ -61,8 +61,11 @@ module.exports = [
       'unicorn/prefer-number-is-safe-integer': 'off', // Number.isInteger() can be intentional
       'unicorn/prefer-private-class-fields': 'off', // Existing underscore fields can cross module boundaries
       'unicorn/prefer-promise-with-resolvers': 'off', // Promise.withResolvers() requires Node.js 22
+      'unicorn/prefer-simple-condition-first': 'off', // Needs a short-circuit behavior audit
+      'unicorn/prefer-then-catch': 'off', // Rejection handlers broaden rejection boundaries
       'unicorn/prefer-unicode-code-point-escapes': 'off', // Questionable benefit
       'unicorn/prevent-abbreviations': 'off',
+      'unicorn/single-line-block-comment-style': 'off', // Preserve compact JSDoc typedefs
     },
   },
   {
