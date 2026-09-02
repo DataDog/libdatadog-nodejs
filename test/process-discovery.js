@@ -8,7 +8,21 @@ const libdatadog = require('..')
 const process_discovery = libdatadog.load('process-discovery')
 assert(process_discovery !== undefined)
 
-const metadata = new process_discovery.TracerMetadata(
+const metadata = {
+  runtimeId: '7938685c-19dd-490f-b9b3-8aae4c22f897',
+  tracerVersion: '1.0.0',
+  hostname: 'my_hostname',
+  serviceName: 'my_svc',
+  serviceEnv: 'my_env',
+  serviceVersion: 'my_version',
+  processTags: 'entrypoint.name:server,svc.auto:my_svc',
+  containerId: 'abc123def456abc123def456abc123def456abc123def456abc123def456abc123',
+}
+
+const cfg_handle = process_discovery.storeMetadata(metadata)
+assert(cfg_handle !== undefined)
+
+const positional_metadata = new process_discovery.TracerMetadata(
   '7938685c-19dd-490f-b9b3-8aae4c22f897',
   '1.0.0',
   'my_hostname',
@@ -18,24 +32,21 @@ const metadata = new process_discovery.TracerMetadata(
   'entrypoint.name:server,svc.auto:my_svc',
   'abc123def456abc123def456abc123def456abc123def456abc123def456abc123',
 )
-
-const cfg_handle = process_discovery.storeMetadata(metadata)
-assert(cfg_handle !== undefined)
+const positional_cfg_handle = process_discovery.storeMetadata(positional_metadata)
+assert(positional_cfg_handle !== undefined)
 
 // Same shape, plus a thread-local metadata block (OTEP-4947). libdatadog
 // implicitly prepends `datadog.local_root_span_id` at wire index 0 in the
 // attribute key map; entries here start at wire index 1. `schemaVersion` and
 // `extraAttributes` describe the on-the-wire record schema for readers.
-const metadata_with_threadlocal = new process_discovery.TracerMetadata(
-  '7938685c-19dd-490f-b9b3-8aae4c22f898',
-  '1.0.0',
-  'my_hostname',
-  'my_svc',
-  'my_env',
-  'my_version',
-  undefined,
-  undefined,
-  {
+const metadata_with_threadlocal = {
+  runtimeId: '7938685c-19dd-490f-b9b3-8aae4c22f898',
+  tracerVersion: '1.0.0',
+  hostname: 'my_hostname',
+  serviceName: 'my_svc',
+  serviceEnv: 'my_env',
+  serviceVersion: 'my_version',
+  threadlocalMetadata: {
     attributeKeys: ['endpoint', 'http.status'],
     schemaVersion: 'nodejs_v1_dev',
     extraAttributes: [
@@ -44,44 +55,21 @@ const metadata_with_threadlocal = new process_discovery.TracerMetadata(
       { key: 'threadlocal.runtime.name', stringValue: 'nodejs' },
     ],
   },
-)
-assert.deepStrictEqual(
-  metadata_with_threadlocal.threadlocalMetadata.attributeKeys,
-  ['endpoint', 'http.status'],
-)
-assert.strictEqual(
-  metadata_with_threadlocal.threadlocalMetadata.schemaVersion,
-  'nodejs_v1_dev',
-)
-assert.strictEqual(
-  metadata_with_threadlocal.threadlocalMetadata.extraAttributes.length,
-  3,
-)
-metadata_with_threadlocal.threadlocalMetadata = {
-  attributeKeys: ['updated'],
-  schemaVersion: undefined,
-  extraAttributes: [],
 }
-assert.deepStrictEqual(
-  metadata_with_threadlocal.threadlocalMetadata.attributeKeys,
-  ['updated'],
-)
 const cfg_handle_threadlocal = process_discovery.storeMetadata(metadata_with_threadlocal)
 assert(cfg_handle_threadlocal !== undefined)
 
 // An ExtraAttribute with neither stringValue nor intValue set is a caller
 // error — one of them has to be picked.
-const bad_metadata_neither = new process_discovery.TracerMetadata(
-  '7938685c-19dd-490f-b9b3-8aae4c22f899',
-  '1.0.0',
-  'my_hostname',
-  undefined, undefined, undefined, undefined, undefined,
-  {
+const bad_metadata_neither = {
+  runtimeId: '7938685c-19dd-490f-b9b3-8aae4c22f899',
+  tracerVersion: '1.0.0',
+  hostname: 'my_hostname',
+  threadlocalMetadata: {
     attributeKeys: [],
-    schemaVersion: undefined,
     extraAttributes: [{ key: 'threadlocal.bogus' }],
   },
-)
+}
 assert.throws(
   () => process_discovery.storeMetadata(bad_metadata_neither),
   /neither is/,
@@ -89,17 +77,15 @@ assert.throws(
 
 // Setting both stringValue and intValue is also a caller error — the intent
 // is ambiguous, so reject.
-const bad_metadata_both = new process_discovery.TracerMetadata(
-  '7938685c-19dd-490f-b9b3-8aae4c22f89a',
-  '1.0.0',
-  'my_hostname',
-  undefined, undefined, undefined, undefined, undefined,
-  {
+const bad_metadata_both = {
+  runtimeId: '7938685c-19dd-490f-b9b3-8aae4c22f89a',
+  tracerVersion: '1.0.0',
+  hostname: 'my_hostname',
+  threadlocalMetadata: {
     attributeKeys: [],
-    schemaVersion: undefined,
     extraAttributes: [{ key: 'threadlocal.bogus', stringValue: 's', intValue: 1 }],
   },
-)
+}
 assert.throws(
   () => process_discovery.storeMetadata(bad_metadata_both),
   /both are/,
