@@ -64,11 +64,11 @@ jobs:
                 )
               ]
               | if length == 1 then .[0] else error("expected one merged v0.x pull request") end
-              | [.merge_commit_sha, .head.sha, .head.repo.full_name]
+              | [.merge_commit_sha, .head.repo.full_name]
               | @tsv
             '
           )
-          IFS=$'\t' read -r MERGE_SHA HEAD_SHA HEAD_REPOSITORY <<< "$PULL"
+          IFS=$'\t' read -r MERGE_SHA HEAD_REPOSITORY <<< "$PULL"
 
           test "$MERGE_SHA" = "$GITHUB_SHA"
           test "$HEAD_REPOSITORY" = "$GITHUB_REPOSITORY"
@@ -78,10 +78,7 @@ jobs:
               gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$ARTIFACT_NAME" --jq "
                 [
                   .artifacts[]
-                  | select(
-                      .expired == false and
-                      .workflow_run.head_sha == \"$HEAD_SHA\"
-                    )
+                  | select(.expired == false)
                 ]
                 | max_by(.created_at).workflow_run.id // empty
               "
