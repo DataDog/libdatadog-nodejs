@@ -33,7 +33,7 @@ fs.writeFileSync(
   gluePath,
   glue.replace(
     loader,
-    `const wasmBytes = require('node:zlib').brotliDecompressSync(Buffer.from('${encodedWasm}', 'base64'));`,
+    () => `const wasmBytes = require('node:zlib').brotliDecompressSync(Buffer.from('${encodedWasm}', 'base64'));`,
   ),
 )
 fs.rmSync(wasmPath)
