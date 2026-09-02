@@ -387,7 +387,7 @@ function createExporter (pipeline, server, options = {}) {
 
 function exporterOptions () {
   return {
-    endpoint: 'http://example.test/api/v2/spans',
+    endpoint: 'https://example.test/api/v2/spans',
     apiKey: 'test-api-key',
     tracerVersion: '0.1.0',
     languageVersion: process.version,

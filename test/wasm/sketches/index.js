@@ -13,7 +13,7 @@ sketch.addWithCount(2, 3)
 assert.strictEqual(sketch.count(), 4)
 
 assert.throws(() => sketch.add(-1), /point is invalid/)
-assert.throws(() => sketch.addWithCount(1, Number.NaN), /count is invalid/)
+assert.throws(() => sketch.addWithCount(1, NaN), /count is invalid/)
 
 const encoded = sketch.encode()
 assert(encoded instanceof Uint8Array)
