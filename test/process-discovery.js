@@ -57,6 +57,15 @@ assert.strictEqual(
   metadata_with_threadlocal.threadlocalMetadata.extraAttributes.length,
   3,
 )
+metadata_with_threadlocal.threadlocalMetadata = {
+  attributeKeys: ['updated'],
+  schemaVersion: undefined,
+  extraAttributes: [],
+}
+assert.deepStrictEqual(
+  metadata_with_threadlocal.threadlocalMetadata.attributeKeys,
+  ['updated'],
+)
 const cfg_handle_threadlocal = process_discovery.storeMetadata(metadata_with_threadlocal)
 assert(cfg_handle_threadlocal !== undefined)
 

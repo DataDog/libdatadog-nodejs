@@ -50,7 +50,7 @@ pub struct ThreadLocalMetadata {
     pub extra_attributes: Vec<ExtraAttribute>,
 }
 
-#[napi(constructor)]
+#[napi]
 pub struct TracerMetadata {
     pub runtime_id: Option<String>,
     pub tracer_version: String,
@@ -63,7 +63,46 @@ pub struct TracerMetadata {
     /// Optional thread-level context metadata; see [`ThreadLocalMetadata`].
     /// `null`/omitted (the default) disables the `threadlocal.*` block in the
     /// emitted OTel process context entirely.
+    #[napi(skip)]
     pub threadlocal_metadata: Option<ThreadLocalMetadata>,
+}
+
+#[napi]
+impl TracerMetadata {
+    #[napi(constructor)]
+    pub fn new(
+        runtime_id: Option<String>,
+        tracer_version: String,
+        hostname: String,
+        service_name: Option<String>,
+        service_env: Option<String>,
+        service_version: Option<String>,
+        process_tags: Option<String>,
+        container_id: Option<String>,
+        threadlocal_metadata: Option<ThreadLocalMetadata>,
+    ) -> Self {
+        Self {
+            runtime_id,
+            tracer_version,
+            hostname,
+            service_name,
+            service_env,
+            service_version,
+            process_tags,
+            container_id,
+            threadlocal_metadata,
+        }
+    }
+
+    #[napi(getter)]
+    pub fn threadlocal_metadata(&self) -> Option<ThreadLocalMetadata> {
+        self.threadlocal_metadata.clone()
+    }
+
+    #[napi(setter)]
+    pub fn set_threadlocal_metadata(&mut self, value: Option<ThreadLocalMetadata>) {
+        self.threadlocal_metadata = value;
+    }
 }
 
 fn convert_extra_attribute(ea: &ExtraAttribute) -> napi::Result<(String, any_value::Value)> {
@@ -108,7 +147,7 @@ fn convert_threadlocal_metadata(
 
 #[napi]
 pub fn store_metadata(data: &TracerMetadata) -> napi::Result<NapiAnonymousFileHandle> {
-    let res = tracer_metadata::store_tracer_metadata(&tracer_metadata::TracerMetadata{
+    let res = tracer_metadata::store_tracer_metadata(&tracer_metadata::TracerMetadata {
         schema_version: 1,
         runtime_id: data.runtime_id.clone(),
         tracer_language: String::from("nodejs"),
@@ -127,7 +166,7 @@ pub fn store_metadata(data: &TracerMetadata) -> napi::Result<NapiAnonymousFileHa
     });
 
     match res {
-        Ok(handle) => Ok(NapiAnonymousFileHandle{ _internal: handle }),
+        Ok(handle) => Ok(NapiAnonymousFileHandle { _internal: handle }),
         Err(e) => {
             let err_msg = format!("Failed to store the tracer configuration: {:?}", e);
             Err(Error::new(Status::GenericFailure, err_msg))
