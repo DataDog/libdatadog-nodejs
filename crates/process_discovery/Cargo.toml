@@ -11,5 +11,5 @@ anyhow = "1"
 libdd-library-config = { git = "https://github.com/DataDog/libdatadog.git", tag = "v43.0.0", features = ["otel-thread-ctx"] }
 libdd-trace-protobuf = { git = "https://github.com/DataDog/libdatadog.git", tag = "v43.0.0" }
 
-napi = { version = "2" }
-napi-derive = { version = "2", default-features = false }
+napi = { version = "3" }
+napi-derive = { version = "3", default-features = false }
