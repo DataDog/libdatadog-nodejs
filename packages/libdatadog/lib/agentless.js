@@ -20,9 +20,13 @@ class AgentlessExporter {
    */
   constructor (binding, options) {
     const { runtimeId } = options
-    const bindingOptions = runtimeId === undefined || runtimeId === null
-      ? { ...options, runtimeId: randomUUID() }
-      : options
+    const bindingOptions = {
+      ...options,
+      runtimeId: runtimeId ?? randomUUID(),
+    }
+    for (const name of ['hostname', 'env', 'service', 'version', 'containerId', 'timeoutMs']) {
+      if (bindingOptions[name] === null) delete bindingOptions[name]
+    }
     const transport = createHostTransport()
     this.#binding = new binding.AgentlessExporter(
       bindingOptions,

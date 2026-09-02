@@ -588,5 +588,5 @@ fn network_error(error: napi::Error) -> HttpError {
 }
 
 fn send_error(error: SendAgentlessV04Error) -> Error {
-    Error::from_reason(format!("failed to send data-pipeline export: {error}"))
+    Error::from_reason(error.to_string())
 }
