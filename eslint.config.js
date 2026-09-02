@@ -39,8 +39,33 @@ module.exports = [
       }],
       'n/no-process-exit': 'off', // Duplicate of unicorn/no-process-exit
       'prefer-const': 'error',
+
+      // Match the deliberate exceptions in dd-trace-js. The remaining recommended rules stay enabled.
+      'unicorn/consistent-boolean-name': 'off', // Would rename public API and config booleans
+      'unicorn/filename-case': ['error', {
+        case: 'kebabCase',
+        // The WASM package name must match the Rust crate name.
+        ignore: ['^library_config$'],
+      }],
+      'unicorn/name-replacements': 'off', // Naming churn
+      'unicorn/no-break-in-nested-loop': 'off', // Conflicts with performance-oriented loops
+      'unicorn/no-global-object-property-assignment': 'off', // Needed for intentional global initialization
+      'unicorn/no-negated-array-predicate': 'off', // Predicate inversion is harder to read
+      'unicorn/no-return-array-push': 'off', // Questionable benefit
+      'unicorn/no-this-outside-of-class': 'off', // Object methods and callback APIs can bind `this`
+      'unicorn/no-top-level-assignment-in-function': 'off', // Module-level singletons are assigned from functions
+      'unicorn/no-undeclared-class-members': 'off', // Field declarations can change object shape
+      'unicorn/prefer-await': 'off', // Production code uses callbacks and synchronous patterns
+      'unicorn/prefer-minimal-ternary': 'off', // Conflicts with restricted syntax in consumers
       'unicorn/prefer-module': 'off', // We use CJS
+      'unicorn/prefer-number-is-safe-integer': 'off', // Number.isInteger() can be intentional
+      'unicorn/prefer-private-class-fields': 'off', // Existing underscore fields can cross module boundaries
+      'unicorn/prefer-promise-with-resolvers': 'off', // Promise.withResolvers() requires Node.js 22
+      'unicorn/prefer-simple-condition-first': 'off', // Needs a short-circuit behavior audit
+      'unicorn/prefer-then-catch': 'off', // Rejection handlers broaden rejection boundaries
+      'unicorn/prefer-unicode-code-point-escapes': 'off', // Questionable benefit
       'unicorn/prevent-abbreviations': 'off',
+      'unicorn/single-line-block-comment-style': 'off', // Preserve compact JSDoc typedefs
     },
   },
   {

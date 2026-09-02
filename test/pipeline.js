@@ -178,6 +178,7 @@ class NativeSpansInterface {
 
   _refreshViews () {
     this._cqbView = new DataView(this._wasmMemory.buffer, this._cqbPtr)
+    // eslint-disable-next-line unicorn/no-unsafe-buffer-conversion -- WebAssembly.Memory.buffer is the full buffer.
     this._cqbBytes = new Uint8Array(this._wasmMemory.buffer, this._cqbPtr)
   }
 
@@ -458,20 +459,24 @@ describe('pipeline', { skip }, () => {
   describe('span attributes', () => {
     it('should set and get string tags', () => {
       const span = nativeSpans.createSpan()
+      // eslint-disable-next-line unicorn/prefer-https -- Plain HTTP is the tag value under test.
+      const httpUrl = 'http://example.com/api'
       span.setTag('http.method', 'GET')
-      span.setTag('http.url', 'http://example.com/api')
+      span.setTag('http.url', httpUrl)
 
       assert.strictEqual(span.getTag('http.method'), 'GET')
-      assert.strictEqual(span.getTag('http.url'), 'http://example.com/api')
+      assert.strictEqual(span.getTag('http.url'), httpUrl)
     })
 
     it('should set and get numeric tags', () => {
       const span = nativeSpans.createSpan()
+      // eslint-disable-next-line unicorn/prefer-math-constants -- The exact fractional value is the test input.
+      const metricValue = 3.14159
       span.setTag('http.status_code', 200)
-      span.setTag('custom.metric', 3.141_59)
+      span.setTag('custom.metric', metricValue)
 
       assert.strictEqual(span.getTag('http.status_code'), 200)
-      assert.strictEqual(span.getTag('custom.metric'), 3.141_59)
+      assert.strictEqual(span.getTag('custom.metric'), metricValue)
     })
 
     it('should set and get error state', () => {
@@ -730,6 +735,7 @@ describe('pipeline', { skip }, () => {
       // second entry).
       const ptr = nativeSpans.state.string_table_input_ptr()
       const view = new DataView(wasmMemory.buffer, ptr)
+      // eslint-disable-next-line unicorn/no-unsafe-buffer-conversion -- WebAssembly.Memory.buffer is the full buffer.
       const bytes = new Uint8Array(wasmMemory.buffer, ptr)
       const entries = [[60_001, 'bulk-key'], [60_002, 'bulk-val']]
       let off = 0
