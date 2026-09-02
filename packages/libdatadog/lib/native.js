@@ -1,0 +1,68 @@
+'use strict'
+
+const path = require('node:path')
+const os = require('node:os')
+
+const { remoteConfigFetcher } = require('./remote-config')
+
+const target = getNativeTarget()
+const binding = loadBinding(target)
+installCurrentThreadHost(binding)
+
+function installCurrentThreadHost (binding) {
+  const version = binding.getCurrentThreadTaskHostContractVersion()
+  if (version !== 4) {
+    throw new Error(`unsupported async-runtime host contract version: ${version}`)
+  }
+  const { high, low } = binding.reserveCurrentThreadHostRegistration()
+  binding.registerCurrentThreadTaskHost(high, low)
+}
+
+function getNativeTarget () {
+  const platform = os.platform()
+  const architecture = process.arch
+
+  if (platform === 'darwin' && (architecture === 'arm64' || architecture === 'x64')) {
+    return `${platform}-${architecture}`
+  }
+
+  if (platform === 'linux' && (architecture === 'arm64' || architecture === 'x64')) {
+    const libc = process.report?.getReport?.().header?.glibcVersionRuntime ? 'gnu' : 'musl'
+    return `linux-${architecture}-${libc}`
+  }
+
+  throw new Error(`unsupported native libdatadog platform: ${platform}-${architecture}`)
+}
+
+function loadBinding (target) {
+  if (process.env.DD_LIBDATADOG_NATIVE_PATH) {
+    return require(path.resolve(process.env.DD_LIBDATADOG_NATIVE_PATH))
+  }
+
+  const localArtifact = path.join(
+    __dirname,
+    '..',
+    'dist',
+    'native',
+    `libdatadog.${target}.node`,
+  )
+
+  try {
+    return require(localArtifact)
+  } catch {
+    return require(`@datadog/libdatadog-${target}`)
+  }
+}
+
+module.exports = {
+  backend: () => 'native',
+  DDSketch: binding.DDSketch,
+  RemoteConfigFetcher: remoteConfigFetcher(binding),
+  createAgentlessExporter,
+  zstd_compress: binding.zstd_compress,
+}
+
+/** @param {import('../index').AgentlessExporterOptions} options */
+function createAgentlessExporter (options) {
+  return require('./agentless').createAgentlessExporter(binding, options)
+}

@@ -4,135 +4,170 @@
 
 const assert = require('node:assert/strict')
 const { AsyncLocalStorage } = require('node:async_hooks')
+const { execFileSync } = require('node:child_process')
 const { EventEmitter } = require('node:events')
 const https = require('node:https')
 const { test } = require('node:test')
 
-const { RemoteConfigFetcher, setStorage } = require('../remote-config')
+const selected = require('..')
+const wasm = require('../wasm')
+const backends = selected === wasm
+  ? [['WASM', wasm]]
+  : [['native', selected], ['WASM', wasm]]
 
 const CONFIG_PATH = 'datadog/2/ASM_FEATURES/asm-features-1/config'
 
-/** @typedef {import('../remote-config').RemoteConfigFetcherOptions} RemoteConfigFetcherOptions */
-
-/**
- * @param {Partial<RemoteConfigFetcherOptions>} [overrides]
- */
 function fetcherOptions (overrides = {}) {
   return {
-    clientId: 'client-id',
-    runtimeId: 'runtime-id',
-    service: 'service',
-    env: 'env',
+    clientId: 'client-id-1',
+    runtimeId: 'runtime-id-1',
+    service: 'my_svc',
+    env: 'my_env',
     appVersion: '1.0.0',
-    tags: [],
-    processTags: [],
+    tags: ['runtime-id:runtime-id-1'],
+    processTags: ['entrypoint.type:script'],
     language: 'nodejs',
-    tracerVersion: '1.0.0',
+    tracerVersion: '1.2.3',
     url: 'https://datadoghq.com',
     timeoutMs: 5000,
-    apiKey: 'api-key',
-    hostname: 'host',
+    apiKey: 'test-api-key',
+    hostname: 'test-host',
     ...overrides,
   }
 }
 
-test('keeps remote config out of the universal WASM entry point', () => {
-  const wasm = require('../wasm')
-
-  assert.strictEqual(wasm.RemoteConfigFetcher, undefined)
-  assert.strictEqual(wasm.setStorage, undefined)
-  assert.strictEqual(typeof RemoteConfigFetcher, 'function')
-})
-
-test('exports agentless remote config from the dedicated entry point', async () => {
+function mockHttps (context, onRequest = () => {}) {
   const requests = []
-  const storage = new AsyncLocalStorage()
-  const storageValue = {}
-  const observedStorageValues = []
-  const originalRequest = https.request
-
-  /** @param {() => void} callback */
-  function runInStorage (callback) {
-    storage.run(storageValue, callback)
-  }
-
-  /**
-   * @param {import('node:https').RequestOptions} options
-   * @param {(response: import('node:http').IncomingMessage) => void} onResponse
-   */
-  function request (options, onResponse) {
-    observedStorageValues.push(storage.getStore())
-    const outgoing = new EventEmitter()
-    const chunks = []
-
-    /**
-     * @param {string | Uint8Array} chunk
-     */
-    outgoing.write = function write (chunk) {
-      chunks.push(Buffer.from(chunk))
-    }
-    outgoing.end = () => {
-      requests.push({ body: Buffer.concat(chunks), options })
+  context.mock.method(https, 'request', (url, options, onResponse) => {
+    onRequest()
+    const request = new EventEmitter()
+    request.destroy = error => request.emit('error', error)
+    request.end = (body) => {
+      requests.push({ body: Buffer.from(body), options, url: url.toString() })
       queueMicrotask(() => {
         const response = new EventEmitter()
         response.statusCode = 200
-        response.rawHeaders = []
         onResponse(response)
         response.emit('end')
       })
     }
-    return outgoing
-  }
-  https.request = request
-  setStorage(runInStorage)
-
-  try {
-    const fetcher = new RemoteConfigFetcher(fetcherOptions())
-    assert.deepStrictEqual(
-      fetcher.setProductCapabilities(['ASM_FEATURES'], ['ASM_ACTIVATION']),
-      [],
-    )
-    fetcher.setExtraServices(['extra-service'])
-
-    await assert.rejects(fetcher.fetchChanges())
-    assert.strictEqual(observedStorageValues.some(value => value !== storageValue), false)
-    assert(observedStorageValues.length > 0)
-
-    let configRequest
-    for (const request of requests) {
-      if (request.options.path === '/api/v0.1/configurations') {
-        configRequest = request
-        break
-      }
-    }
-    assert(configRequest)
-    assert.strictEqual(configRequest.options.headers['dd-api-key'], 'api-key')
-    assert.strictEqual(configRequest.options.method, 'POST')
-    assert(configRequest.body.length > 0)
-  } finally {
-    setStorage(runWithoutStorage)
-    https.request = originalRequest
-  }
-})
-
-/** @param {() => void} callback */
-function runWithoutStorage (callback) {
-  callback()
+    return request
+  })
+  return requests
 }
 
-test('keeps the WASM remote config validation contract', () => {
-  const fetcher = new RemoteConfigFetcher(fetcherOptions())
+test('native remote config invokes the transport in the fetch caller context', {
+  skip: selected.backend() !== 'native',
+}, async (context) => {
+  const storage = new AsyncLocalStorage()
+  const stores = []
+  mockHttps(context, () => stores.push(storage.getStore()))
+  const fetcher = new selected.RemoteConfigFetcher(fetcherOptions())
 
-  assert.deepStrictEqual(
-    fetcher.setProductCapabilities(
-      ['ASM_FEATURES', 'NOT_A_PRODUCT'],
-      ['ASM_ACTIVATION', 'NOT_A_CAPABILITY'],
-    ),
-    ['NOT_A_PRODUCT', 'NOT_A_CAPABILITY'],
-  )
-  assert.throws(
-    () => fetcher.setConfigState(CONFIG_PATH, 42),
-    /Unknown apply state 42/,
-  )
-  assert.strictEqual(typeof setStorage, 'function')
+  await storage.run('fetch-context', () => assert.rejects(
+    fetcher.fetchChanges(),
+    /missing config meta/,
+  ))
+  assert.ok(stores.length > 0)
+  assert.deepStrictEqual(new Set(stores), new Set(['fetch-context']))
 })
+
+test('WASM agentless remote config does not require WebCrypto', () => {
+  const entryPoint = require.resolve('../wasm')
+  const script = `
+    delete globalThis.crypto
+    if (globalThis.crypto !== undefined) throw new Error('could not hide WebCrypto')
+    const { EventEmitter } = require('node:events')
+    const https = require('node:https')
+    let requested = false
+    https.request = (_url, _options, onResponse) => {
+      const request = new EventEmitter()
+      request.destroy = error => request.emit('error', error)
+      request.end = () => {
+        requested = true
+        queueMicrotask(() => {
+          const response = new EventEmitter()
+          response.statusCode = 200
+          onResponse(response)
+          response.emit('end')
+        })
+      }
+      return request
+    }
+    const { RemoteConfigFetcher } = require(${JSON.stringify(entryPoint)})
+    new RemoteConfigFetcher(${JSON.stringify(fetcherOptions())})
+      .fetchChanges()
+      .then(() => { throw new Error('invalid TUF response was accepted') })
+      .catch(() => {
+        if (!requested) throw new Error('agentless request was not sent')
+        process.stdout.write('ok')
+      })
+  `
+
+  assert.strictEqual(
+    execFileSync(process.execPath, ['--eval', script], { encoding: 'utf8' }),
+    'ok',
+  )
+})
+
+for (const [name, { RemoteConfigFetcher }] of backends) {
+  test(`${name} remote config sends directly to the backend`, async (context) => {
+    const requests = mockHttps(context)
+    const fetcher = new RemoteConfigFetcher(fetcherOptions())
+    assert.deepStrictEqual(
+      fetcher.setProductCapabilities(
+        ['ASM_FEATURES', 'ASM_DD'],
+        ['ASM_ACTIVATION', 'ASM_DD_RULES'],
+      ),
+      [],
+    )
+    fetcher.setExtraServices(['other_svc'])
+
+    await assert.rejects(fetcher.fetchChanges(), /missing config meta/)
+    assert.strictEqual(requests.length, 2)
+    const request = requests.find(({ url }) => url.endsWith('/api/v0.1/configurations'))
+    assert.ok(request)
+    assert.strictEqual(
+      request.url,
+      'https://config.datadoghq.com/api/v0.1/configurations',
+    )
+    assert.strictEqual(request.options.headers['dd-api-key'], 'test-api-key')
+    assert.strictEqual(request.options.method, 'POST')
+    assert.ok(request.body.length > 0)
+  })
+
+  test(`${name} remote config validates input`, () => {
+    const fetcher = new RemoteConfigFetcher(fetcherOptions())
+    assert.deepStrictEqual(
+      fetcher.setProductCapabilities(
+        ['ASM_FEATURES', 'NOT_A_PRODUCT'],
+        ['ASM_ACTIVATION', 'NOT_A_CAPABILITY'],
+      ),
+      ['NOT_A_PRODUCT', 'NOT_A_CAPABILITY'],
+    )
+    assert.throws(
+      () => fetcher.setConfigState(CONFIG_PATH, 42),
+      /Unknown apply state 42/,
+    )
+    assert.throws(
+      () => new RemoteConfigFetcher(fetcherOptions({ url: 'http://datadoghq.com' })),
+      /agentless endpoint is invalid/,
+    )
+    assert.throws(
+      () => new RemoteConfigFetcher(fetcherOptions({ hostname: '' })),
+      /hostname is empty/,
+    )
+  })
+
+  test(`${name} remote config enforces its request timeout`, async (context) => {
+    context.mock.method(https, 'request', () => {
+      const request = new EventEmitter()
+      request.destroy = error => request.emit('error', error)
+      request.end = () => {}
+      return request
+    })
+
+    const fetcher = new RemoteConfigFetcher(fetcherOptions({ timeoutMs: 1 }))
+    await assert.rejects(fetcher.fetchChanges(), /timed out after 1ms/)
+  })
+}

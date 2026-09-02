@@ -34,6 +34,10 @@ const forbiddenWasmCode = [
     dependency: 'zstd-sys',
     owners: new Set(['zstd-sys', 'zstd-sys (C)']),
   },
+  {
+    dependency: 'tokio',
+    owners: new Set(['tokio', 'tokio-util']),
+  },
 ]
 
 function readUnsignedLeb128 (bytes, start) {
@@ -307,15 +311,28 @@ function appendCrateReport (lines, profilePath) {
 
 function createReport (gluePath, profilePath) {
   const glue = fs.readFileSync(gluePath, 'utf8')
-  const match = glue.match(/Buffer\.from\('([A-Za-z0-9+/=]+)', 'base64'\)/)
-  if (!match) throw new Error('could not find the inline base64 WASM payload')
+  const wasmBase64 = readPayload(glue, 'wasmBrotliBase64')
+  if (!wasmBase64) throw new Error('could not find the inline base64 WASM payload')
 
-  const base64Bytes = Buffer.byteLength(match[1])
-  const compressed = Buffer.from(match[1], 'base64')
+  const payloadNames = [
+    ['loaderBrotliBase64', 'Brotli-compressed napi-rs loader'],
+    ['runtimeBrotliBase64', 'Brotli-compressed emnapi runtime'],
+    ['workerBrotliBase64', 'Brotli-compressed emnapi worker'],
+  ]
+  const payloads = payloadNames
+    .map(([name, label]) => ({ base64: readPayload(glue, name), label }))
+    .filter(payload => payload.base64)
+  payloads.push({ base64: wasmBase64, label: 'Brotli-compressed WASM' })
+
+  const base64Bytes = payloads
+    .reduce((total, payload) => total + Buffer.byteLength(payload.base64), 0)
+  const compressedBytes = payloads
+    .reduce((total, payload) => total + Buffer.from(payload.base64, 'base64').length, 0)
+  const compressed = Buffer.from(wasmBase64, 'base64')
   const wasm = brotliDecompressSync(compressed)
   const glueBytes = Buffer.byteLength(glue) - base64Bytes
   const inlineBytes = Buffer.byteLength(glue)
-  const base64Overhead = base64Bytes - compressed.length
+  const base64Overhead = base64Bytes - compressedBytes
   const sections = readSections(wasm)
   const lines = [
     '## libdatadog WASM size',
@@ -323,9 +340,12 @@ function createReport (gluePath, profilePath) {
     '| Inline artifact layer | Bytes | KiB |',
     '| --- | ---: | ---: |',
     layerRow('Raw WASM (before Brotli)', wasm.length),
-    layerRow('Brotli-compressed WASM', compressed.length),
+    ...payloads.map(payload => layerRow(
+      payload.label,
+      Buffer.from(payload.base64, 'base64').length,
+    )),
     layerRow('Base64 encoding overhead', base64Overhead),
-    layerRow('JavaScript glue/loader', glueBytes),
+    layerRow('JavaScript bootstrap/glue', glueBytes),
     layerRow('Final inlined JavaScript', inlineBytes, true),
     '',
     '### Raw WebAssembly sections',
@@ -346,6 +366,10 @@ function createReport (gluePath, profilePath) {
 
   lines.push('', `Generated from \`${path.relative(process.cwd(), gluePath)}\`.`)
   return lines.join('\n')
+}
+
+function readPayload (source, name) {
+  return source.match(new RegExp(`${name}:"([A-Za-z0-9+/=]+)"`))?.[1]
 }
 
 if (require.main === module) {

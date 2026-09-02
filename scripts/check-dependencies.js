@@ -4,42 +4,30 @@ const path = require('node:path')
 const { execFileSync } = require('node:child_process')
 
 const repositoryRoot = path.join(__dirname, '..')
+const packageJson = require('../packages/libdatadog/package.json')
 const trees = [
-  { package: 'libdatadog-wasm', target: 'wasm32-unknown-unknown' },
-  { package: 'remote-config', target: 'wasm32-unknown-unknown' },
+  ...packageJson.napi.targets.map(target => ({ package: 'libdatadog', target })),
+  { package: 'libdatadog', target: 'wasm32-unknown-unknown' },
 ]
-// libdd-tuf 0.3.1 uses older dependency majors. Exact sets keep unrelated duplicates failing validation.
-const remoteConfigDuplicatePackages = new Map([
-  ['http', new Set(['0.2.12', '1.5.0'])],
-  ['itoa', new Set(['0.4.8', '1.0.18'])],
-  ['syn', new Set(['2.0.119', '3.0.4'])],
-  ['thiserror', new Set(['1.0.69', '2.0.20'])],
-  ['thiserror-impl', new Set(['1.0.69', '2.0.20'])],
-  ['untrusted', new Set(['0.7.1', '0.9.0'])],
+// TODO: Remove these exceptions after porting the Datadog TUF changes onto
+// modern upstream TUF and aligning the remaining remote config dependencies.
+const remoteConfigDuplicatePackages = new Set([
+  'getrandom',
+  'http',
+  'itoa',
+  'syn',
+  'untrusted',
 ])
-// async-trait pulled in via libdd-shared-runtime now depends on syn 3, while
-// pin-project (via libdd-common) still depends on syn 2. Both majors coexist.
-const libdatadogWasmDuplicatePackages = new Map([
-  ['syn', new Set(['2.0.119', '3.0.4'])],
-])
-const allowedDuplicatePackagesByTree = new Map([
-  ['remote-config', remoteConfigDuplicatePackages],
-  ['libdatadog-wasm', libdatadogWasmDuplicatePackages],
-])
+// libdd-remote-config exposes a single-client API but still compiles its Tokio
+// scheduler modules. The symbolized WASM report separately prevents Tokio code
+// from reaching the shipped fallback.
 const remoteConfigTokioPackages = new Set(['tokio', 'tokio-macros', 'tokio-util'])
-
-/**
- * @param {Set<string>} actual
- * @param {Set<string>} expected
- */
-function setsEqual (actual, expected) {
-  if (actual.size !== expected.size) return false
-
-  for (const value of actual) {
-    if (!expected.has(value)) return false
-  }
-  return true
-}
+// The existing agentless feature enables libdd-common/https across the native
+// feature graph. LTO removes its unused implementation from the shipped addon.
+const remoteConfigNativeFeatureUnion = new Set([
+  ...remoteConfigTokioPackages,
+  'tokio-rustls',
+])
 
 function parseCargoTree (output) {
   const paths = []
@@ -59,11 +47,7 @@ function parseCargoTree (output) {
   return paths
 }
 
-/**
- * @param {{ name: string, version: string }[]} dependencies
- * @param {{ package?: string }} [tree]
- */
-function findDuplicateVersions (dependencies, tree = {}) {
+function findDuplicateVersions (dependencies) {
   const versionsByPackage = new Map()
   const failures = []
 
@@ -73,25 +57,22 @@ function findDuplicateVersions (dependencies, tree = {}) {
     versionsByPackage.set(name, versions)
   }
 
-  const allowedDuplicatePackages = allowedDuplicatePackagesByTree.get(tree.package)
   for (const [name, versions] of versionsByPackage) {
-    const allowedVersions = allowedDuplicatePackages?.get(name)
-    const isAllowedDuplicate = allowedVersions !== undefined
-      && setsEqual(versions, allowedVersions)
-    if (versions.size > 1 && !isAllowedDuplicate) {
+    if (versions.size > 1 && !isRemoteConfigDuplicate(dependencies, name)) {
       failures.push({ name, versions: [...versions] })
     }
   }
   return failures
 }
 
-/**
- * @template {{ name: string }} Dependency
- * @param {Dependency[]} dependencies
- * @param {{ package?: string }} [tree]
- * @returns {Dependency[]}
- */
-function findForbiddenDependencies (dependencies, tree = {}) {
+function isRemoteConfigDuplicate (dependencies, name) {
+  return remoteConfigDuplicatePackages.has(name)
+    && dependencies.some(({ name: dependencyName, path }) => (
+      dependencyName === name && path.includes('libdd-remote-config')
+    ))
+}
+
+function findForbiddenDependencies (dependencies, tree) {
   const failures = []
 
   for (const dependency of dependencies) {
@@ -99,10 +80,18 @@ function findForbiddenDependencies (dependencies, tree = {}) {
     const isTokioCompanion = dependency.name.startsWith('tokio-')
     if (!isTokio && !isTokioCompanion) continue
 
-    const allowedRemoteConfigRuntime = tree.package === 'remote-config'
-      && remoteConfigTokioPackages.has(dependency.name)
+    const parent = dependency.path.at(-2)
+    const allowedNapiBridge = tree.package === 'libdatadog'
+      && isTokio
+      && parent === 'napi'
+    const allowedRemoteConfigRuntime = remoteConfigTokioPackages.has(dependency.name)
       && dependency.path.includes('libdd-remote-config')
-    if (!allowedRemoteConfigRuntime) failures.push(dependency)
+    const allowedNativeFeatureUnion = tree.target !== 'wasm32-unknown-unknown'
+      && remoteConfigNativeFeatureUnion.has(dependency.name)
+      && dependencies.some(({ name }) => name === 'libdd-remote-config')
+    if (!allowedNapiBridge && !allowedRemoteConfigRuntime && !allowedNativeFeatureUnion) {
+      failures.push(dependency)
+    }
   }
 
   return failures
@@ -127,7 +116,7 @@ function checkTrees () {
     })
     const dependencies = parseCargoTree(output)
 
-    for (const failure of findDuplicateVersions(dependencies, tree)) {
+    for (const failure of findDuplicateVersions(dependencies)) {
       duplicateFailures.push({ ...failure, ...tree })
     }
     for (const failure of findForbiddenDependencies(dependencies, tree)) {
@@ -156,7 +145,7 @@ function checkTrees () {
       )
     }
   } else {
-    console.log('Tokio is limited to the dedicated remote config artifact.')
+    console.log('Tokio is limited to the NAPI bridge and remote config runtime.')
   }
 
   if (duplicateFailures.length > 0 || forbiddenFailures.length > 0) {

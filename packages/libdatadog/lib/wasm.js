@@ -2,9 +2,12 @@
 
 const binding = require('@datadog/libdatadog-wasm')
 
+const { remoteConfigFetcher } = require('./remote-config')
+
 module.exports = {
   backend: () => 'wasm',
   DDSketch: binding.DDSketch,
+  RemoteConfigFetcher: remoteConfigFetcher(binding),
   createAgentlessExporter,
   zstd_compress: binding.zstd_compress,
 }

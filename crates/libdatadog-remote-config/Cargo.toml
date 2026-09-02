@@ -1,0 +1,29 @@
+[package]
+name = "libdatadog-remote-config"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = []
+agentless = ["libdd-remote-config/agentless"]
+regex-lite = ["libdd-remote-config/regex-lite"]
+
+[dependencies]
+anyhow = "1"
+serde_json = "1"
+
+[dependencies.libdd-capabilities]
+git = "https://github.com/DataDog/libdatadog.git"
+tag = "v43.0.0"
+default-features = false
+
+[dependencies.libdd-common]
+git = "https://github.com/DataDog/libdatadog.git"
+tag = "v43.0.0"
+default-features = false
+
+[dependencies.libdd-remote-config]
+git = "https://github.com/DataDog/libdatadog.git"
+tag = "v43.0.0"
+default-features = false
+features = ["agentless"]

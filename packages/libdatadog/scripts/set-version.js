@@ -14,6 +14,9 @@ const wasmPackageJson = JSON.parse(fs.readFileSync(wasmPackagePath, 'utf8'))
 
 packageJson.version = version
 packageJson.dependencies['@datadog/libdatadog-wasm'] = version
+for (const name of Object.keys(packageJson.optionalDependencies)) {
+  packageJson.optionalDependencies[name] = version
+}
 wasmPackageJson.version = version
 
 fs.writeFileSync(packagePath, JSON.stringify(packageJson, undefined, 2) + '\n')

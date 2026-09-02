@@ -19,10 +19,19 @@ class AgentlessExporter {
    * @param {AgentlessExporterOptions} options
    */
   constructor (binding, options) {
-    const { runtimeId } = options
-    const bindingOptions = runtimeId === undefined || runtimeId === null
-      ? { ...options, runtimeId: randomUUID() }
-      : options
+    const { runtimeId, timeoutMs } = options
+    if (timeoutMs !== undefined && timeoutMs !== null && (
+      !Number.isInteger(timeoutMs) || timeoutMs < 0 || timeoutMs > 4_294_967_295
+    )) {
+      throw new TypeError('timeoutMs must be an unsigned integer')
+    }
+    const bindingOptions = {
+      ...options,
+      runtimeId: runtimeId ?? randomUUID(),
+    }
+    for (const name of ['hostname', 'env', 'service', 'version', 'containerId', 'timeoutMs']) {
+      if (bindingOptions[name] === null) delete bindingOptions[name]
+    }
     const transport = createHostTransport()
     this.#binding = new binding.AgentlessExporter(
       bindingOptions,

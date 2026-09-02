@@ -1,9 +1,14 @@
 'use strict'
 
+/* eslint-disable unicorn/prefer-event-target -- Node stream mocks use EventEmitter. */
+
 const assert = require('node:assert/strict')
+const { AsyncLocalStorage } = require('node:async_hooks')
+const { EventEmitter } = require('node:events')
 const fs = require('node:fs')
 const http = require('node:http')
 const path = require('node:path')
+const { PassThrough } = require('node:stream')
 const { test } = require('node:test')
 const { zstdDecompressSync } = require('node:zlib')
 
@@ -12,14 +17,24 @@ const { encode } = require('@msgpack/msgpack')
 const zstdMagic = Buffer.from([0x28, 0xB5, 0x2F, 0xFD])
 
 const packageRoot = path.join(__dirname, '..')
+const nativeDirectory = path.join(packageRoot, 'dist', 'native')
+const nativeArtifact = fs.existsSync(nativeDirectory)
+  ? fs.readdirSync(nativeDirectory).find(file => file.startsWith('libdatadog.') && file.endsWith('.node'))
+  : undefined
 const wasmArtifact = path.join(packageRoot, 'wasm', 'dist', 'libdatadog_wasm.js')
 
 test('package entry points defer unused agentless modules', {
   skip: !fs.existsSync(wasmArtifact),
 }, () => {
   const agentlessPath = require.resolve('../lib/agentless')
+  const wasmBindingPath = require.resolve('@datadog/libdatadog-wasm')
 
-  require('..')
+  if (nativeArtifact) {
+    loadNativePipeline()
+    assert.strictEqual(require.cache[wasmBindingPath], undefined)
+  } else {
+    require('..')
+  }
   assert.strictEqual(require.cache[agentlessPath], undefined)
 
   require('../wasm')
@@ -169,10 +184,46 @@ test('agentless exporter reports sends after close without calling the binding',
   ]])
 })
 
-test('package entry point compresses agentless v0.4 exports with Zstandard', {
+test('native backend compresses agentless v0.4 exports with Zstandard', {
+  skip: !nativeArtifact,
+}, async () => {
+  await assertExport(loadNativePipeline(), 'native')
+})
+
+test('native backend invokes the transport in the send caller context', {
+  skip: !nativeArtifact,
+}, async (context) => {
+  const storage = new AsyncLocalStorage()
+  const stores = []
+  context.mock.method(http, 'request', (target, options, onResponse) => {
+    stores.push(storage.getStore())
+    const outgoing = new EventEmitter()
+    outgoing.destroy = error => outgoing.emit('error', error)
+    outgoing.end = () => {
+      const response = new PassThrough()
+      response.statusCode = 200
+      onResponse(response)
+      response.end()
+    }
+    return outgoing
+  })
+
+  const exporter = loadNativePipeline().createAgentlessExporter(exporterOptions())
+  try {
+    await storage.run('send-context', () => sendExport(exporter))
+    assert.deepStrictEqual(stores, ['send-context'])
+  } finally {
+    exporter.close()
+  }
+})
+
+test('inline-WASM backend compresses agentless v0.4 exports with Zstandard', {
   skip: !fs.existsSync(wasmArtifact),
 }, async () => {
-  await assertExport(require('..'))
+  await assertExport(
+    require('../wasm'),
+    'wasm',
+  )
 })
 
 test('inline-WASM backend validates optional values', {
@@ -320,10 +371,7 @@ test('agentless exporter close cancels retry backoff', {
   }
 })
 
-/**
- * @param {typeof import('..')} pipeline
- */
-async function assertExport (pipeline) {
+async function assertExport (pipeline, expectedBackend) {
   const received = await withIntake(async (endpoint) => {
     const exporter = pipeline.createAgentlessExporter({
       endpoint,
@@ -343,7 +391,7 @@ async function assertExport (pipeline) {
     }
   })
 
-  assert.strictEqual(pipeline.backend(), 'wasm')
+  assert.strictEqual(pipeline.backend(), expectedBackend)
   assert.strictEqual(received.headers['dd-api-key'], 'test-api-key')
   assert.strictEqual(received.headers['datadog-container-id'], 'container-id')
   assert.match(received.headers['content-type'], /^application\/json/)
@@ -371,6 +419,15 @@ function tracePayload () {
     meta: {},
     metrics: {},
   }]], { useBigInt64: true })
+}
+
+function loadNativePipeline () {
+  process.env.DD_LIBDATADOG_NATIVE_PATH = path.join(nativeDirectory, nativeArtifact)
+  try {
+    return require('..')
+  } finally {
+    delete process.env.DD_LIBDATADOG_NATIVE_PATH
+  }
 }
 
 function createExporter (pipeline, server, options = {}) {
