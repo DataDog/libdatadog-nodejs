@@ -13,9 +13,5 @@ wasm-bindgen-futures = "0.4"
 js-sys = "0.3"
 http = "1"
 bytes = "1.4"
-futures-core = "0.3"
 anyhow = "1"
 libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", tag = "v43.0.0" }
-
-[dev-dependencies]
-wasm-bindgen-test = "0.3"

@@ -25,9 +25,6 @@ console_error_panic_hook = "0.1"
 getrandom = { version = "0.2", features = ["js"] }
 uuid = { version = "1", features = ["js"] }
 
-[dev-dependencies]
-wasm-bindgen-test = "0.3"
-
 # The pipeline wasm uses post-MVP features (bulk-memory for change-buffer
 # copies, sign-extension, etc.) that the wasm-opt bundled with wasm-pack does
 # not enable by default. Pass --all-features so wasm-opt validation passes

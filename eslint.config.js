@@ -49,7 +49,6 @@ module.exports = [
       }],
       'unicorn/name-replacements': 'off', // Naming churn
       'unicorn/no-break-in-nested-loop': 'off', // Conflicts with performance-oriented loops
-      'unicorn/no-global-object-property-assignment': 'off', // Needed for intentional global initialization
       'unicorn/no-negated-array-predicate': 'off', // Predicate inversion is harder to read
       'unicorn/no-return-array-push': 'off', // Questionable benefit
       'unicorn/no-this-outside-of-class': 'off', // Object methods and callback APIs can bind `this`

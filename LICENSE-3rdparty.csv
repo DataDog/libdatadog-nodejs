@@ -19,7 +19,6 @@ bs58,https://github.com/Nullus157/bs58-rs,MIT OR Apache-2.0,The bs58 Authors
 bumpalo,https://github.com/fitzgen/bumpalo,MIT OR Apache-2.0,Nick Fitzgerald <fitzgen@gmail.com>
 bytes,https://github.com/tokio-rs/bytes,MIT,"Carl Lerche <me@carllerche.com>, Sean McArthur <sean@seanmonstar.com>"
 cadence,https://github.com/56quarters/cadence,Apache-2.0 OR MIT,Nick Pillitteri
-cast,https://github.com/japaric/cast.rs,MIT OR Apache-2.0,Jorge Aparicio <jorge@japaric.io>
 cc,https://github.com/rust-lang/cc-rs,MIT OR Apache-2.0,Alex Crichton <alex@alexcrichton.com>
 cesu8,https://github.com/emk/cesu8-rs,Apache-2.0 OR MIT,Eric Kidd <git@randomhacks.net>
 cfg-if,https://github.com/rust-lang/cfg-if,MIT OR Apache-2.0,Alex Crichton <alex@alexcrichton.com>
@@ -135,7 +134,6 @@ libdd-trace-stats,https://github.com/DataDog/libdatadog/tree/main/libdd-trace-st
 libdd-trace-utils,https://github.com/DataDog/libdatadog/tree/main/libdd-trace-utils,Apache-2.0,The libdd-trace-utils Authors
 libdd-tuf,https://github.com/theupdateframework/rust-tuf,MIT OR Apache-2.0,"heartsucker <heartsucker@autistici.org>, Erick Tryzelaar <etryzelaar@google.com>"
 libloading,https://github.com/nagisa/rust_libloading,ISC,Simonas Kazlauskas <libloading@kazlauskas.me>
-libm,https://github.com/rust-lang/compiler-builtins,MIT,"Alex Crichton <alex@alexcrichton.com>, Amanieu d'Antras <amanieu@gmail.com>, Jorge Aparicio <japaricious@gmail.com>, Trevor Gross <tg@trevorgross.com>"
 linux-raw-sys,https://github.com/sunfishcode/linux-raw-sys,Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT,Dan Gohman <dev@sunfishcode.online>
 litemap,https://github.com/unicode-org/icu4x,Unicode-3.0,The ICU4X Project Developers
 log,https://github.com/rust-lang/log,MIT OR Apache-2.0,The Rust Project Developers
@@ -144,7 +142,6 @@ memchr,https://github.com/BurntSushi/memchr,Unlicense OR MIT,"Andrew Gallant <ja
 memfd,https://github.com/lucab/memfd-rs,MIT OR Apache-2.0,"Luca Bruno <lucab@lucabruno.net>, Simonas Kazlauskas <memfd@kazlauskas.me>"
 memmap2,https://github.com/RazrFalcon/memmap2-rs,MIT OR Apache-2.0,"Dan Burkert <dan@danburkert.com>, Yevhenii Reizner <razrfalcon@gmail.com>, The Contributors"
 memoffset,https://github.com/Gilnaa/memoffset,MIT,Gilad Naaman <gilad.naaman@gmail.com>
-minicov,https://github.com/Amanieu/minicov,Apache-2.0 OR MIT,Amanieu d'Antras <amanieu@gmail.com>
 miniz_oxide,https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide,MIT OR Zlib OR Apache-2.0,"Frommi <daniil.liferenko@gmail.com>, oyvindln <oyvindln@users.noreply.github.com>, Rich Geldreich richgel99@gmail.com"
 mio,https://github.com/tokio-rs/mio,MIT,"Carl Lerche <me@carllerche.com>, Thomas de Zeeuw <thomasdezeeuw@gmail.com>, Tokio Contributors <team@tokio.rs>"
 msvc-demangler,https://github.com/mstange/msvc-demangler-rust,MIT OR NCSA,"Markus Stange <mstange@themasta.com>, Jeff Muizelaar <jrmuizel@gmail.com>"
@@ -153,7 +150,6 @@ napi-derive,https://github.com/napi-rs/napi-rs,MIT,"LongYinan <lynweklm@gmail.co
 napi-derive-backend,https://github.com/napi-rs/napi-rs,MIT,The napi-derive-backend Authors
 napi-sys,https://github.com/napi-rs/napi-rs,MIT,LongYinan <lynweklm@gmail.com>
 nix,https://github.com/nix-rust/nix,MIT,The nix-rust Project Developers
-nu-ansi-term,https://github.com/nushell/nu-ansi-term,MIT,"ogham@bsago.me, Ryan Scheel (Havvy) <ryan.havvy@gmail.com>, Josh Triplett <josh@joshtriplett.org>, The Nushell Project Developers"
 num-conv,https://github.com/jhpratt/num-conv,MIT OR Apache-2.0,Jacob Pratt <jacob@jhpratt.dev>
 num-derive,https://github.com/rust-num/num-derive,MIT OR Apache-2.0,The Rust Project Developers
 num-traits,https://github.com/rust-num/num-traits,MIT OR Apache-2.0,The Rust Project Developers
@@ -172,7 +168,6 @@ objc2-quartz-core,https://github.com/madsmtm/objc2,Zlib OR Apache-2.0 OR MIT,The
 objc2-ui-kit,https://github.com/madsmtm/objc2,Zlib OR Apache-2.0 OR MIT,The objc2-ui-kit Authors
 objc2-user-notifications,https://github.com/madsmtm/objc2,Zlib OR Apache-2.0 OR MIT,The objc2-user-notifications Authors
 once_cell,https://github.com/matklad/once_cell,MIT OR Apache-2.0,Aleksey Kladov <aleksey.kladov@gmail.com>
-oorandom,https://hg.sr.ht/~icefox/oorandom,MIT,Simon Heath <icefox@dreamquest.io>
 openssl-probe,https://github.com/alexcrichton/openssl-probe,MIT OR Apache-2.0,Alex Crichton <alex@alexcrichton.com>
 os_info,https://github.com/stanislav-tkach/os_info,MIT,"Jan Schulte <hello@unexpected-co.de>, Stanislav Tkach <stanislav.tkach@gmail.com>"
 page_size,https://github.com/Elzair/page_size_rs,MIT OR Apache-2.0,Philip Woods <elzairthesorcerer@gmail.com>
@@ -286,8 +281,6 @@ wasm-bindgen-futures,https://github.com/wasm-bindgen/wasm-bindgen/tree/master/cr
 wasm-bindgen-macro,https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/macro,MIT OR Apache-2.0,The wasm-bindgen Developers
 wasm-bindgen-macro-support,https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/macro-support,MIT OR Apache-2.0,The wasm-bindgen Developers
 wasm-bindgen-shared,https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/shared,MIT OR Apache-2.0,The wasm-bindgen Developers
-wasm-bindgen-test-macro,https://github.com/wasm-bindgen/wasm-bindgen,MIT OR Apache-2.0,The wasm-bindgen Developers
-wasm-bindgen-test-shared,https://github.com/rustwasm/wasm-bindgen/tree/master/crates/test-shared,MIT OR Apache-2.0,The wasm-bindgen Developers
 wasm-encoder,https://github.com/bytecodealliance/wasm-tools/tree/main/crates/wasm-encoder,Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT,Nick Fitzgerald <fitzgen@gmail.com>
 wasm-metadata,https://github.com/bytecodealliance/wasm-tools/tree/main/crates/wasm-metadata,Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT,The wasm-metadata Authors
 wasmparser,https://github.com/bytecodealliance/wasm-tools/tree/main/crates/wasmparser,Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT,Yury Delendik <ydelendik@mozilla.com>
