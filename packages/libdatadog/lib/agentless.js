@@ -21,7 +21,7 @@ class AgentlessExporter {
   constructor (binding, options) {
     const { runtimeId, timeoutMs } = options
     if (timeoutMs !== undefined && timeoutMs !== null && (
-      !Number.isInteger(timeoutMs) || timeoutMs < 0 || timeoutMs > 0xFFFFFFFF
+      !Number.isInteger(timeoutMs) || timeoutMs < 0 || timeoutMs > 0xFFFF_FFFF
     )) {
       throw new TypeError('timeoutMs must be an unsigned integer')
     }
