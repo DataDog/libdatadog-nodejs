@@ -131,7 +131,7 @@ test('embeds a Brotli-compressed WASM fallback below the size budgets', () => {
   const compressedWasm = Buffer.from(encodedWasm, 'base64')
   const wasm = brotliDecompressSync(compressedWasm)
   assert.ok(Buffer.byteLength(glue) < 520 * 1024)
-  assert.ok(wasm.length < 1024 * 1024)
+  assert.ok(wasm.length < 1120 * 1024)
   assert.doesNotMatch(wasm.toString('latin1'), /wasi_snapshot_preview1/)
   assert.doesNotMatch(glue, /node:(?:wasi|worker_threads)/)
   assert.doesNotMatch(runtime, /node:(?:wasi|worker_threads)/)

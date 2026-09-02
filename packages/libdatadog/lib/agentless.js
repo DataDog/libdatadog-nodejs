@@ -19,7 +19,12 @@ class AgentlessExporter {
    * @param {AgentlessExporterOptions} options
    */
   constructor (binding, options) {
-    const { runtimeId } = options
+    const { runtimeId, timeoutMs } = options
+    if (timeoutMs !== undefined && timeoutMs !== null && (
+      !Number.isInteger(timeoutMs) || timeoutMs < 0 || timeoutMs > 0xFFFFFFFF
+    )) {
+      throw new TypeError('timeoutMs must be an unsigned integer')
+    }
     const bindingOptions = {
       ...options,
       runtimeId: runtimeId ?? randomUUID(),
