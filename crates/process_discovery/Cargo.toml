@@ -12,4 +12,4 @@ libdd-library-config = { git = "https://github.com/DataDog/libdatadog.git", tag 
 libdd-trace-protobuf = { git = "https://github.com/DataDog/libdatadog.git", tag = "v43.0.0" }
 
 napi = { version = "2" }
-napi-derive = { version = "2", default-features = false }
+napi-derive = { version = "3", default-features = false }
