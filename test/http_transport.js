@@ -15,9 +15,8 @@ const fs = require('node:fs')
 
 const transport = require('../crates/capabilities/src/http_transport')
 
-// Distinctive, multi-byte body so the pooled-buffer slicing in httpRequest
-// (the reason for `new Uint8Array(body)` over `body.buffer`) is exercised:
-// a small Buffer.concat result lands at a non-zero offset in Node's shared pool.
+// Distinctive, multi-byte body so the pooled Buffer bounds in httpRequest are exercised.
+// A small Buffer.concat result can start at a non-zero offset in Node's shared pool.
 const RESPONSE_BODY = '{"rate_by_service":{"service:test,env:":0.5}}'
 
 function fakeWasmMemory (headBytes) {
