@@ -5,8 +5,9 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use bytes::Bytes;
+use futures::channel::oneshot;
 use futures::future::{AbortHandle, Abortable};
-use js_sys::{Array, Function, Object, Promise, Reflect, Uint8Array};
+use js_sys::{Array, Function, Object, Reflect, Uint8Array};
 use libdatadog_data_pipeline::{
     send_agentless_v04, AgentlessTraceConfig, ObfuscationConfig, SendAgentlessV04Error,
     TracerMetadata, DEFAULT_AGENTLESS_TIMEOUT,
@@ -20,7 +21,7 @@ use libdd_trace_obfuscation::obfuscation_config::{
 use libdd_trace_obfuscation::replacer::ReplaceRule;
 use libdd_trace_obfuscation::sql::{SqlObfuscateConfig, SqlObfuscationMode};
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::JsFuture;
+use wasm_bindgen_futures::spawn_local;
 
 struct AgentlessExporterOptions {
     endpoint: String,
@@ -76,13 +77,23 @@ impl HttpClientCapability for HostCapabilities {
     ) -> Result<http::Response<Bytes>, HttpError> {
         let id = self.next_call_id();
         let plan = request_value(id, request)?;
+        let (sender, receiver) = oneshot::channel();
+        let complete = Closure::once(move |error: JsValue, response: JsValue| {
+            let result = if error.is_undefined() {
+                Ok(response)
+            } else {
+                Err(error)
+            };
+            let _ = sender.send(result);
+        });
         let mut guard = CancelGuard::new(id, self.cancel_request.clone());
-        let promise = self
-            .request
-            .call1(&JsValue::UNDEFINED, &plan)
-            .map(|value| Promise::resolve(&value))
+        self.request
+            .call2(&JsValue::UNDEFINED, &plan, complete.as_ref())
             .map_err(network_error)?;
-        let response = JsFuture::from(promise).await.map_err(network_error)?;
+        let response = receiver
+            .await
+            .map_err(|_| callback_dropped("request"))?
+            .map_err(network_error)?;
         guard.disarm();
 
         let status = required_number(&response, "status")?;
@@ -104,13 +115,22 @@ impl SleepCapability for HostCapabilities {
     async fn sleep(&self, duration: Duration) {
         let id = self.next_call_id();
         let milliseconds = duration_millis(duration);
+        let (sender, receiver) = oneshot::channel();
+        let complete = Closure::once(move || {
+            let _ = sender.send(());
+        });
         let mut guard = CancelGuard::new(id, self.cancel_sleep.clone());
-        if let Ok(value) = self.sleep.call2(
-            &JsValue::UNDEFINED,
-            &JsValue::from_f64(f64::from(id)),
-            &JsValue::from_f64(f64::from(milliseconds)),
-        ) {
-            let _ = JsFuture::from(Promise::resolve(&value)).await;
+        if self
+            .sleep
+            .call3(
+                &JsValue::UNDEFINED,
+                &JsValue::from_f64(f64::from(id)),
+                &JsValue::from_f64(f64::from(milliseconds)),
+                complete.as_ref(),
+            )
+            .is_ok()
+        {
+            let _ = receiver.await;
         }
         guard.disarm();
     }
@@ -148,8 +168,8 @@ impl Drop for CancelGuard {
 
 #[wasm_bindgen]
 pub struct AgentlessExporter {
-    metadata: TracerMetadata,
-    config: AgentlessTraceConfig,
+    metadata: Rc<TracerMetadata>,
+    config: Rc<AgentlessTraceConfig>,
     capabilities: HostCapabilities,
     in_flight: Rc<RefCell<HashMap<u32, AbortHandle>>>,
     next_operation_id: Cell<u32>,
@@ -212,8 +232,8 @@ impl AgentlessExporter {
         };
 
         Ok(Self {
-            metadata,
-            config,
+            metadata: Rc::new(metadata),
+            config: Rc::new(config),
             capabilities,
             in_flight: Rc::new(RefCell::new(HashMap::new())),
             next_operation_id: Cell::new(1),
@@ -221,23 +241,28 @@ impl AgentlessExporter {
     }
 
     #[wasm_bindgen(js_name = sendV04)]
-    pub async fn send_v04(&self, payload: &[u8]) -> Result<(), JsValue> {
+    pub fn send_v04(&self, payload: Vec<u8>, done: Function) {
         let operation_id = self.next_operation_id.get();
         self.next_operation_id.set(operation_id.wrapping_add(1));
         let (abort, registration) = AbortHandle::new_pair();
         self.in_flight.borrow_mut().insert(operation_id, abort);
-        let _guard = OperationGuard {
-            id: operation_id,
-            in_flight: self.in_flight.clone(),
-        };
-        let send =
-            send_agentless_v04(&self.capabilities, payload, &self.metadata, &self.config, false);
-
-        match Abortable::new(send, registration).await {
-            Ok(Ok(_)) => Ok(()),
-            Ok(Err(error)) => Err(send_error(error)),
-            Err(_) => Err(JsValue::from_str("data-pipeline export was cancelled")),
-        }
+        let capabilities = self.capabilities.clone();
+        let config = self.config.clone();
+        let in_flight = self.in_flight.clone();
+        let metadata = self.metadata.clone();
+        spawn_local(async move {
+            let _guard = OperationGuard {
+                id: operation_id,
+                in_flight,
+            };
+            let send = send_agentless_v04(&capabilities, &payload, &metadata, &config, false);
+            let error = match Abortable::new(send, registration).await {
+                Ok(Ok(_)) => JsValue::UNDEFINED,
+                Ok(Err(error)) => send_error(error),
+                Err(_) => JsValue::from_str("data-pipeline export was cancelled"),
+            };
+            let _ = done.call1(&JsValue::UNDEFINED, &error);
+        });
     }
 
     #[wasm_bindgen(js_name = cancelAll)]
@@ -309,6 +334,10 @@ fn duration_millis(duration: Duration) -> u32 {
 
 fn network_error(error: JsValue) -> HttpError {
     HttpError::Network(anyhow::anyhow!(js_error_message(error)))
+}
+
+fn callback_dropped(name: &str) -> HttpError {
+    HttpError::Network(anyhow::anyhow!("JavaScript {name} callback was dropped"))
 }
 
 fn send_error(error: SendAgentlessV04Error) -> JsValue {

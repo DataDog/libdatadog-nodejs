@@ -9,10 +9,14 @@ const { zstdDecompressSync } = require('node:zlib')
 
 const { encode } = require('@msgpack/msgpack')
 
+const { createHostTransport } = require('../lib/agentless-transport')
+
 const zstdMagic = Buffer.from([0x28, 0xB5, 0x2F, 0xFD])
 
 const packageRoot = path.join(__dirname, '..')
 const wasmArtifact = path.join(packageRoot, 'wasm', 'dist', 'libdatadog_wasm.js')
+
+/** @typedef {(error?: unknown) => void} BindingDone */
 
 test('package entry points defer unused agentless modules', {
   skip: !fs.existsSync(wasmArtifact),
@@ -28,8 +32,12 @@ test('package entry points defer unused agentless modules', {
 
 test('agentless exporter reports completion through its callback', async () => {
   class BindingExporter {
-    sendV04 () {
-      return Promise.resolve()
+    /**
+     * @param {Uint8Array} payload
+     * @param {BindingDone} done
+     */
+    sendV04 (payload, done) {
+      done()
     }
 
     cancelAll () {}
@@ -53,8 +61,12 @@ test('agentless exporter reports completion through its callback', async () => {
 
 test('agentless exporter logs asynchronous failures before reporting completion', async () => {
   class BindingExporter {
-    sendV04 () {
-      return Promise.reject('intake unavailable')
+    /**
+     * @param {Uint8Array} payload
+     * @param {BindingDone} done
+     */
+    sendV04 (payload, done) {
+      queueMicrotask(() => done('intake unavailable'))
     }
 
     cancelAll () {}
@@ -105,13 +117,15 @@ test('agentless exporter logs synchronous failures before reporting completion',
 })
 
 test('agentless exporter logs failures settled before close', async () => {
-  let rejectSend
+  let completeSend
 
   class BindingExporter {
-    sendV04 () {
-      return new Promise((resolve, reject) => {
-        rejectSend = reject
-      })
+    /**
+     * @param {Uint8Array} payload
+     * @param {BindingDone} done
+     */
+    sendV04 (payload, done) {
+      completeSend = done
     }
 
     cancelAll () {}
@@ -127,7 +141,7 @@ test('agentless exporter logs failures settled before close', async () => {
     }, log)
   })
 
-  rejectSend('intake unavailable')
+  completeSend('intake unavailable')
   exporter.close()
   await send
 
@@ -145,7 +159,6 @@ test('agentless exporter reports sends after close without calling the binding',
   class BindingExporter {
     sendV04 () {
       sends++
-      return Promise.resolve()
     }
 
     cancelAll () {
@@ -230,6 +243,45 @@ test('agentless exporter retries in Rust until the third attempt succeeds', {
   }
 })
 
+test('agentless exporter drops over-budget requests without retrying', {
+  skip: !fs.existsSync(wasmArtifact),
+}, async () => {
+  const pipeline = require('../wasm')
+  const transport = createHostTransport()
+  let requests = 0
+  let resolveFirstRequest
+  const firstRequestReceived = new Promise((resolve) => {
+    resolveFirstRequest = resolve
+  })
+  const server = http.createServer((incoming) => {
+    requests++
+    incoming.resume()
+    resolveFirstRequest()
+  })
+
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  const { port } = server.address()
+  transport.request({
+    id: 1,
+    url: `http://127.0.0.1:${port}`,
+    method: 'POST',
+    headers: [],
+    body: Buffer.alloc(16 * 1024 * 1024),
+  }, assert.fail)
+  const exporter = createExporter(pipeline, server)
+  try {
+    await firstRequestReceived
+    const log = testLog()
+    await sendExport(exporter, log)
+    assert.deepStrictEqual(log.errors, [])
+    assert.strictEqual(requests, 1)
+  } finally {
+    exporter.close()
+    transport.cancelRequest(1)
+    await new Promise(resolve => server.close(resolve))
+  }
+})
+
 test('agentless exporter applies Rust timeouts and retry policy', {
   skip: !fs.existsSync(wasmArtifact),
 }, async () => {
@@ -250,6 +302,32 @@ test('agentless exporter applies Rust timeouts and retry policy', {
     assert.strictEqual(log.errors[0][0], 'Failed to send data-pipeline export: %s')
     assert.match(log.errors[0][1], /Request timed out/)
     assert.doesNotMatch(log.errors[0][1], /data-pipeline export/)
+  } finally {
+    exporter.close()
+    await new Promise(resolve => server.close(resolve))
+  }
+})
+
+test('agentless exporter close cancels a send started in the same turn', {
+  skip: !fs.existsSync(wasmArtifact),
+}, async () => {
+  const pipeline = require('../wasm')
+  let requests = 0
+  const server = http.createServer((incoming, response) => {
+    requests++
+    incoming.resume()
+    incoming.once('end', () => response.end())
+  })
+
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  const exporter = createExporter(pipeline, server)
+  try {
+    const log = testLog()
+    const send = sendExport(exporter, log)
+    exporter.close()
+    await send
+    assert.strictEqual(requests, 0)
+    assert.deepStrictEqual(log.errors, [])
   } finally {
     exporter.close()
     await new Promise(resolve => server.close(resolve))
@@ -397,7 +475,7 @@ function exporterOptions () {
 
 /**
  * @typedef {object} TestBindingExporter
- * @property {(payload: Uint8Array) => Promise<void>} sendV04
+ * @property {(payload: Uint8Array, done: BindingDone) => void} sendV04
  * @property {() => void} cancelAll
  */
 
