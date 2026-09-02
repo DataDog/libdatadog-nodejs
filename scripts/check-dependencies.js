@@ -6,40 +6,7 @@ const { execFileSync } = require('node:child_process')
 const repositoryRoot = path.join(__dirname, '..')
 const trees = [
   { package: 'libdatadog-wasm', target: 'wasm32-unknown-unknown' },
-  { package: 'remote-config', target: 'wasm32-unknown-unknown' },
 ]
-// libdd-tuf 0.3.1 uses older dependency majors. Exact sets keep unrelated duplicates failing validation.
-const remoteConfigDuplicatePackages = new Map([
-  ['http', new Set(['0.2.12', '1.5.0'])],
-  ['itoa', new Set(['0.4.8', '1.0.18'])],
-  ['syn', new Set(['2.0.119', '3.0.4'])],
-  ['thiserror', new Set(['1.0.69', '2.0.20'])],
-  ['thiserror-impl', new Set(['1.0.69', '2.0.20'])],
-  ['untrusted', new Set(['0.7.1', '0.9.0'])],
-])
-// async-trait pulled in via libdd-shared-runtime now depends on syn 3, while
-// pin-project (via libdd-common) still depends on syn 2. Both majors coexist.
-const libdatadogWasmDuplicatePackages = new Map([
-  ['syn', new Set(['2.0.119', '3.0.4'])],
-])
-const allowedDuplicatePackagesByTree = new Map([
-  ['remote-config', remoteConfigDuplicatePackages],
-  ['libdatadog-wasm', libdatadogWasmDuplicatePackages],
-])
-const remoteConfigTokioPackages = new Set(['tokio', 'tokio-macros', 'tokio-util'])
-
-/**
- * @param {Set<string>} actual
- * @param {Set<string>} expected
- */
-function setsEqual (actual, expected) {
-  if (actual.size !== expected.size) return false
-
-  for (const value of actual) {
-    if (!expected.has(value)) return false
-  }
-  return true
-}
 
 function parseCargoTree (output) {
   const paths = []
@@ -59,11 +26,7 @@ function parseCargoTree (output) {
   return paths
 }
 
-/**
- * @param {{ name: string, version: string }[]} dependencies
- * @param {{ package?: string }} [tree]
- */
-function findDuplicateVersions (dependencies, tree = {}) {
+function findDuplicateVersions (dependencies) {
   const versionsByPackage = new Map()
   const failures = []
 
@@ -73,12 +36,8 @@ function findDuplicateVersions (dependencies, tree = {}) {
     versionsByPackage.set(name, versions)
   }
 
-  const allowedDuplicatePackages = allowedDuplicatePackagesByTree.get(tree.package)
   for (const [name, versions] of versionsByPackage) {
-    const allowedVersions = allowedDuplicatePackages?.get(name)
-    const isAllowedDuplicate = allowedVersions !== undefined
-      && setsEqual(versions, allowedVersions)
-    if (versions.size > 1 && !isAllowedDuplicate) {
+    if (versions.size > 1) {
       failures.push({ name, versions: [...versions] })
     }
   }
@@ -88,21 +47,15 @@ function findDuplicateVersions (dependencies, tree = {}) {
 /**
  * @template {{ name: string }} Dependency
  * @param {Dependency[]} dependencies
- * @param {{ package?: string }} [tree]
  * @returns {Dependency[]}
  */
-function findForbiddenDependencies (dependencies, tree = {}) {
+function findForbiddenDependencies (dependencies) {
   const failures = []
 
   for (const dependency of dependencies) {
     const isTokio = dependency.name === 'tokio'
     const isTokioCompanion = dependency.name.startsWith('tokio-')
-    if (!isTokio && !isTokioCompanion) continue
-
-    const allowedRemoteConfigRuntime = tree.package === 'remote-config'
-      && remoteConfigTokioPackages.has(dependency.name)
-      && dependency.path.includes('libdd-remote-config')
-    if (!allowedRemoteConfigRuntime) failures.push(dependency)
+    if (isTokio || isTokioCompanion) failures.push(dependency)
   }
 
   return failures
@@ -127,10 +80,10 @@ function checkTrees () {
     })
     const dependencies = parseCargoTree(output)
 
-    for (const failure of findDuplicateVersions(dependencies, tree)) {
+    for (const failure of findDuplicateVersions(dependencies)) {
       duplicateFailures.push({ ...failure, ...tree })
     }
-    for (const failure of findForbiddenDependencies(dependencies, tree)) {
+    for (const failure of findForbiddenDependencies(dependencies)) {
       forbiddenFailures.push({ ...failure, ...tree })
     }
   }
@@ -156,7 +109,7 @@ function checkTrees () {
       )
     }
   } else {
-    console.log('Tokio is limited to the dedicated remote config artifact.')
+    console.log('Tokio is absent from WASM.')
   }
 
   if (duplicateFailures.length > 0 || forbiddenFailures.length > 0) {

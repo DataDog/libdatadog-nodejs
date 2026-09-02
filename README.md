@@ -21,9 +21,6 @@ Zstandard compression, DDSketch, and the agentless data pipeline use a
 wasm-bindgen backend whose WebAssembly bytes are embedded in JavaScript. No raw
 `.wasm` asset or native extension is published.
 
-Remote configuration is available from `@datadog/libdatadog/remote-config`.
-It uses a dedicated wasm-bindgen artifact that loads only with this entry point.
-
 See the [package README](packages/libdatadog/README.md) for implementation and
 packaging details.
 
