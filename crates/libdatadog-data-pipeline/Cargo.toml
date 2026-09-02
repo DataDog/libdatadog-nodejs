@@ -1,0 +1,33 @@
+[package]
+name = "libdatadog-data-pipeline"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+thiserror = "1"
+
+[dependencies.libdd-capabilities]
+git = "https://github.com/DataDog/libdatadog.git"
+tag = "v43.0.0"
+default-features = false
+
+[dependencies.libdd-data-pipeline-core]
+git = "https://github.com/DataDog/libdatadog.git"
+tag = "v43.0.0"
+default-features = false
+
+[dependencies.libdd-trace-utils]
+git = "https://github.com/DataDog/libdatadog.git"
+tag = "v43.0.0"
+default-features = false
+
+[dependencies.libdd-trace-obfuscation]
+git = "https://github.com/DataDog/libdatadog.git"
+tag = "v43.0.0"
+default-features = false
+
+[features]
+default = []
+compression = ["libdd-data-pipeline-core/compression"]
+regex-lite = ["libdd-data-pipeline-core/regex-lite", "libdd-trace-obfuscation/regex-lite"]

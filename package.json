@@ -1,7 +1,7 @@
 {
-  "name": "@datadog/libdatadog",
+  "name": "@datadog/libdatadog-extras",
   "version": "0.1.0-pre",
-  "description": "Node.js binding for libdatadog",
+  "description": "Optional native and WASM libdatadog functionality for Node.js",
   "main": "index.js",
   "scripts": {
     "install-wasm-pack": "curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh",
@@ -9,11 +9,13 @@
     "build-debug": "mkdir -p target && yarn -s cargo-build > ./target/out.ndjson && yarn -s copy-artifacts",
     "build-release": "mkdir -p target && yarn -s cargo-build-release > ./target/out.ndjson && yarn -s copy-artifacts",
     "build-all": "mkdir -p target && yarn -s cargo-build -- --workspace > ./target/out.ndjson && yarn -s copy-artifacts && yarn -s build-wasm",
-    "build-wasm": "node scripts/build-wasm.js library_config && node scripts/build-wasm.js datadog-js-zstd && node scripts/build-wasm.js trace_exporter && node scripts/build-wasm.js pipeline",
+    "build-wasm": "yarn -s install-wasm-pack && node scripts/build-wasm.js",
     "cargo-build-release": "yarn -s cargo-build -- --release",
     "cargo-build": "cargo build --message-format=json-render-diagnostics",
     "copy-artifacts": "node ./scripts/copy-artifacts",
-    "test": "node test"
+    "check:dependencies": "node scripts/check-dependencies.js",
+    "lint": "eslint .",
+    "test": "bash scripts/test.sh"
   },
   "author": "Datadog Inc. <info@datadoghq.com>",
   "license": "Apache-2.0",
@@ -28,7 +30,13 @@
   "publishConfig": {
     "access": "public"
   },
-  "dependencies": {
-    "@napi-rs/cli": "^3.6.0"
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.9.0",
+    "eslint": "^10.6.0",
+    "eslint-plugin-import-x": "^4.17.1",
+    "eslint-plugin-n": "^17.24.0",
+    "eslint-plugin-unicorn": "^63.0.0",
+    "globals": "^17.7.0"
   }
 }

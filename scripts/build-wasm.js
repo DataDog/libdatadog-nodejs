@@ -10,37 +10,92 @@
 // Our releases are built on Linux, and fortunately no special handling is required there. This
 // script only allows development to happen on macOS.
 
-const os = require('os');
-const childProcess = require('child_process');
+const os = require('node:os')
+const fs = require('node:fs')
+const path = require('node:path')
+const childProcess = require('node:child_process')
 
-const isMacOS = os.platform() === 'darwin';
-const noWasmOpt = isMacOS ? '--no-opt' : '';
-const library = process.argv[2];
+const isMacOS = os.platform() === 'darwin'
+const libraries = [
+  'library_config',
+  'pipeline',
+  'remote_config',
+]
 
 const env = {
   ...process.env,
-};
+}
 
 if (isMacOS) {
-  const homebrewDir = env.HOMEBREW_DIR ?? '/opt/homebrew';
-  const llvmDir = `${homebrewDir}/opt/llvm/`;
-  const llvmBinDir = `${llvmDir}/bin`;
+  const homebrewDir = env.HOMEBREW_DIR ?? '/opt/homebrew'
+  const llvmDir = `${homebrewDir}/opt/llvm/`
+  const llvmBinDir = `${llvmDir}/bin`
 
   try {
-    childProcess.execSync(`${llvmBinDir}/llvm-config --version`);
-  } catch (error) {
-    console.error(`‼️ LLVM not found in ${llvmDir}.\n‼️ Please install LLVM using Homebrew:\n📝   brew install llvm`);
-    process.exit(1);
+    childProcess.execSync(`${llvmBinDir}/llvm-config --version`)
+  } catch {
+    console.error([
+      `‼️ LLVM not found in ${llvmDir}.`,
+      '‼️ Please install LLVM using Homebrew:',
+      '📝   brew install llvm',
+    ].join('\n'))
+    process.exit(1) // eslint-disable-line unicorn/no-process-exit
   }
 
   if (!env.PATH.includes(llvmBinDir)) {
     // Add LLVM to PATH if not already included
-    env.PATH = `${llvmBinDir}:${env.PATH}`;
+    env.PATH = `${llvmBinDir}:${env.PATH}`
   }
+
+  // Force C/C++ code (e.g. zstd-sys) to use Homebrew's clang for wasm32. Otherwise a global
+  // CC (e.g. ccache cc) can point at Apple Clang, which does not support wasm32-unknown-unknown.
+  env.CC_wasm32_unknown_unknown = `${llvmBinDir}/clang`
+  env.CXX_wasm32_unknown_unknown = `${llvmBinDir}/clang++`
 }
 
-childProcess.execSync(
-  `wasm-pack build ${noWasmOpt} --target nodejs ./crates/${library} --out-dir ../../prebuilds/${library}`, {
-    env
+/**
+ * Build one WASM crate with the platform-specific compiler configuration.
+ *
+ * @param {string} cratePath
+ * @param {string} outputDirectory
+ * @param {{ profiling?: boolean, skipOptimization?: boolean }} options
+ * @returns {void}
+ */
+function buildWasm (cratePath, outputDirectory, options = {}) {
+  const { profiling = false, skipOptimization = false } = options
+  const resolvedOutputDirectory = path.resolve(cratePath, outputDirectory)
+  fs.rmSync(resolvedOutputDirectory, { force: true, recursive: true })
+  const args = ['build']
+  if (profiling) args.push('--profiling')
+  if (skipOptimization) args.push('--no-opt')
+  args.push('--target', 'nodejs', cratePath, '--out-dir', resolvedOutputDirectory)
+  childProcess.execFileSync('wasm-pack', args, {
+    env: {
+      ...env,
+      // Cargo's release profile strips the function names needed for size attribution.
+      ...(profiling && { CARGO_PROFILE_RELEASE_STRIP: 'false' }),
+    },
+  })
+  // wasm-pack ignores its output by default. These outputs are package inputs,
+  // so remove the nested ignore file and let each npm package's files allowlist
+  // decide whether they are published.
+  fs.rmSync(path.join(resolvedOutputDirectory, '.gitignore'), { force: true })
+}
+
+const [cratePath, outputDirectory, mode] = process.argv.slice(2)
+if (cratePath || outputDirectory) {
+  if (!cratePath || !outputDirectory) {
+    throw new Error('Both the WASM crate path and output directory are required')
   }
-);
+  if (mode && mode !== '--profiling') throw new Error(`Unknown build mode: ${mode}`)
+  buildWasm(path.resolve(cratePath), path.resolve(outputDirectory), {
+    profiling: mode === '--profiling',
+    skipOptimization: isMacOS,
+  })
+} else {
+  for (const library of libraries) {
+    buildWasm(`./crates/${library}`, `../../prebuilds/${library}`, {
+      skipOptimization: isMacOS,
+    })
+  }
+}

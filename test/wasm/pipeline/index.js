@@ -1,9 +1,10 @@
 'use strict'
 
-const http = require('http')
-const assert = require('assert')
-const crypto = require('crypto')
-const loader = require('../../../load.js')
+const http = require('node:http')
+const assert = require('node:assert')
+const crypto = require('node:crypto')
+
+const loader = require('../../../load')
 
 const pipeline = loader.load('pipeline')
 assert(pipeline !== undefined, 'pipeline module loaded')
@@ -20,7 +21,7 @@ const expectedOpCodes = [
   'Create', 'SetMetaAttr', 'SetMetricAttr', 'SetServiceName',
   'SetResourceName', 'SetError', 'SetStart', 'SetDuration',
   'SetType', 'SetName', 'SetTraceMetaAttr', 'SetTraceMetricsAttr',
-  'SetTraceOrigin'
+  'SetTraceOrigin',
 ]
 for (const name of expectedOpCodes) {
   assert.strictEqual(typeof OpCode[name], 'number', `OpCode.${name} should be a number`)
@@ -62,7 +63,7 @@ class WasmSpansInterface {
     const bytes = new Uint8Array(
       this.wasmMemory.buffer,
       this.state.change_queue_ptr(),
-      this.state.change_queue_len()
+      this.state.change_queue_len(),
     )
     bytes.fill(0)
   }
@@ -110,10 +111,11 @@ class WasmSpansInterface {
       } else {
         const [typ, num] = arg
         switch (typ) {
-          case 'u64':
+          case 'u64': {
             this.changeQueueBuffer.setBigUint64(this.cqbIndex, BigInt(num), true)
             this.cqbIndex += 8
             break
+          }
           case 'u128': {
             // num is [lo, hi] pair of numbers
             this.changeQueueBuffer.setBigUint64(this.cqbIndex, BigInt(num[0]), true)
@@ -122,20 +124,24 @@ class WasmSpansInterface {
             this.cqbIndex += 8
             break
           }
-          case 'i64':
+          case 'i64': {
             this.changeQueueBuffer.setBigInt64(this.cqbIndex, BigInt(num), true)
             this.cqbIndex += 8
             break
-          case 'i32':
+          }
+          case 'i32': {
             this.changeQueueBuffer.setInt32(this.cqbIndex, num, true)
             this.cqbIndex += 4
             break
-          case 'f64':
+          }
+          case 'f64': {
             this.changeQueueBuffer.setFloat64(this.cqbIndex, num, true)
             this.cqbIndex += 8
             break
-          default:
+          }
+          default: {
             throw new Error('unsupported number type: ' + typ)
+          }
         }
       }
     }
@@ -148,7 +154,7 @@ class WasmSpansInterface {
     const tid = traceId || [getRandomU64(), getRandomU64()]
     const pid = parentId || 0
     const spanId = getRandomU64()
-    const startTime = Date.now() * 1000000
+    const startTime = Date.now() * 1_000_000
 
     this.queueOp(OpCode.Create, spanId, ['u128', tid], ['u64', pid])
     this.queueOp(OpCode.SetStart, spanId, ['i64', startTime])
@@ -176,10 +182,10 @@ const state = new WasmSpanState(
   'nodejs',
   process.version,
   'v8',
-  64 * 1024,  // change_queue_size
-  10 * 1024,  // string_table_input_size
+  64 * 1024, // change_queue_size
+  10 * 1024, // string_table_input_size
   process.pid,
-  'test-service'
+  'test-service',
 )
 
 const iface = new WasmSpansInterface(state, wasmMemory)
@@ -241,7 +247,7 @@ const iface = new WasmSpansInterface(state, wasmMemory)
 
 // Test: flush to mock agent
 const server = http.createServer((req, res) => {
-  let body = []
+  const body = []
   req.on('data', chunk => body.push(chunk))
   req.on('end', () => {
     res.writeHead(200, { 'content-type': 'application/json' })
@@ -257,7 +263,7 @@ server.listen(0, '127.0.0.1', async () => {
     // Create a new state pointing at the mock agent
     const flushState = new WasmSpanState(
       url, '1.0.0', 'nodejs', process.version, 'v8',
-      64 * 1024, 10 * 1024, process.pid, 'test-service'
+      64 * 1024, 10 * 1024, process.pid, 'test-service',
     )
     const flushIface = new WasmSpansInterface(flushState, wasmMemory)
 
@@ -266,14 +272,14 @@ server.listen(0, '127.0.0.1', async () => {
     flushIface.queueOp(OpCode.SetServiceName, span.spanId, 'test-service')
     flushIface.queueOp(OpCode.SetResourceName, span.spanId, 'test-resource')
     flushIface.queueOp(OpCode.SetType, span.spanId, 'web')
-    flushIface.queueOp(OpCode.SetDuration, span.spanId, ['i64', 1000000])
+    flushIface.queueOp(OpCode.SetDuration, span.spanId, ['i64', 1_000_000])
 
     const result = await flushIface.flushSpans(span)
     assert(result !== undefined)
     console.log('Flush result:', result)
     console.log('PASS: flush to mock agent')
-  } catch (err) {
-    console.error('Flush test error:', err)
+  } catch (error) {
+    console.error('Flush test error:', error)
     process.exitCode = 1
   } finally {
     server.close()

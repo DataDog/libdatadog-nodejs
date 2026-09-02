@@ -13,15 +13,4 @@ codegen-units = 1
 lto = true
 opt-level = "z"
 panic = "abort"
-# strip = "none"
-debug = true
-
-
-[patch.'https://github.com/DataDog/libdatadog.git']
-libdd-capabilities = { path = "../libdatadog_node_native_spans_worktree/libdd-capabilities" }
-libdd-capabilities-impl = { path = "../libdatadog_node_native_spans_worktree/libdd-capabilities-impl" }
-libdd-data-pipeline = { path = "../libdatadog_node_native_spans_worktree/libdd-data-pipeline" }
-libdd-trace-utils = {  path = "../libdatadog_node_native_spans_worktree/libdd-trace-utils" }
-libdd-trace-stats = {  path = "../libdatadog_node_native_spans_worktree/libdd-trace-stats" }
-libdd-trace-protobuf = {  path = "../libdatadog_node_native_spans_worktree/libdd-trace-protobuf" }
-libdd-library-config = {  path = "../libdatadog_node_native_spans_worktree/libdd-library-config" }
+strip = true

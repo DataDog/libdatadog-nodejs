@@ -1,0 +1,75 @@
+[package]
+name = "libdatadog-wasm"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+name = "libdatadog_wasm"
+
+[dependencies]
+js-sys = "0.3"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+anyhow = "1"
+bytes = "1"
+futures = "0.3"
+http = "1"
+# The agentless v0.4 path does not compile or evaluate user-provided patterns.
+# Use the smaller regex engine so the full engine and its Unicode tables are
+# removed by the WASM linker.
+libdd-ddsketch = "1.1.1"
+# Keep this aligned with the pure-Rust WASM encoder used by libdatadog.
+zrip = { version = "=0.6.0", default-features = false, features = ["alloc"] }
+
+[dependencies.libdd-capabilities]
+git = "https://github.com/DataDog/libdatadog.git"
+tag = "v43.0.0"
+default-features = false
+
+[dependencies.libdd-trace-obfuscation]
+git = "https://github.com/DataDog/libdatadog.git"
+tag = "v43.0.0"
+default-features = false
+
+[dependencies.libdd-common]
+git = "https://github.com/DataDog/libdatadog.git"
+tag = "v43.0.0"
+default-features = false
+features = ["regex-lite"]
+
+[dependencies.libdatadog-data-pipeline]
+path = "../libdatadog-data-pipeline"
+features = ["compression", "regex-lite"]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
+
+[package.metadata.wasm-pack.profile.release]
+# Do not use --all-features: Binaryen may then emit WebAssembly GC instructions,
+# which are not supported by Node.js 18. Keep this list to features used by the
+# Rust output and supported by every Node.js version that we test.
+wasm-opt = [
+  "-Oz",
+  "--enable-mutable-globals",
+  "--enable-nontrapping-float-to-int",
+  "--enable-bulk-memory",
+  "--enable-sign-ext",
+  "--enable-reference-types",
+  "--enable-multivalue",
+  "--converge",
+]
+
+[package.metadata.wasm-pack.profile.profiling]
+# Keep function names for crate attribution after wasm-opt runs in Linux CI.
+wasm-opt = [
+  "-Oz",
+  "--enable-mutable-globals",
+  "--enable-nontrapping-float-to-int",
+  "--enable-bulk-memory",
+  "--enable-sign-ext",
+  "--enable-reference-types",
+  "--enable-multivalue",
+  "--converge",
+  "-g",
+]

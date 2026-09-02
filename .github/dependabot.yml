@@ -1,0 +1,70 @@
+# Dependabot version updates
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 5
+      exclude:
+        - "@datadog/*"
+    groups:
+      gh-actions-packages:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    versioning-strategy: "increase"
+    labels:
+      - dependabot
+      - dependencies
+      - javascript
+      - semver-patch
+    groups:
+      patch-updates:
+        update-types:
+          - "patch"
+      minor-updates:
+        update-types:
+          - "minor"
+
+  - package-ecosystem: "npm"
+    directory: "/test/crashtracker"
+    schedule:
+      interval: "weekly"
+    versioning-strategy: "increase"
+    labels:
+      - dependabot
+      - dependencies
+      - javascript
+      - semver-patch
+    groups:
+      patch-updates:
+        update-types:
+          - "patch"
+      minor-updates:
+        update-types:
+          - "minor"
+
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - dependabot
+      - dependencies
+      - rust
+      - semver-patch
+    groups:
+      patch-updates:
+        update-types:
+          - "patch"
+      minor-updates:
+        update-types:
+          - "minor"

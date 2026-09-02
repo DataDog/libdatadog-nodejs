@@ -7,16 +7,17 @@
 //   1. Build: wasm-pack build --target nodejs ./crates/trace_exporter --out-dir ../../prebuilds/trace_exporter
 //   2. Run:   node test_wasm.js trace_exporter
 
-const http = require('http')
-const loader = require('../../../load.js')
-const assert = require('assert')
+const http = require('node:http')
+const assert = require('node:assert')
+
+const loader = require('../../../load')
 
 const traceExporter = loader.load('trace_exporter')
 assert(traceExporter !== undefined, 'trace_exporter wasm module loaded')
 
 // Start a minimal HTTP server that acts as a mock Datadog agent
 const server = http.createServer((req, res) => {
-  let body = []
+  const body = []
   req.on('data', chunk => body.push(chunk))
   req.on('end', () => {
     // Return a minimal agent response
@@ -41,8 +42,8 @@ server.listen(0, '127.0.0.1', async () => {
 
     console.log('Trace export result:', result)
     console.log('PASS: wasm trace exporter integration test')
-  } catch (err) {
-    console.error('Test error:', err)
+  } catch (error) {
+    console.error('Test error:', error)
     process.exitCode = 1
   } finally {
     server.close()
