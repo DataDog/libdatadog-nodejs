@@ -6,6 +6,26 @@ const { test } = require('node:test')
 
 const { createHostTransport } = require('../lib/agentless-transport')
 
+/** @typedef {ReturnType<typeof createHostTransport>} HostTransport */
+/** @typedef {Parameters<HostTransport['request']>[0]} RequestPlan */
+
+/**
+ * @param {HostTransport} transport
+ * @param {RequestPlan} plan
+ */
+function sendRequest (transport, plan) {
+  return new Promise((resolve, reject) => {
+    const result = transport.request(plan, (error, response) => {
+      if (error) {
+        reject(error)
+      } else {
+        resolve(response)
+      }
+    })
+    assert.strictEqual(result, undefined)
+  })
+}
+
 test('host transport rejects when a response is aborted', async () => {
   const transport = createHostTransport()
   let resolveResponseClosed
@@ -22,22 +42,15 @@ test('host transport rejects when a response is aborted', async () => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
   try {
     const { port } = server.address()
-    const result = transport.request({
+    const result = assert.rejects(sendRequest(transport, {
       id: 1,
       url: `http://127.0.0.1:${port}`,
       method: 'POST',
       headers: [],
       body: Buffer.alloc(0),
-    }).then(
-      () => ({ status: 'resolved' }),
-      error => ({ error, status: 'rejected' }),
-    )
+    }), /response aborted|aborted/)
 
-    await responseClosed
-    const outcome = await result
-
-    assert.strictEqual(outcome.status, 'rejected')
-    assert.match(outcome.error.message, /response aborted|aborted/)
+    await Promise.all([responseClosed, result])
   } finally {
     await new Promise(resolve => server.close(resolve))
   }
@@ -45,6 +58,7 @@ test('host transport rejects when a response is aborted', async () => {
 
 test('host transport cancels an active request', async () => {
   const transport = createHostTransport()
+  let completed = 0
   let resolveRequest
   const received = new Promise((resolve) => {
     resolveRequest = resolve
@@ -57,16 +71,17 @@ test('host transport cancels an active request', async () => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
   try {
     const { port } = server.address()
-    const request = transport.request({
+    const result = transport.request({
       id: 2,
       url: `http://127.0.0.1:${port}`,
       method: 'POST',
       headers: [],
       body: Buffer.alloc(0),
-    })
+    }, () => completed++)
+    assert.strictEqual(result, undefined)
     await received
     transport.cancelRequest(2)
-    await assert.rejects(request, /request was cancelled/)
+    assert.strictEqual(completed, 0)
   } finally {
     await new Promise(resolve => server.close(resolve))
   }
@@ -82,7 +97,7 @@ test('host transport bounds active request buffers', async () => {
   /**
    * @param {import('node:http').IncomingMessage} request
    * @param {import('node:http').ServerResponse} response
-  */
+   */
   const server = http.createServer((request, response) => {
     requestCount++
     if (requestCount === 1) {
@@ -97,38 +112,42 @@ test('host transport bounds active request buffers', async () => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
   const { port } = server.address()
   const atLimitBody = Buffer.alloc(16 * 1024 * 1024)
+  const overLimitBody = Buffer.alloc(atLimitBody.length + 1)
   const firstRequest = transport.request({
     id: 4,
     url: `http://127.0.0.1:${port}`,
     method: 'POST',
     headers: [],
     body: atLimitBody,
-  })
-  const firstRequestCanceled = assert.rejects(firstRequest, /request was cancelled/)
+  }, assert.fail)
+  assert.strictEqual(firstRequest, undefined)
 
   try {
     await firstRequestReceived
-    await assert.rejects(transport.request({
+    const discarded = await sendRequest(transport, {
       id: 5,
       url: `http://127.0.0.1:${port}`,
       method: 'POST',
       headers: [],
       body: Buffer.alloc(1),
-    }), /Maximum active agentless request buffer size reached/)
+    })
+    assert.strictEqual(discarded.status, 200)
+    assert.strictEqual(discarded.body.length, 0)
 
     transport.cancelRequest(4)
-    await firstRequestCanceled
 
-    const response = await transport.request({
+    const oversized = await sendRequest(transport, {
       id: 6,
       url: `http://127.0.0.1:${port}`,
       method: 'POST',
       headers: [],
-      body: atLimitBody,
+      body: overLimitBody,
     })
-    assert.strictEqual(response.status, 200)
+    assert.strictEqual(oversized.status, 200)
+    assert.strictEqual(oversized.body.length, 0)
+    assert.strictEqual(requestCount, 1)
 
-    const nextResponse = await transport.request({
+    const nextResponse = await sendRequest(transport, {
       id: 7,
       url: `http://127.0.0.1:${port}`,
       method: 'POST',
@@ -136,18 +155,20 @@ test('host transport bounds active request buffers', async () => {
       body: Buffer.alloc(1),
     })
     assert.strictEqual(nextResponse.status, 200)
+    assert.strictEqual(requestCount, 2)
   } finally {
     transport.cancelRequest(4)
-    await firstRequestCanceled
     await new Promise(resolve => server.close(resolve))
   }
 })
 
-test('host transport cancels a pending timer', async () => {
+test('host transport cancels a pending timer', () => {
   const transport = createHostTransport()
-  const sleep = transport.sleep(3, 60_000)
+  let completed = 0
+  const pendingSleep = transport.sleep(3, 60_000, () => completed++)
+  assert.strictEqual(pendingSleep, undefined)
 
   transport.cancelSleep(3)
 
-  await assert.rejects(sleep, /timer was cancelled/)
+  assert.strictEqual(completed, 0)
 })
