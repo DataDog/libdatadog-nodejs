@@ -1,6 +1,6 @@
 {
   "name": "@datadog/libdatadog-extras",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "description": "Optional native and WASM libdatadog functionality for Node.js",
   "main": "index.js",
   "scripts": {

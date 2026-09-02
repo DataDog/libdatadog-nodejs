@@ -1,6 +1,6 @@
 {
   "name": "@datadog/libdatadog",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "description": "WASM Node.js bindings for libdatadog",
   "license": "Apache-2.0",
   "repository": {
@@ -67,7 +67,7 @@
     "test:types": "tsc --noEmit --strict --target ES2022 --module Node16 --moduleResolution Node16 test/types.test.ts"
   },
   "dependencies": {
-    "@datadog/libdatadog-wasm": "0.20.0"
+    "@datadog/libdatadog-wasm": "0.21.0"
   },
   "devDependencies": {
     "@msgpack/msgpack": "^3.1.3",
