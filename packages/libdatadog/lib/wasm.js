@@ -7,7 +7,7 @@ module.exports = {
   DDSketch: binding.DDSketch,
   createAgentlessExporter,
   supportsAgentlessStats: true,
-  zstd_compress: binding.zstd_compress,
+  zstd_compress: zstdCompress,
 }
 
 /**
@@ -16,4 +16,13 @@ module.exports = {
  */
 function createAgentlessExporter (options, transportOptions) {
   return require('./agentless').createAgentlessExporter(binding, options, transportOptions)
+}
+
+/**
+ * @param {Uint8Array} data
+ * @param {number} level
+ * @returns {Uint8Array}
+ */
+function zstdCompress (data, level) {
+  return require('@datadog/libdatadog-wasm/zstd').zstd_compress(data, level)
 }
