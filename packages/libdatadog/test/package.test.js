@@ -17,6 +17,7 @@ test('publishes the universal libdatadog package', () => {
   assert.strictEqual(packageJson.exports['./wasm'].require, './wasm.js')
   assert.strictEqual(packageJson.exports['./remote-config'].import, './remote-config.js')
   assert.strictEqual(packageJson.exports['./remote-config'].require, './remote-config.js')
+  assert.strictEqual(packageJson.exports['./zstd'].require, './zstd.js')
 
   const wasmPackageJson = JSON.parse(fs.readFileSync(
     path.join(packageRoot, 'wasm', 'package.json'),
@@ -25,6 +26,10 @@ test('publishes the universal libdatadog package', () => {
   assert.strictEqual(
     wasmPackageJson.exports['./remote-config'].require,
     './dist/remote-config/remote_config.js',
+  )
+  assert.strictEqual(
+    wasmPackageJson.exports['./zstd'].require,
+    './dist/zstd/libdatadog_wasm_zstd.js',
   )
 })
 
@@ -92,6 +97,19 @@ test('embeds dedicated remote config WASM below the size budgets', () => {
 
   assert.ok(Buffer.byteLength(glue) < 450 * 1024)
   assert.ok(wasm.length < 1024 * 1024)
+})
+
+test('embeds dedicated Zstandard WASM below the size budgets', () => {
+  const { glue, wasm } = readInlineWasm(path.join(
+    packageRoot,
+    'wasm',
+    'dist',
+    'zstd',
+    'libdatadog_wasm_zstd.js',
+  ))
+
+  assert.ok(Buffer.byteLength(glue) < 100 * 1024)
+  assert.ok(wasm.length < 256 * 1024)
 })
 
 test('requires an artifact name and output directory when inlining WASM', () => {

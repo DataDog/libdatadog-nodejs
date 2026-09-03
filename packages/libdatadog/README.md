@@ -5,10 +5,15 @@
 > applications or other libraries. Its API, behavior, and distribution may
 > change without notice.
 
-WASM Node.js bindings for libdatadog. The bindings for Zstandard compression,
-DDSketch, and the agentless data pipeline are maintained in the root
-`crates/libdatadog-wasm` workspace crate. Optional libdatadog functionality is
-published separately as `@datadog/libdatadog-extras`.
+WASM Node.js bindings for libdatadog. The bindings for DDSketch and the
+agentless data pipeline are maintained in the root `crates/libdatadog-wasm`
+workspace crate. Optional libdatadog functionality is published separately as
+`@datadog/libdatadog-extras`.
+
+Zstandard compression is available from `@datadog/libdatadog/zstd`. It uses a
+dedicated wasm-bindgen artifact so consumers that only compress profiles do not
+load the agentless data pipeline or DDSketch. The root entry point keeps the
+existing `zstd_compress` export and loads the dedicated artifact on first use.
 
 Remote configuration is available from `@datadog/libdatadog/remote-config`.
 It uses a dedicated wasm-bindgen artifact that loads only with this entry point.
@@ -20,5 +25,5 @@ delivery failures to the supplied logger. It does not return a promise.
 The package uses a wasm-bindgen backend with the WebAssembly bytes embedded in
 JavaScript. The canonical inlined output is published as the regular
 `@datadog/libdatadog-wasm` dependency from the `wasm` workspace. The WASM
-package also contains the separate remote configuration artifact. No raw
+package also contains separate Zstandard and remote configuration artifacts. No raw
 `.wasm` asset or native extension is published.

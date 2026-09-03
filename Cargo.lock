@@ -1229,6 +1229,14 @@ dependencies = [
  "libdd-trace-obfuscation",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+]
+
+[[package]]
+name = "libdatadog-wasm-zstd"
+version = "0.1.0"
+dependencies = [
+ "js-sys",
+ "wasm-bindgen",
  "zrip",
 ]
 
