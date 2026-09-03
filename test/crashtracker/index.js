@@ -148,6 +148,16 @@ const server = app.listen(async () => {
     expectedMessage: 'something went wrong',
     expectedFrame: 'myFaultyFunction',
   })
+  await testUnhandledError('uncaught-exception-cross-context', 'app-uncaught-exception-cross-context', {
+    expectedType: 'TypeError',
+    expectedMessage: 'cross-realm failure',
+    expectedFrame: 'customerVmHandler',
+  })
+  await testUnhandledError('uncaught-exception-proxy-error', 'app-uncaught-exception-proxy-error', {
+    expectedType: 'TypeError',
+    expectedMessage: 'proxied failure',
+    expectedFrame: 'customerProxyHandler',
+  })
   await testUnhandledNonError('uncaught-exception-non-error', 'app-uncaught-exception-non-error', {
     expectedFallbackType: 'uncaughtException',
     expectedValue: 'a plain string error',
