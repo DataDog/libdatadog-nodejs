@@ -114,6 +114,7 @@ module.exports = [
     // These imports are either installed by the package test workflow or
     // generated during its build; root lint cannot resolve them.
     files: [
+      'packages/libdatadog/benchmark/agentless-pipeline.js',
       'packages/libdatadog/lib/wasm.js',
       'packages/libdatadog/remote-config.js',
       'packages/libdatadog/test/bundlers.test.js',
