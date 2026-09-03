@@ -4,6 +4,8 @@ const fs = require('node:fs')
 const path = require('node:path')
 const { brotliDecompressSync } = require('node:zlib')
 
+const binaryenEscapeSequence = /^[0-9A-Fa-f]{2}$/
+const crateDisambiguator = /\[[0-9A-Fa-f]+\](?=::)/g
 const sectionNames = [
   'custom',
   'type',
@@ -33,6 +35,19 @@ const forbiddenWasmCode = [
   {
     dependency: 'zstd-sys',
     owners: new Set(['zstd-sys', 'zstd-sys (C)']),
+  },
+]
+
+const artifacts = [
+  {
+    name: 'libdatadog',
+    gluePath: path.join(__dirname, '..', 'wasm', 'dist', 'libdatadog_wasm.js'),
+    maximumInlineBytes: 225 * 1024,
+  },
+  {
+    name: 'remote config',
+    gluePath: path.join(__dirname, '..', 'wasm', 'dist', 'remote-config', 'remote_config.js'),
+    maximumInlineBytes: 365 * 1024,
   },
 ]
 
@@ -195,14 +210,35 @@ function readFunctionNames (wasm, sections) {
   return names
 }
 
+/** @param {string} functionName */
+function decodeBinaryenName (functionName) {
+  let decodedName = ''
+
+  for (let index = 0; index < functionName.length; index++) {
+    const sequence = functionName.slice(index + 1, index + 3)
+    if (functionName[index] === '\\' && binaryenEscapeSequence.test(sequence)) {
+      decodedName += String.fromCodePoint(Number.parseInt(sequence, 16))
+      index += 2
+    } else {
+      decodedName += functionName[index]
+    }
+  }
+
+  return decodedName
+}
+
+/** @param {string} functionName */
 function inferCrate (functionName) {
-  if (/^(COVER|FASTCOVER|FSE|HIST|HUF|POOL|XXH|ZSTD|ZSTDMT)_/.test(functionName)) {
+  const decodedName = decodeBinaryenName(functionName)
+    .replaceAll(crateDisambiguator, '')
+
+  if (/^(COVER|FASTCOVER|FSE|HIST|HUF|POOL|XXH|ZSTD|ZSTDMT)_/.test(decodedName)) {
     return 'zstd-sys (C)'
   }
-  if (/^__(externref|wbindgen|wbg)/.test(functionName)) return 'wasm-bindgen runtime'
-  if (/^(__rust|__rg_|dlmalloc::)/.test(functionName)) return 'Rust runtime'
+  if (/^__(externref|wbindgen|wbg)/.test(decodedName)) return 'wasm-bindgen runtime'
+  if (/^(__rust|__rg_|dlmalloc::)/.test(decodedName)) return 'Rust runtime'
 
-  const match = functionName.match(/(?:^|[< &(,])(?:mut )?([A-Za-z][A-Za-z0-9_]*)::/)
+  const match = decodedName.match(/(?:^|[< &(,])(?:mut )?([A-Za-z][A-Za-z0-9_]*)::/)
   if (!match) return 'bindings / unattributed'
   if (['alloc', 'core', 'std'].includes(match[1])) return 'Rust standard library'
   return match[1].replaceAll('_', '-')
@@ -305,7 +341,12 @@ function appendCrateReport (lines, profilePath) {
   lines.push('', attributionNote)
 }
 
-function createReport (gluePath, profilePath) {
+/**
+ * @param {string} gluePath
+ * @param {string | undefined} profilePath
+ * @param {string} [artifactName]
+ */
+function createReport (gluePath, profilePath, artifactName = 'libdatadog') {
   const glue = fs.readFileSync(gluePath, 'utf8')
   const match = glue.match(/Buffer\.from\('([A-Za-z0-9+/=]+)', 'base64'\)/)
   if (!match) throw new Error('could not find the inline base64 WASM payload')
@@ -318,7 +359,7 @@ function createReport (gluePath, profilePath) {
   const base64Overhead = base64Bytes - compressed.length
   const sections = readSections(wasm)
   const lines = [
-    '## libdatadog WASM size',
+    `## ${artifactName} WASM size`,
     '',
     '| Inline artifact layer | Bytes | KiB |',
     '| --- | ---: | ---: |',
@@ -348,28 +389,48 @@ function createReport (gluePath, profilePath) {
   return lines.join('\n')
 }
 
-if (require.main === module) {
-  const gluePath = path.join(__dirname, '..', 'wasm', 'dist', 'libdatadog_wasm.js')
-  const profilePath = process.argv[2] && path.resolve(process.argv[2])
-  const report = createReport(gluePath, profilePath)
-  console.log(report)
+/**
+ * @param {string} artifactName
+ * @param {number} inlineBytes
+ * @param {number} maximumInlineBytes
+ */
+function getSizeBudgetFailure (artifactName, inlineBytes, maximumInlineBytes) {
+  if (inlineBytes <= maximumInlineBytes) return
+  return `${artifactName}: ${formatBytes(inlineBytes)} bytes exceeds ${formatBytes(maximumInlineBytes)} bytes`
+}
 
-  if (process.env.GITHUB_STEP_SUMMARY) {
-    fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${report}\n`)
+if (require.main === module) {
+  const profilePaths = process.argv.slice(2)
+  if (profilePaths.length > 0 && profilePaths.length !== artifacts.length) {
+    throw new Error(`expected ${artifacts.length} symbolized WASM paths, received ${profilePaths.length}`)
+  }
+  const failures = []
+
+  for (const [index, artifact] of artifacts.entries()) {
+    const { gluePath, maximumInlineBytes, name } = artifact
+    const profilePath = profilePaths[index] && path.resolve(profilePaths[index])
+    const report = createReport(gluePath, profilePath, name)
+    console.log(report)
+
+    if (process.env.GITHUB_STEP_SUMMARY) {
+      fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${report}\n`)
+    }
+
+    const inlineBytes = fs.statSync(gluePath).size
+    const budgetFailure = getSizeBudgetFailure(name, inlineBytes, maximumInlineBytes)
+    if (budgetFailure) failures.push(budgetFailure)
+    if (!profilePath) continue
+
+    const profileWasm = fs.readFileSync(profilePath)
+    for (const failure of findForbiddenWasmCode(readCrateSizes(profileWasm).entries)) {
+      failures.push(`${failure.dependency} via ${failure.name}: ${formatBytes(failure.bytes)} bytes`)
+    }
   }
 
-  if (profilePath) {
-    const profileWasm = fs.readFileSync(profilePath)
-    const failures = findForbiddenWasmCode(readCrateSizes(profileWasm).entries)
-    if (failures.length > 0) {
-      console.error('Forbidden code found in the symbolized WASM binary:')
-      for (const failure of failures) {
-        console.error(
-          `- ${failure.dependency} via ${failure.name}: ${formatBytes(failure.bytes)} bytes`,
-        )
-      }
-      process.exitCode = 1
-    }
+  if (failures.length > 0) {
+    console.error('WASM size validation failed:')
+    for (const failure of failures) console.error(`- ${failure}`)
+    process.exitCode = 1
   }
 }
 
