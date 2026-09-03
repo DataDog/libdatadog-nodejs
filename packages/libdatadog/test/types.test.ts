@@ -47,6 +47,8 @@ const remoteConfigFetcher = new RemoteConfigFetcher({
   tracerVersion: '1.0.0',
   url: 'http://127.0.0.1:8126',
   timeoutMs: 5000,
+  apiKey: 'api-key',
+  hostname: 'host',
 })
 
 remoteConfigFetcher.setExtraServices([])
