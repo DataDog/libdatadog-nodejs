@@ -82,6 +82,10 @@ fn parse_location(location: &str, frame: &mut libdd_crashtracker::StackFrame) {
 }
 
 fn is_error_instance(env: &Env, value: &Unknown) -> napi::Result<bool> {
+    if value.is_error()? {
+        return Ok(true);
+    }
+
     let global = env.get_global()?;
     let error_ctor: Function<'_, (), Unknown<'_>> = global.get_named_property("Error")?;
     value.instanceof(error_ctor)
