@@ -14,11 +14,11 @@ js-sys = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1"
 libdatadog-nodejs-capabilities = { path = "../capabilities" }
-libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", tag = "v43.0.0" }
-libdd-common = { git = "https://github.com/DataDog/libdatadog.git", tag = "v43.0.0", default-features = false }
-libdd-data-pipeline = { git = "https://github.com/DataDog/libdatadog.git", tag = "v43.0.0", default-features = false, features = ["telemetry"] }
-libdd-trace-utils = { git = "https://github.com/DataDog/libdatadog.git", tag = "v43.0.0", default-features = false, features = ["change-buffer"] }
-libdd-shared-runtime = { git = "https://github.com/DataDog/libdatadog.git", tag = "v43.0.0", default-features = false }
+libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", rev = "3bb89cfd2ce3c6f4ee3e4009c74a77e4cf89adf8" }
+libdd-common = { git = "https://github.com/DataDog/libdatadog.git", rev = "3bb89cfd2ce3c6f4ee3e4009c74a77e4cf89adf8", default-features = false }
+libdd-data-pipeline = { git = "https://github.com/DataDog/libdatadog.git", rev = "3bb89cfd2ce3c6f4ee3e4009c74a77e4cf89adf8", default-features = false, features = ["telemetry"] }
+libdd-trace-utils = { git = "https://github.com/DataDog/libdatadog.git", rev = "3bb89cfd2ce3c6f4ee3e4009c74a77e4cf89adf8", default-features = false, features = ["change-buffer"] }
+libdd-shared-runtime = { git = "https://github.com/DataDog/libdatadog.git", rev = "3bb89cfd2ce3c6f4ee3e4009c74a77e4cf89adf8", default-features = false }
 console_error_panic_hook = "0.1"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
