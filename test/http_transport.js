@@ -6,12 +6,13 @@
 // from a Uint8Array view over `wasm_memory.buffer`, so we hand it a fake memory
 // object containing a well-formed HTTP/1.1 request head.
 
-const { describe, it, before, after, beforeEach } = require('node:test')
-const assert = require('node:assert')
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
 const http = require('node:http')
 const os = require('node:os')
 const path = require('node:path')
-const fs = require('node:fs')
+const { PassThrough } = require('node:stream')
+const { describe, it, before, after, beforeEach } = require('node:test')
 
 const transport = require('../crates/capabilities/src/http_transport')
 
@@ -24,6 +25,112 @@ function fakeWasmMemory (headBytes) {
   new Uint8Array(buf).set(headBytes)
   return { buffer: buf }
 }
+
+/**
+ * @param {'end' | 'error' | 'request-error' | 'write-error'} event
+ * @param {Error} [error]
+ */
+async function requestWithResponseEvent (event, error) {
+  const originalRequest = http.request
+  const head = Buffer.from('POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\n\r\n')
+
+  /**
+   * @param {import('node:http').RequestOptions} requestOptions
+   * @param {(response: import('node:http').IncomingMessage) => void} onResponse
+   */
+  function request (requestOptions, onResponse) {
+    assert.strictEqual(requestOptions.method, 'POST')
+    const outgoing = new PassThrough()
+    outgoing.write = () => {
+      if (event === 'write-error') throw error
+      return true
+    }
+    outgoing.end = () => {
+      queueMicrotask(() => {
+        if (event === 'request-error') {
+          outgoing.emit('error', error)
+          return
+        }
+
+        const response = new PassThrough()
+        response.statusCode = 200
+        response.rawHeaders = []
+        onResponse(response)
+        response.emit('data', Buffer.from('partial'))
+        response.emit(event, error)
+      })
+    }
+    return outgoing
+  }
+
+  http.request = request
+  try {
+    return await transport.httpRequest('localhost', 80, false, '', true, 0, head.length, 0, 0, fakeWasmMemory(head))
+  } finally {
+    http.request = originalRequest
+  }
+}
+
+describe('http_transport response lifecycle', () => {
+  it('resolves complete responses', async () => {
+    const [status, , body] = await requestWithResponseEvent('end')
+
+    assert.strictEqual(status, 200)
+    assert.strictEqual(Buffer.from(body).toString(), 'partial')
+  })
+
+  it('rejects aborted responses', async () => {
+    let observations = 0
+    let resolveResponseClosed
+    const responseClosed = new Promise((resolve) => {
+      resolveResponseClosed = resolve
+    })
+    const server = http.createServer((request, response) => {
+      response.writeHead(200, { 'content-length': 100 })
+      response.write('partial')
+      response.once('close', resolveResponseClosed)
+      setImmediate(() => response.destroy())
+    })
+    transport.setResponseHeaderObserver(() => {
+      observations++
+    })
+
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+    try {
+      const { port } = server.address()
+      const head = Buffer.from(
+        `POST / HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\nContent-Length: 0\r\n\r\n`,
+      )
+      const request = transport.httpRequest(
+        '127.0.0.1', port, false, '', true, 0, head.length, 0, 0, fakeWasmMemory(head),
+      )
+
+      await Promise.all([responseClosed, assert.rejects(request, /response aborted/)])
+      assert.strictEqual(observations, 0)
+    } finally {
+      transport.setResponseHeaderObserver(undefined)
+      await new Promise(resolve => server.close(resolve))
+    }
+  })
+
+  it('rejects response errors', async () => {
+    const error = new Error('response failed')
+
+    await assert.rejects(requestWithResponseEvent('error', error), error)
+  })
+
+  it('preserves request errors', async () => {
+    const error = new Error('request failed')
+
+    await assert.rejects(requestWithResponseEvent('request-error', error), error)
+  })
+
+  it('preserves synchronous write errors', async () => {
+    const error = new Error('write failed')
+
+    await assert.rejects(requestWithResponseEvent('write-error', error), error)
+  })
+})
 
 describe('http_transport response header observer', () => {
   let server
@@ -60,12 +167,18 @@ describe('http_transport response header observer', () => {
 
   it('invokes the observer with the raw response headers', async () => {
     let observed
-    transport.setResponseHeaderObserver((rawHeaders) => {
+    let observations = 0
+
+    /** @param {string[]} rawHeaders */
+    function observeHeaders (rawHeaders) {
       observed = rawHeaders
-    })
+      observations++
+    }
+    transport.setResponseHeaderObserver(observeHeaders)
 
     await doRequest()
 
+    assert.strictEqual(observations, 1)
     assert.ok(Array.isArray(observed), 'observer received the raw headers array')
     const idx = observed.findIndex(h => h.toLowerCase() === 'datadog-container-tags-hash')
     assert.notStrictEqual(idx, -1, 'container-tags hash header present')
