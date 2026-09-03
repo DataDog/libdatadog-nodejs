@@ -116,6 +116,7 @@ module.exports = [
       'packages/libdatadog/benchmark/agentless-pipeline.js',
       'packages/libdatadog/lib/wasm.js',
       'packages/libdatadog/remote-config.js',
+      'packages/libdatadog/zstd.js',
       'packages/libdatadog/test/bundlers.test.js',
       'packages/libdatadog/test/exporter.test.js',
     ],
