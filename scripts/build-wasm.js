@@ -16,6 +16,10 @@ const path = require('node:path')
 const childProcess = require('node:child_process')
 
 const isMacOS = os.platform() === 'darwin'
+const wasmRustToolchain = fs.readFileSync(
+  path.join(__dirname, '..', 'wasm-rust-toolchain'),
+  'utf8',
+).trim()
 const libraries = [
   'library_config',
   'pipeline',
@@ -25,6 +29,20 @@ const libraries = [
 const env = {
   ...process.env,
 }
+const pathKey = Object.keys(env).find(key => key.toUpperCase() === 'PATH') ?? 'PATH'
+const rustFlagsKey = Object.keys(env).find(key => key.toUpperCase() === 'RUSTFLAGS') ?? 'RUSTFLAGS'
+const rustupToolchainKey = Object.keys(env).find(key => key.toUpperCase() === 'RUSTUP_TOOLCHAIN') ?? 'RUSTUP_TOOLCHAIN'
+const cargoPath = childProcess.execFileSync(
+  'rustup',
+  ['which', 'cargo', '--toolchain', wasmRustToolchain],
+  { encoding: 'utf8' },
+).trim()
+
+env[pathKey] = `${path.dirname(cargoPath)}${path.delimiter}${env[pathKey]}`
+env[rustFlagsKey] = [env[rustFlagsKey], '-Zunstable-options', '-Cpanic=immediate-abort']
+  .filter(Boolean)
+  .join(' ')
+env[rustupToolchainKey] = wasmRustToolchain
 
 if (isMacOS) {
   const homebrewDir = env.HOMEBREW_DIR ?? '/opt/homebrew'
@@ -42,9 +60,9 @@ if (isMacOS) {
     process.exit(1) // eslint-disable-line unicorn/no-process-exit
   }
 
-  if (!env.PATH.includes(llvmBinDir)) {
+  if (!env[pathKey].includes(llvmBinDir)) {
     // Add LLVM to PATH if not already included
-    env.PATH = `${llvmBinDir}:${env.PATH}`
+    env[pathKey] = `${llvmBinDir}${path.delimiter}${env[pathKey]}`
   }
 
   // Force C/C++ code (e.g. zstd-sys) to use Homebrew's clang for wasm32. Otherwise a global
@@ -68,7 +86,7 @@ function buildWasm (cratePath, outputDirectory, options = {}) {
   const args = ['build']
   if (profiling) args.push('--profiling')
   if (skipOptimization) args.push('--no-opt')
-  args.push('--target', 'nodejs', cratePath, '--out-dir', resolvedOutputDirectory)
+  args.push('--target', 'nodejs', cratePath, '--out-dir', resolvedOutputDirectory, '--', '-Z', 'build-std=std')
   childProcess.execFileSync('wasm-pack', args, {
     env: {
       ...env,
