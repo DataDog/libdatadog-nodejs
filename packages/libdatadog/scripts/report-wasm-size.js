@@ -307,26 +307,21 @@ function appendCrateReport (lines, profilePath) {
 
 function createReport (gluePath, profilePath) {
   const glue = fs.readFileSync(gluePath, 'utf8')
-  const match = glue.match(/Buffer\.from\('([A-Za-z0-9+/=]+)', 'base64'\)/)
-  if (!match) throw new Error('could not find the inline base64 WASM payload')
-
-  const base64Bytes = Buffer.byteLength(match[1])
-  const compressed = Buffer.from(match[1], 'base64')
+  const compressedPath = `${gluePath.slice(0, -3)}_bg.wasm.br`
+  const compressed = fs.readFileSync(compressedPath)
   const wasm = brotliDecompressSync(compressed)
-  const glueBytes = Buffer.byteLength(glue) - base64Bytes
-  const inlineBytes = Buffer.byteLength(glue)
-  const base64Overhead = base64Bytes - compressed.length
+  const glueBytes = Buffer.byteLength(glue)
+  const packagedBytes = glueBytes + compressed.length
   const sections = readSections(wasm)
   const lines = [
     '## libdatadog WASM size',
     '',
-    '| Inline artifact layer | Bytes | KiB |',
+    '| Packaged artifact layer | Bytes | KiB |',
     '| --- | ---: | ---: |',
     layerRow('Raw WASM (before Brotli)', wasm.length),
     layerRow('Brotli-compressed WASM', compressed.length),
-    layerRow('Base64 encoding overhead', base64Overhead),
     layerRow('JavaScript glue/loader', glueBytes),
-    layerRow('Final inlined JavaScript', inlineBytes, true),
+    layerRow('Final packaged artifacts', packagedBytes, true),
     '',
     '### Raw WebAssembly sections',
     '',
@@ -344,7 +339,11 @@ function createReport (gluePath, profilePath) {
 
   if (profilePath) appendCrateReport(lines, profilePath)
 
-  lines.push('', `Generated from \`${path.relative(process.cwd(), gluePath)}\`.`)
+  lines.push(
+    '',
+    `Generated from \`${path.relative(process.cwd(), gluePath)}\` and `
+    + `\`${path.relative(process.cwd(), compressedPath)}\`.`,
+  )
   return lines.join('\n')
 }
 
