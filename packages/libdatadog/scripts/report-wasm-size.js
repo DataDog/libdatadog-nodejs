@@ -202,7 +202,9 @@ function inferCrate (functionName) {
   if (/^__(externref|wbindgen|wbg)/.test(functionName)) return 'wasm-bindgen runtime'
   if (/^(__rust|__rg_|dlmalloc::)/.test(functionName)) return 'Rust runtime'
 
-  const match = functionName.match(/(?:^|[< &(,])(?:mut )?([A-Za-z][A-Za-z0-9_]*)::/)
+  const match = functionName.match(
+    /(?:^|[< &(,])(?:mut )?([A-Za-z][A-Za-z0-9_]*)(?:\[[\da-f]+\])?::/,
+  )
   if (!match) return 'bindings / unattributed'
   if (['alloc', 'core', 'std'].includes(match[1])) return 'Rust standard library'
   return match[1].replaceAll('_', '-')
@@ -242,6 +244,14 @@ function readCrateSizes (wasm) {
 
   const entries = []
   for (const [name, bytes] of sizes) insertBySize(entries, { bytes, name })
+  if (!entries.some(entry => ![
+    'bindings / unattributed',
+    'Rust runtime',
+    'Rust standard library',
+    'wasm-bindgen runtime',
+  ].includes(entry.name))) {
+    throw new Error('symbolized WASM does not contain attributable Rust crate names')
+  }
   return { entries, totalBytes }
 }
 
@@ -356,6 +366,9 @@ if (require.main === module) {
 
   if (process.env.GITHUB_STEP_SUMMARY) {
     fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${report}\n`)
+  }
+  if (process.env.WASM_SIZE_REPORT) {
+    fs.writeFileSync(process.env.WASM_SIZE_REPORT, `${report}\n`)
   }
 
   if (profilePath) {

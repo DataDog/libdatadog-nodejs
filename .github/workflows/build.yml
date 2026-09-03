@@ -20,6 +20,9 @@ jobs:
 
   build-libdatadog:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Setup Node.js
@@ -34,9 +37,47 @@ jobs:
       - name: Build symbolized WASM for size attribution
         run: npm run size:profile --prefix packages/libdatadog
       - name: Report and validate WASM binary size
+        env:
+          WASM_SIZE_REPORT: ${{ runner.temp }}/wasm-size-report.md
         run: >-
           npm run report:wasm-size --prefix packages/libdatadog --
           ../../target/size/libdatadog_wasm_bg.wasm
+      - name: Post WASM size report
+        if: ${{ always() && github.event_name == 'pull_request' }}
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          WASM_SIZE_REPORT: ${{ runner.temp }}/wasm-size-report.md
+        with:
+          script: |
+            const fs = require('node:fs')
+            if (!fs.existsSync(process.env.WASM_SIZE_REPORT)) {
+              core.warning('The WASM size report was not generated')
+              return
+            }
+
+            const marker = '<!-- libdatadog-wasm-size-report -->'
+            const body = `${marker}\n${fs.readFileSync(process.env.WASM_SIZE_REPORT, 'utf8')}`
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              ...context.repo,
+              issue_number: context.issue.number,
+            })
+            const previous = comments.find(comment =>
+              comment.user?.type === 'Bot' && comment.body?.includes(marker)
+            )
+
+            if (previous) {
+              await github.rest.issues.updateComment({
+                ...context.repo,
+                comment_id: previous.id,
+                body,
+              })
+            } else {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: context.issue.number,
+                body,
+              })
+            }
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: libdatadog-wasm

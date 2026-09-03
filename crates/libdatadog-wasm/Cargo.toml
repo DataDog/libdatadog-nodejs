@@ -71,5 +71,9 @@ wasm-opt = [
   "--enable-reference-types",
   "--enable-multivalue",
   "--converge",
+  "--strip-dwarf",
   "-g",
 ]
+
+[package.metadata.wasm-pack.profile.profiling.wasm-bindgen]
+dwarf-debug-info = true
