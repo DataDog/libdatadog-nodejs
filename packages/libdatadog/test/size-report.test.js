@@ -68,22 +68,22 @@ test('enforces each inline artifact size budget through the CLI', (t) => {
   fs.mkdirSync(path.dirname(mainGlue), { recursive: true })
   fs.mkdirSync(path.dirname(remoteGlue), { recursive: true })
   fs.copyFileSync(reportScript, fixtureScript)
-  writeInlineWasm(mainGlue, 225 * 1024)
-  writeInlineWasm(remoteGlue, 365 * 1024)
+  writeInlineWasm(mainGlue, 210 * 1024)
+  writeInlineWasm(remoteGlue, 330 * 1024)
 
   const accepted = spawnSync(process.execPath, [fixtureScript], { encoding: 'utf8' })
   assert.equal(accepted.status, 0, accepted.stderr)
 
-  writeInlineWasm(mainGlue, 225 * 1024 + 1)
+  writeInlineWasm(mainGlue, 210 * 1024 + 1)
   const mainRejected = spawnSync(process.execPath, [fixtureScript], { encoding: 'utf8' })
   assert.equal(mainRejected.status, 1)
-  assert.match(mainRejected.stderr, /libdatadog: 230,401 bytes exceeds 230,400 bytes/)
+  assert.match(mainRejected.stderr, /libdatadog: 215,041 bytes exceeds 215,040 bytes/)
 
-  writeInlineWasm(mainGlue, 225 * 1024)
-  writeInlineWasm(remoteGlue, 365 * 1024 + 1)
+  writeInlineWasm(mainGlue, 210 * 1024)
+  writeInlineWasm(remoteGlue, 330 * 1024 + 1)
   const remoteRejected = spawnSync(process.execPath, [fixtureScript], { encoding: 'utf8' })
   assert.equal(remoteRejected.status, 1)
-  assert.match(remoteRejected.stderr, /remote config: 373,761 bytes exceeds 373,760 bytes/)
+  assert.match(remoteRejected.stderr, /remote config: 337,921 bytes exceeds 337,920 bytes/)
 })
 
 test('rejects forbidden code linked into WASM', () => {
