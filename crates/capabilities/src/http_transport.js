@@ -193,6 +193,44 @@ module.exports.httpRequest = function (host, port, isHttps, socketPath, connecti
 
   function attempt () {
     return new Promise((resolve, reject) => {
+      let chunks
+      let response
+      let settled = false
+
+      /** @param {Error} [error] */
+      function settle (error) {
+        if (settled) return
+        settled = true
+
+        if (error) {
+          reject(error)
+          return
+        }
+
+        const body = Buffer.concat(chunks)
+        if (responseHeaderObserver) {
+          try {
+            responseHeaderObserver(response.rawHeaders)
+          } catch (error) {
+            // Only read `error.message` (a string) rather than stringifying an
+            // arbitrary thrown value, so a hostile/throwing toString on the
+            // error can't turn the log line into its own failure path.
+            process.stderr.write('responseHeaderObserver error: ' + (error && error.message) + '\n')
+          }
+        }
+        resolve([
+          response.statusCode,
+          response.rawHeaders,
+          // Buffer is a Uint8Array with exact byteOffset and byteLength.
+          // Rust copies it into Bytes before this response is released.
+          body,
+        ])
+      }
+
+      function abortResponse () {
+        settle(new Error('response aborted'))
+      }
+
       storage(() => {
         // wasm_memory.buffer is replaced each time WebAssembly.Memory grows, so
         // the views must be recreated on every attempt against the current buffer.
@@ -216,31 +254,18 @@ module.exports.httpRequest = function (host, port, isHttps, socketPath, connecti
           ? { socketPath, method, path, headers }
           : { host, port, method, path, headers }
         if (!connectionPooling) requestOptions.agent = false
-        const req = transport.request(requestOptions, (res) => {
-          const chunks = []
+        /** @param {import('node:http').IncomingMessage} res */
+        function handleResponse (res) {
+          response = res
+          chunks = []
           res.on('data', chunk => chunks.push(chunk))
-          res.on('end', () => {
-            const body = Buffer.concat(chunks)
-            if (responseHeaderObserver) {
-              try {
-                responseHeaderObserver(res.rawHeaders)
-              } catch (error) {
-                // Only read `err.message` (a string) rather than stringifying an
-                // arbitrary thrown value, so a hostile/throwing toString on the
-                // error can't turn the log line into its own failure path.
-                process.stderr.write('responseHeaderObserver error: ' + (error && error.message) + '\n')
-              }
-            }
-            resolve([
-              res.statusCode,
-              res.rawHeaders,
-              // Buffer is a Uint8Array with exact byteOffset and byteLength.
-              // Rust copies it into Bytes before this response is released.
-              body,
-            ])
-          })
-        })
-        req.on('error', reject)
+          res.once('end', settle)
+          res.once('aborted', abortResponse)
+          res.once('error', settle)
+        }
+
+        const req = transport.request(requestOptions, handleResponse)
+        req.once('error', settle)
 
         // The request head (method/path/headers) was supplied via requestOptions
         // above; just write the stable Node-owned body. (No `req._header`
@@ -249,7 +274,7 @@ module.exports.httpRequest = function (host, port, isHttps, socketPath, connecti
           req.write(body)
           req.end()
         } catch (error) {
-          reject(error)
+          settle(error)
         }
       })
     })

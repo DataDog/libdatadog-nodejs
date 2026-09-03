@@ -115,6 +115,42 @@ test('exports agentless remote config from the dedicated entry point', async () 
   }
 })
 
+test('rejects an aborted agentless remote config response', async () => {
+  const originalRequest = https.request
+  let requestCount = 0
+
+  /**
+   * @param {import('node:https').RequestOptions} requestOptions
+   * @param {(response: import('node:http').IncomingMessage) => void} onResponse
+   */
+  function request (requestOptions, onResponse) {
+    assert.strictEqual(typeof requestOptions.method, 'string')
+    requestCount++
+    const outgoing = new EventEmitter()
+    outgoing.write = () => {}
+    outgoing.end = () => {
+      queueMicrotask(() => {
+        const response = new EventEmitter()
+        response.statusCode = 200
+        response.rawHeaders = []
+        onResponse(response)
+        response.emit('aborted')
+      })
+    }
+    return outgoing
+  }
+
+  https.request = request
+  try {
+    const fetcher = new RemoteConfigFetcher(fetcherOptions())
+
+    await assert.rejects(fetcher.fetchChanges(), /response aborted/)
+    assert(requestCount > 0)
+  } finally {
+    https.request = originalRequest
+  }
+})
+
 /** @param {() => void} callback */
 function runWithoutStorage (callback) {
   callback()
