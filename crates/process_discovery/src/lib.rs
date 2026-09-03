@@ -17,7 +17,6 @@ impl NapiAnonymousFileHandle {}
 /// exactly one of `string_value` / `int_value` — the other variants of OTel's
 /// `AnyValue` (bool, double, bytes, array, kvlist) are not yet exposed.
 /// Passing both set or neither set is rejected as invalid input.
-#[derive(Clone)]
 #[napi(object)]
 pub struct ExtraAttribute {
     pub key: String,
@@ -29,7 +28,6 @@ pub struct ExtraAttribute {
 /// OTel process context. When present on a [`TracerMetadata`], drives the
 /// `threadlocal.*` block in the emitted process context; when absent, no such
 /// block is emitted.
-#[derive(Clone)]
 #[napi(object)]
 pub struct ThreadLocalMetadata {
     /// Ordered list of attribute key names for thread-level OTEP-4947 context
@@ -50,7 +48,7 @@ pub struct ThreadLocalMetadata {
     pub extra_attributes: Vec<ExtraAttribute>,
 }
 
-#[napi]
+#[napi(object)]
 pub struct TracerMetadata {
     pub runtime_id: Option<String>,
     pub tracer_version: String,
@@ -61,60 +59,53 @@ pub struct TracerMetadata {
     pub process_tags: Option<String>,
     pub container_id: Option<String>,
     /// Optional thread-level context metadata; see [`ThreadLocalMetadata`].
-    /// `null`/omitted (the default) disables the `threadlocal.*` block in the
-    /// emitted OTel process context entirely.
-    #[napi(skip)]
+    /// Omitted or `undefined` disables the `threadlocal.*` block in the emitted
+    /// OTel process context entirely.
     pub threadlocal_metadata: Option<ThreadLocalMetadata>,
 }
 
-#[napi]
-impl TracerMetadata {
-    #[napi(constructor)]
-    pub fn new(
-        runtime_id: Option<String>,
-        tracer_version: String,
-        hostname: String,
-        service_name: Option<String>,
-        service_env: Option<String>,
-        service_version: Option<String>,
-        process_tags: Option<String>,
-        container_id: Option<String>,
-        threadlocal_metadata: Option<ThreadLocalMetadata>,
-    ) -> Self {
-        Self {
-            runtime_id,
-            tracer_version,
-            hostname,
-            service_name,
-            service_env,
-            service_version,
-            process_tags,
-            container_id,
-            threadlocal_metadata,
-        }
-    }
-
-    #[napi(getter)]
-    pub fn threadlocal_metadata(&self) -> Option<ThreadLocalMetadata> {
-        self.threadlocal_metadata.clone()
-    }
-
-    #[napi(setter)]
-    pub fn set_threadlocal_metadata(&mut self, value: Option<ThreadLocalMetadata>) {
-        self.threadlocal_metadata = value;
+/// Builds a metadata object for callers that use the positional constructor.
+#[allow(clippy::too_many_arguments)]
+#[napi(js_name = "TracerMetadata")]
+pub fn legacy_tracer_metadata(
+    runtime_id: Option<String>,
+    tracer_version: String,
+    hostname: String,
+    service_name: Option<String>,
+    service_env: Option<String>,
+    service_version: Option<String>,
+    process_tags: Option<String>,
+    container_id: Option<String>,
+    threadlocal_metadata: Option<ThreadLocalMetadata>,
+) -> TracerMetadata {
+    TracerMetadata {
+        runtime_id,
+        tracer_version,
+        hostname,
+        service_name,
+        service_env,
+        service_version,
+        process_tags,
+        container_id,
+        threadlocal_metadata,
     }
 }
 
-fn convert_extra_attribute(ea: &ExtraAttribute) -> napi::Result<(String, any_value::Value)> {
-    let value = match (&ea.string_value, ea.int_value) {
-        (Some(s), None) => any_value::Value::StringValue(s.clone()),
-        (None, Some(i)) => any_value::Value::IntValue(i),
+fn convert_extra_attribute(attribute: ExtraAttribute) -> napi::Result<(String, any_value::Value)> {
+    let ExtraAttribute {
+        key,
+        string_value,
+        int_value,
+    } = attribute;
+    let value = match (string_value, int_value) {
+        (Some(value), None) => any_value::Value::StringValue(value),
+        (None, Some(value)) => any_value::Value::IntValue(value),
         (Some(_), Some(_)) => {
             return Err(Error::new(
                 Status::InvalidArg,
                 format!(
                     "ExtraAttribute {:?}: exactly one of stringValue / intValue must be set, both are",
-                    ea.key,
+                    key,
                 ),
             ));
         }
@@ -123,53 +114,52 @@ fn convert_extra_attribute(ea: &ExtraAttribute) -> napi::Result<(String, any_val
                 Status::InvalidArg,
                 format!(
                     "ExtraAttribute {:?}: exactly one of stringValue / intValue must be set, neither is",
-                    ea.key,
+                    key,
                 ),
             ));
         }
     };
-    Ok((ea.key.clone(), value))
+    Ok((key, value))
 }
 
 fn convert_threadlocal_metadata(
-    tlm: &ThreadLocalMetadata,
+    metadata: ThreadLocalMetadata,
 ) -> napi::Result<tracer_metadata::ThreadLocalMetadata> {
     Ok(tracer_metadata::ThreadLocalMetadata {
-        attribute_keys: tlm.attribute_keys.clone(),
-        schema_version: tlm.schema_version.clone(),
-        extra_attributes: tlm
+        attribute_keys: metadata.attribute_keys,
+        schema_version: metadata.schema_version,
+        extra_attributes: metadata
             .extra_attributes
-            .iter()
+            .into_iter()
             .map(convert_extra_attribute)
             .collect::<napi::Result<_>>()?,
     })
 }
 
 #[napi]
-pub fn store_metadata(data: &TracerMetadata) -> napi::Result<NapiAnonymousFileHandle> {
-    let res = tracer_metadata::store_tracer_metadata(&tracer_metadata::TracerMetadata {
+pub fn store_metadata(data: TracerMetadata) -> napi::Result<NapiAnonymousFileHandle> {
+    let result = tracer_metadata::store_tracer_metadata(&tracer_metadata::TracerMetadata {
         schema_version: 1,
-        runtime_id: data.runtime_id.clone(),
+        runtime_id: data.runtime_id,
         tracer_language: String::from("nodejs"),
-        tracer_version: data.tracer_version.clone(),
-        hostname: data.hostname.clone(),
-        service_name: data.service_name.clone(),
-        service_env: data.service_env.clone(),
-        service_version: data.service_version.clone(),
-        process_tags: data.process_tags.clone(),
-        container_id: data.container_id.clone(),
+        tracer_version: data.tracer_version,
+        hostname: data.hostname,
+        service_name: data.service_name,
+        service_env: data.service_env,
+        service_version: data.service_version,
+        process_tags: data.process_tags,
+        container_id: data.container_id,
         threadlocal_metadata: data
             .threadlocal_metadata
-            .as_ref()
             .map(convert_threadlocal_metadata)
             .transpose()?,
     });
 
-    match res {
+    match result {
         Ok(handle) => Ok(NapiAnonymousFileHandle { _internal: handle }),
-        Err(e) => {
-            let err_msg = format!("Failed to store the tracer configuration: {:?}", e);
-            Err(Error::new(Status::GenericFailure, err_msg))
+        Err(error) => {
+            let error_message = format!("Failed to store the tracer configuration: {:?}", error);
+            Err(Error::new(Status::GenericFailure, error_message))
         }
     }
 }
