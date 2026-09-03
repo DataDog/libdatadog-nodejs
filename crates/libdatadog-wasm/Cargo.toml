@@ -52,7 +52,7 @@ getrandom = { version = "0.2", features = ["js"] }
 # Shared release and profiling Cargo artifacts retain target feature metadata.
 # Disable GC because Binaryen can otherwise emit instructions that Node.js 18 does not support.
 wasm-opt = [
-  "-Oz",
+  "-O3",
   "--enable-mutable-globals",
   "--enable-nontrapping-float-to-int",
   "--enable-bulk-memory",
@@ -60,13 +60,14 @@ wasm-opt = [
   "--enable-reference-types",
   "--enable-multivalue",
   "--disable-gc",
+  "--enable-simd",
   "--converge",
 ]
 
 [package.metadata.wasm-pack.profile.profiling]
 # Keep function names for crate attribution after wasm-opt runs in Linux CI.
 wasm-opt = [
-  "-Oz",
+  "-O3",
   "--enable-mutable-globals",
   "--enable-nontrapping-float-to-int",
   "--enable-bulk-memory",
@@ -74,6 +75,7 @@ wasm-opt = [
   "--enable-reference-types",
   "--enable-multivalue",
   "--disable-gc",
+  "--enable-simd",
   "--converge",
   "--strip-dwarf",
   "-g",
