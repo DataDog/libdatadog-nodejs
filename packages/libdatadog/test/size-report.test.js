@@ -10,12 +10,12 @@ const {
   inferCrate,
   readSections,
 } = require('../scripts/report-wasm-size')
-test('reports inline packaging and WASM section sizes', () => {
+test('reports compressed packaging and WASM section sizes', () => {
   const gluePath = path.join(__dirname, '..', 'wasm', 'dist', 'libdatadog_wasm.js')
   const report = createWasmReport(gluePath)
 
   assert.match(report, /Raw WASM \(before Brotli\)/)
-  assert.match(report, /Base64 encoding overhead/)
+  assert.match(report, /Final packaged artifacts/)
   assert.match(report, /Raw WebAssembly sections/)
   assert.match(report, /\| code \|/)
   assert.match(report, /\| data \|/)

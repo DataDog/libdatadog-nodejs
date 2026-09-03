@@ -53,12 +53,12 @@
     "node": ">=18"
   },
   "scripts": {
-    "build:wasm": "npm run build:wasm:binary && npm run build:remote-config:binary && npm run inline:wasm && npm run inline:remote-config",
+    "build:wasm": "npm run build:wasm:binary && npm run build:remote-config:binary && npm run compress:wasm && npm run compress:remote-config",
     "build:wasm:binary": "node ../../scripts/build-wasm.js ../../crates/libdatadog-wasm wasm/dist",
     "build:remote-config:binary": "node ../../scripts/build-wasm.js ../../crates/remote_config wasm/dist/remote-config",
     "size:profile": "node ../../scripts/build-wasm.js ../../crates/libdatadog-wasm ../../target/size --profiling",
-    "inline:wasm": "node scripts/inline-wasm.js libdatadog_wasm wasm/dist",
-    "inline:remote-config": "node scripts/inline-wasm.js remote_config wasm/dist/remote-config",
+    "compress:wasm": "node scripts/compress-wasm.js libdatadog_wasm wasm/dist",
+    "compress:remote-config": "node scripts/compress-wasm.js remote_config wasm/dist/remote-config",
     "report:wasm-size": "node scripts/report-wasm-size.js",
     "build": "npm run build:wasm",
     "test": "node scripts/run-tests.js && npm run test:types",
