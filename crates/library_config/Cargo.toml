@@ -7,16 +7,12 @@ edition = "2018"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-anyhow = "1"
 libdd-library-config = { git = "https://github.com/DataDog/libdatadog.git", tag = "v43.0.0" }
 
 wasm-bindgen = "0.2.100"
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ["-O", "--enable-bulk-memory"]
-
-[dev-dependencies]
-wasm-bindgen-test = "0.3.50"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2", features = ["js"] }
