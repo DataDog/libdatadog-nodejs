@@ -22,6 +22,3 @@ console_error_panic_hook = "0.1"
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ["-O", "--all-features"]
-
-[dev-dependencies]
-wasm-bindgen-test = "0.3"
