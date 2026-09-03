@@ -53,6 +53,7 @@
     "node": ">=18"
   },
   "scripts": {
+    "benchmark:agentless": "npm run build:wasm:binary && npm run inline:wasm && node benchmark/agentless-pipeline.js",
     "build:wasm": "npm run build:wasm:binary && npm run build:remote-config:binary && npm run inline:wasm && npm run inline:remote-config",
     "build:wasm:binary": "node ../../scripts/build-wasm.js ../../crates/libdatadog-wasm wasm/dist",
     "build:remote-config:binary": "node ../../scripts/build-wasm.js ../../crates/remote_config wasm/dist/remote-config",
