@@ -33,6 +33,12 @@
       "import": "./remote-config.js",
       "require": "./remote-config.js",
       "default": "./remote-config.js"
+    },
+    "./zstd": {
+      "types": "./zstd.d.ts",
+      "import": "./zstd.mjs",
+      "require": "./zstd.js",
+      "default": "./zstd.js"
     }
   },
   "files": [
@@ -41,6 +47,9 @@
     "index.mjs",
     "remote-config.js",
     "remote-config.d.ts",
+    "zstd.js",
+    "zstd.mjs",
+    "zstd.d.ts",
     "wasm.js",
     "wasm.mjs",
     "index.d.ts",
@@ -54,11 +63,13 @@
   },
   "scripts": {
     "benchmark:agentless": "npm run build:wasm:binary && npm run inline:wasm && node benchmark/agentless-pipeline.js",
-    "build:wasm": "npm run build:wasm:binary && npm run build:remote-config:binary && npm run inline:wasm && npm run inline:remote-config",
+    "build:wasm": "npm run build:wasm:binary && npm run build:zstd:binary && npm run build:remote-config:binary && npm run inline:wasm && npm run inline:zstd && npm run inline:remote-config",
     "build:wasm:binary": "node ../../scripts/build-wasm.js ../../crates/libdatadog-wasm wasm/dist",
+    "build:zstd:binary": "node ../../scripts/build-wasm.js ../../crates/libdatadog-wasm-zstd wasm/dist/zstd",
     "build:remote-config:binary": "node ../../scripts/build-wasm.js ../../crates/remote_config wasm/dist/remote-config",
     "size:profile": "node ../../scripts/build-wasm.js ../../crates/libdatadog-wasm ../../target/size --profiling",
     "inline:wasm": "node scripts/inline-wasm.js libdatadog_wasm wasm/dist",
+    "inline:zstd": "node scripts/inline-wasm.js libdatadog_wasm_zstd wasm/dist/zstd",
     "inline:remote-config": "node scripts/inline-wasm.js remote_config wasm/dist/remote-config",
     "report:wasm-size": "node scripts/report-wasm-size.js",
     "build": "npm run build:wasm",
