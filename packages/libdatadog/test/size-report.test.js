@@ -31,6 +31,7 @@ test('attributes symbolized functions to their Rust crate', () => {
     'libdd-data-pipeline',
   )
   assert.equal(inferCrate('<serde_yaml::Value as serde::Serialize>::serialize'), 'serde-yaml')
+  assert.equal(inferCrate('serde_yaml[0123abcd]::Value::serialize'), 'serde-yaml')
   assert.equal(inferCrate('ZSTD_compress'), 'zstd-sys (C)')
   assert.equal(inferCrate('core::slice::sort'), 'Rust standard library')
 })
