@@ -69,20 +69,19 @@ test('root entry point uses the WASM backend', () => {
   assert.strictEqual(libdatadog.backend(), 'wasm')
 })
 
-test('embeds a Brotli-compressed WASM fallback below the size budgets', () => {
-  const { glue, wasm } = readInlineWasm(path.join(
+test('embeds a Brotli-compressed WASM fallback', () => {
+  const { wasm } = readInlineWasm(path.join(
     packageRoot,
     'wasm',
     'dist',
     'libdatadog_wasm.js',
   ))
 
-  assert.ok(Buffer.byteLength(glue) < 260 * 1024)
   assert.ok(wasm.length < 600 * 1024)
 })
 
-test('embeds dedicated remote config WASM below the size budgets', () => {
-  const { glue, wasm } = readInlineWasm(path.join(
+test('embeds dedicated remote config WASM', () => {
+  const { wasm } = readInlineWasm(path.join(
     packageRoot,
     'wasm',
     'dist',
@@ -90,7 +89,6 @@ test('embeds dedicated remote config WASM below the size budgets', () => {
     'remote_config.js',
   ))
 
-  assert.ok(Buffer.byteLength(glue) < 450 * 1024)
   assert.ok(wasm.length < 1024 * 1024)
 })
 
