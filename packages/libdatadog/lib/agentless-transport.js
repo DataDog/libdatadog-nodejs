@@ -13,6 +13,7 @@ let activeBufferSize = 0
 
 /** @param {AgentlessTransportOptions} [options] */
 function createHostTransport ({ agent } = {}) {
+  const requestAgent = agent ?? false
   const requests = new Map()
   const timers = new Map()
 
@@ -30,6 +31,7 @@ function createHostTransport ({ agent } = {}) {
     const target = new URL(url)
     const client = target.protocol === 'https:' ? require('node:https') : require('node:http')
     const headers = Object.fromEntries(headerList.map(({ name, value }) => [name, value]))
+    if (requestAgent === false) headers.connection = 'close'
 
     let settled = false
     /**
@@ -46,8 +48,8 @@ function createHostTransport ({ agent } = {}) {
       return true
     }
     const outgoing = client.request(target, {
-      agent: agent ?? false,
-      headers: { ...headers, connection: 'close' },
+      agent: requestAgent,
+      headers,
       method,
     }, (response) => {
       const chunks = []

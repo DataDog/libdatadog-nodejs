@@ -80,9 +80,13 @@ export interface AgentlessExporterOptions {
   obfuscation?: ObfuscationConfig
 }
 
+interface AgentlessTransportAgent {
+  addRequest(request: object, options: object): void
+}
+
 export interface AgentlessTransportOptions {
   /** Borrowed Node.js HTTP agent. The exporter does not destroy it. */
-  agent?: object
+  agent?: AgentlessTransportAgent
 }
 
 export interface AgentlessExporter {

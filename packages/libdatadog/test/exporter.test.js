@@ -19,8 +19,22 @@ const wasmArtifact = path.join(packageRoot, 'wasm', 'dist', 'libdatadog_wasm.js'
 /** @typedef {(error?: unknown) => void} BindingDone */
 
 class TrackingAgent extends http.Agent {
+  connections = 0
   requests = 0
   destroyed = false
+
+  constructor () {
+    super({ keepAlive: true })
+  }
+
+  /**
+   * @param {import('node:http').ClientRequestArgs} options
+   * @param {(error: Error | null, stream: import('node:stream').Duplex) => void} [callback]
+   */
+  createConnection (options, callback) {
+    this.connections++
+    return super.createConnection(options, callback)
+  }
 
   /**
    * @param {import('node:http').ClientRequest} request
@@ -213,8 +227,9 @@ test('package entry point uses a borrowed transport agent', {
   const agent = new TrackingAgent()
 
   try {
-    await assertExport(require('..'), { agent })
-    assert.strictEqual(agent.requests, 1)
+    await assertExport(require('..'), { agent }, 2)
+    assert.strictEqual(agent.requests, 2)
+    assert.strictEqual(agent.connections, 1)
     assert.strictEqual(agent.destroyed, false)
   } finally {
     agent.destroy()
@@ -434,8 +449,9 @@ test('agentless exporter close cancels retry backoff', {
 /**
  * @param {typeof import('..')} pipeline
  * @param {import('../index').AgentlessTransportOptions} [transportOptions]
+ * @param {number} [count]
  */
-async function assertExport (pipeline, transportOptions) {
+async function assertExport (pipeline, transportOptions, count = 1) {
   const received = await withIntake(async (endpoint) => {
     const exporter = pipeline.createAgentlessExporter({
       endpoint,
@@ -449,7 +465,9 @@ async function assertExport (pipeline, transportOptions) {
     }, transportOptions)
 
     try {
-      await sendExport(exporter)
+      for (let i = 0; i < count; i++) {
+        await sendExport(exporter)
+      }
     } finally {
       exporter.close()
     }

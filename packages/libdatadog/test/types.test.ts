@@ -1,5 +1,6 @@
 import {
   type AgentlessLogger,
+  type AgentlessTransportOptions,
   backend,
   createAgentlessExporter,
   DDSketch,
@@ -25,6 +26,10 @@ const agentlessExporter = createAgentlessExporter({
     addRequest () {},
   },
 })
+const invalidTransportOptions: AgentlessTransportOptions = {
+  // @ts-expect-error Transport agents must implement addRequest.
+  agent: {},
+}
 const logger: AgentlessLogger = {
   error () {},
 }
