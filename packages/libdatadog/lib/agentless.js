@@ -5,6 +5,7 @@ const { randomUUID } = require('node:crypto')
 const { createHostTransport } = require('./agentless-transport')
 
 /** @typedef {import('../index').AgentlessExporterOptions} AgentlessExporterOptions */
+/** @typedef {import('../index').AgentlessTransportOptions} AgentlessTransportOptions */
 /** @typedef {import('../index').AgentlessLogger} AgentlessLogger */
 /** @typedef {typeof import('@datadog/libdatadog-wasm')} AgentlessBinding */
 
@@ -17,13 +18,14 @@ class AgentlessExporter {
   /**
    * @param {AgentlessBinding} binding
    * @param {AgentlessExporterOptions} options
+   * @param {AgentlessTransportOptions} [transportOptions]
    */
-  constructor (binding, options) {
+  constructor (binding, options, transportOptions) {
     const { runtimeId } = options
     const bindingOptions = runtimeId === undefined || runtimeId === null
       ? { ...options, runtimeId: randomUUID() }
       : options
-    const transport = createHostTransport()
+    const transport = createHostTransport(transportOptions)
     this.#binding = new binding.AgentlessExporter(
       bindingOptions,
       transport.request,
@@ -81,9 +83,10 @@ function errorMessage (error) {
 /**
  * @param {AgentlessBinding} binding
  * @param {AgentlessExporterOptions} options
+ * @param {AgentlessTransportOptions} [transportOptions]
  */
-function createAgentlessExporter (binding, options) {
-  return new AgentlessExporter(binding, options)
+function createAgentlessExporter (binding, options, transportOptions) {
+  return new AgentlessExporter(binding, options, transportOptions)
 }
 
 module.exports = { createAgentlessExporter }
