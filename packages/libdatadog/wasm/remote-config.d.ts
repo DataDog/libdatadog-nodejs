@@ -29,6 +29,7 @@ export class RemoteConfigFetcher {
   fetchChanges(): Promise<RemoteConfigChange[]>
   setConfigState(path: string, applyState: number, applyError?: string): void
   setExtraServices(services: string[]): void
+  setIdentity(clientId: string, runtimeId: string, tags: string[]): void
   setProductCapabilities(products: string[], capabilities: string[]): string[]
 }
 
