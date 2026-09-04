@@ -17,6 +17,9 @@ The package accepts Datadog v0.4 MessagePack payloads and exports them to an
 agentless intake. `sendV04()` reports completion through a callback and sends
 delivery failures to the supplied logger. It does not return a promise.
 
+`createAgentlessExporter(options, { agent })` accepts an optional borrowed
+Node.js HTTP agent. The caller owns the agent and its lifetime.
+
 The package uses a wasm-bindgen backend with the WebAssembly bytes embedded in
 JavaScript. The canonical inlined output is published as the regular
 `@datadog/libdatadog-wasm` dependency from the `wasm` workspace. The WASM
