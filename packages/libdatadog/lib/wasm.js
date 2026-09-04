@@ -9,7 +9,10 @@ module.exports = {
   zstd_compress: binding.zstd_compress,
 }
 
-/** @param {import('../index').AgentlessExporterOptions} options */
-function createAgentlessExporter (options) {
-  return require('./agentless').createAgentlessExporter(binding, options)
+/**
+ * @param {import('../index').AgentlessExporterOptions} options
+ * @param {import('../index').AgentlessTransportOptions} [transportOptions]
+ */
+function createAgentlessExporter (options, transportOptions) {
+  return require('./agentless').createAgentlessExporter(binding, options, transportOptions)
 }

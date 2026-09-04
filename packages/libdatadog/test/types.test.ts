@@ -20,6 +20,10 @@ const agentlessExporter = createAgentlessExporter({
   tracerVersion: '1.2.3',
   languageVersion: '22.0.0',
   languageInterpreter: 'v8',
+}, {
+  agent: {
+    addRequest () {},
+  },
 })
 const logger: AgentlessLogger = {
   error () {},

@@ -80,6 +80,11 @@ export interface AgentlessExporterOptions {
   obfuscation?: ObfuscationConfig
 }
 
+export interface AgentlessTransportOptions {
+  /** Borrowed Node.js HTTP agent. The exporter does not destroy it. */
+  agent?: object
+}
+
 export interface AgentlessExporter {
   sendV04(payload: Uint8Array, done: () => void, log: AgentlessLogger): void
   close(): void
@@ -89,7 +94,10 @@ export interface AgentlessLogger {
   error(message: string, ...args: unknown[]): void
 }
 
-export function createAgentlessExporter(options: AgentlessExporterOptions): AgentlessExporter
+export function createAgentlessExporter(
+  options: AgentlessExporterOptions,
+  transportOptions?: AgentlessTransportOptions
+): AgentlessExporter
 export function backend(): 'wasm'
 
 export function zstd_compress(data: Uint8Array, level: number): Uint8Array

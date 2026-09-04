@@ -18,6 +18,25 @@ const wasmArtifact = path.join(packageRoot, 'wasm', 'dist', 'libdatadog_wasm.js'
 
 /** @typedef {(error?: unknown) => void} BindingDone */
 
+class TrackingAgent extends http.Agent {
+  requests = 0
+  destroyed = false
+
+  /**
+   * @param {import('node:http').ClientRequest} request
+   * @param {import('node:http').RequestOptions} options
+   */
+  addRequest (request, options) {
+    this.requests++
+    super.addRequest(request, options)
+  }
+
+  destroy () {
+    this.destroyed = true
+    super.destroy()
+  }
+}
+
 test('package entry points defer unused agentless modules', {
   skip: !fs.existsSync(wasmArtifact),
 }, () => {
@@ -186,6 +205,20 @@ test('package entry point compresses agentless v0.4 exports with Zstandard', {
   skip: !fs.existsSync(wasmArtifact),
 }, async () => {
   await assertExport(require('..'))
+})
+
+test('package entry point uses a borrowed transport agent', {
+  skip: !fs.existsSync(wasmArtifact),
+}, async () => {
+  const agent = new TrackingAgent()
+
+  try {
+    await assertExport(require('..'), { agent })
+    assert.strictEqual(agent.requests, 1)
+    assert.strictEqual(agent.destroyed, false)
+  } finally {
+    agent.destroy()
+  }
 })
 
 test('inline-WASM backend validates optional values', {
@@ -400,8 +433,9 @@ test('agentless exporter close cancels retry backoff', {
 
 /**
  * @param {typeof import('..')} pipeline
+ * @param {import('../index').AgentlessTransportOptions} [transportOptions]
  */
-async function assertExport (pipeline) {
+async function assertExport (pipeline, transportOptions) {
   const received = await withIntake(async (endpoint) => {
     const exporter = pipeline.createAgentlessExporter({
       endpoint,
@@ -412,7 +446,7 @@ async function assertExport (pipeline) {
       runtimeId: 'runtime-id',
       service: 'service',
       containerId: 'container-id',
-    })
+    }, transportOptions)
 
     try {
       await sendExport(exporter)

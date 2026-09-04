@@ -4,13 +4,15 @@
 /** @typedef {{ id: number, url: string, method: string, headers: Header[], body: Uint8Array }} RequestPlan */
 /** @typedef {{ status: number | undefined, body: Buffer }} Response */
 /** @typedef {(error?: Error, response?: Response) => void} RequestCallback */
+/** @typedef {import('../index').AgentlessTransportOptions} AgentlessTransportOptions */
 
 const maxActiveBufferSize = 16 * 1024 * 1024
 const discardedResponse = { status: 200, body: Buffer.alloc(0) }
 
 let activeBufferSize = 0
 
-function createHostTransport () {
+/** @param {AgentlessTransportOptions} [options] */
+function createHostTransport ({ agent } = {}) {
   const requests = new Map()
   const timers = new Map()
 
@@ -44,7 +46,7 @@ function createHostTransport () {
       return true
     }
     const outgoing = client.request(target, {
-      agent: false,
+      agent: agent ?? false,
       headers: { ...headers, connection: 'close' },
       method,
     }, (response) => {
