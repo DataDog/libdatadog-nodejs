@@ -44,6 +44,10 @@ env[rustFlagsKey] = [env[rustFlagsKey], '-Zunstable-options', '-Cpanic=immediate
   .join(' ')
 env[rustupToolchainKey] = wasmRustToolchain
 
+// Keep the min-size profile while relaxing only LLVM's inlining cap for the compression hot path.
+// Rebenchmark this LLVM-internal threshold when updating rust-toolchain.toml.
+const libdatadogWasmRustFlags = '-C target-feature=+simd128 -C llvm-args=-inline-threshold=45'
+
 if (isMacOS) {
   const homebrewDir = env.HOMEBREW_DIR ?? '/opt/homebrew'
   const llvmDir = `${homebrewDir}/opt/llvm/`
@@ -82,6 +86,23 @@ if (isMacOS) {
 function buildWasm (cratePath, outputDirectory, options = {}) {
   const { profiling = false, skipOptimization = false } = options
   const resolvedOutputDirectory = path.resolve(cratePath, outputDirectory)
+  const buildEnvironment = { ...env }
+  if (path.basename(cratePath) === 'libdatadog-wasm') {
+    if (buildEnvironment.CARGO_ENCODED_RUSTFLAGS === undefined) {
+      const rustFlagsName = buildEnvironment.RUSTFLAGS === undefined
+        ? 'CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS'
+        : 'RUSTFLAGS'
+      buildEnvironment[rustFlagsName] = [
+        buildEnvironment[rustFlagsName],
+        libdatadogWasmRustFlags,
+      ].filter(Boolean).join(' ')
+    } else {
+      buildEnvironment.CARGO_ENCODED_RUSTFLAGS = [
+        buildEnvironment.CARGO_ENCODED_RUSTFLAGS,
+        ...libdatadogWasmRustFlags.split(' '),
+      ].filter(Boolean).join('\x1F')
+    }
+  }
   fs.rmSync(resolvedOutputDirectory, { force: true, recursive: true })
   const args = ['build']
   if (profiling) args.push('--profiling')
@@ -89,7 +110,7 @@ function buildWasm (cratePath, outputDirectory, options = {}) {
   args.push('--target', 'nodejs', cratePath, '--out-dir', resolvedOutputDirectory, '--', '-Z', 'build-std=std')
   childProcess.execFileSync('wasm-pack', args, {
     env: {
-      ...env,
+      ...buildEnvironment,
       // Cargo's release profile strips the function names needed for size attribution.
       ...(profiling && { CARGO_PROFILE_RELEASE_STRIP: 'false' }),
     },
