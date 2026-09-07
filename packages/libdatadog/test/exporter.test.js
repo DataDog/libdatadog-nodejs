@@ -477,25 +477,33 @@ test('inline-WASM backend validates optional values', {
   )
 })
 
-test('agentless exporter retries in Rust until the third attempt succeeds', {
+test('agentless exporter retries trace and stats exports until the third attempt succeeds', {
   skip: !fs.existsSync(wasmArtifact),
 }, async () => {
   const pipeline = require('../wasm')
-  let requests = 0
+  const requests = new Map()
   const server = http.createServer((incoming, response) => {
     incoming.resume()
     incoming.once('end', () => {
-      requests++
-      response.writeHead(requests < 3 ? 500 : 202)
+      const count = (requests.get(incoming.url) ?? 0) + 1
+      requests.set(incoming.url, count)
+      response.writeHead(count < 3 ? 500 : 202)
       response.end()
     })
   })
 
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
-  const exporter = createExporter(pipeline, server)
+  const { port } = server.address()
+  const exporter = createExporter(pipeline, server, {
+    statsEndpoint: `http://127.0.0.1:${port}/api/v0.2/stats`,
+  })
   try {
-    await sendExport(exporter)
-    assert.strictEqual(requests, 3)
+    await Promise.all([
+      sendExport(exporter),
+      sendStatsExport(exporter, statsPayload()),
+    ])
+    assert.strictEqual(requests.get('/api/v2/spans'), 3)
+    assert.strictEqual(requests.get('/api/v0.2/stats'), 3)
   } finally {
     exporter.close()
     await new Promise(resolve => server.close(resolve))
