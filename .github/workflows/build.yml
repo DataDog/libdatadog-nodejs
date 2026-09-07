@@ -36,7 +36,8 @@ jobs:
       - name: Report and validate WASM binary size
         run: >-
           npm run report:wasm-size --prefix packages/libdatadog --
-          ../../target/size/libdatadog_wasm_bg.wasm
+          ../../target/size/libdatadog-wasm/libdatadog_wasm_bg.wasm
+          ../../target/size/remote-config/remote_config_bg.wasm
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: libdatadog-wasm
