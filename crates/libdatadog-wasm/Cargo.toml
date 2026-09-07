@@ -50,26 +50,28 @@ getrandom = { version = "0.2", features = ["js"] }
 # which are not supported by Node.js 18. Keep this list to features used by the
 # Rust output and supported by every Node.js version that we test.
 wasm-opt = [
-  "-Oz",
+  "-O3",
   "--enable-mutable-globals",
   "--enable-nontrapping-float-to-int",
   "--enable-bulk-memory",
   "--enable-sign-ext",
   "--enable-reference-types",
   "--enable-multivalue",
+  "--enable-simd",
   "--converge",
 ]
 
 [package.metadata.wasm-pack.profile.profiling]
 # Keep function names for crate attribution after wasm-opt runs in Linux CI.
 wasm-opt = [
-  "-Oz",
+  "-O3",
   "--enable-mutable-globals",
   "--enable-nontrapping-float-to-int",
   "--enable-bulk-memory",
   "--enable-sign-ext",
   "--enable-reference-types",
   "--enable-multivalue",
+  "--enable-simd",
   "--converge",
   "-g",
 ]
