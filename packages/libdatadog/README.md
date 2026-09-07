@@ -17,6 +17,11 @@ The package accepts Datadog v0.4 MessagePack payloads and exports them to an
 agentless intake. `sendV04()` reports completion through a callback and sends
 delivery failures to the supplied logger. It does not return a promise.
 
+Set `statsEndpoint` to enable client-computed stats for trace exports.
+`sendStats()` accepts a MessagePack `ClientStatsPayload` and sends it to that
+intake. It applies agentless resource obfuscation and payload wrapping before
+delivery.
+
 `createAgentlessExporter(options, { agent })` accepts an optional borrowed
 Node.js HTTP agent. The caller owns the agent and its lifetime.
 

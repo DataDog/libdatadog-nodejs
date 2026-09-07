@@ -66,6 +66,8 @@ export interface ObfuscationConfig {
 
 export interface AgentlessExporterOptions {
   endpoint: string
+  /** Full URL for agentless client stats intake. */
+  statsEndpoint?: string
   apiKey: string
   hostname?: string
   env?: string
@@ -91,6 +93,7 @@ export interface AgentlessTransportOptions {
 
 export interface AgentlessExporter {
   sendV04(payload: Uint8Array, done: () => void, log: AgentlessLogger): void
+  sendStats(payload: Uint8Array, done: () => void, log: AgentlessLogger): void
   close(): void
 }
 

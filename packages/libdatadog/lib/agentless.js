@@ -36,13 +36,16 @@ class AgentlessExporter {
   }
 
   /**
+   * @param {(payload: Uint8Array, done: (error?: unknown) => void) => void} send
+   * @param {string} closedMessage
+   * @param {string} failureMessage
    * @param {Uint8Array} payload
    * @param {() => void} done
    * @param {AgentlessLogger} log
    */
-  sendV04 (payload, done, log) {
+  #send (send, closedMessage, failureMessage, payload, done, log) {
     if (this.#closed) {
-      log.error('Cannot send data-pipeline export after the exporter is closed')
+      log.error(closedMessage)
       done()
       return
     }
@@ -52,18 +55,50 @@ class AgentlessExporter {
       if (error !== undefined) {
         const message = errorMessage(error)
         if (!this.#closed || message !== canceledError) {
-          log.error('Failed to send data-pipeline export: %s', message)
+          log.error(failureMessage, message)
         }
       }
       done()
     }
 
     try {
-      this.#binding.sendV04(payload, complete)
+      send.call(this.#binding, payload, complete)
     } catch (error) {
-      log.error('Failed to send data-pipeline export: %s', errorMessage(error))
+      log.error(failureMessage, errorMessage(error))
       done()
     }
+  }
+
+  /**
+   * @param {Uint8Array} payload
+   * @param {() => void} done
+   * @param {AgentlessLogger} log
+   */
+  sendV04 (payload, done, log) {
+    this.#send(
+      this.#binding.sendV04,
+      'Cannot send data-pipeline export after the exporter is closed',
+      'Failed to send data-pipeline export: %s',
+      payload,
+      done,
+      log,
+    )
+  }
+
+  /**
+   * @param {Uint8Array} payload
+   * @param {() => void} done
+   * @param {AgentlessLogger} log
+   */
+  sendStats (payload, done, log) {
+    this.#send(
+      this.#binding.sendStats,
+      'Cannot send agentless stats after the exporter is closed',
+      'Failed to send agentless stats: %s',
+      payload,
+      done,
+      log,
+    )
   }
 
   close () {

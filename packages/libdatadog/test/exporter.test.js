@@ -7,7 +7,7 @@ const path = require('node:path')
 const { test } = require('node:test')
 const { zstdDecompressSync } = require('node:zlib')
 
-const { encode } = require('@msgpack/msgpack')
+const { decode, encode } = require('@msgpack/msgpack')
 
 const { createHostTransport } = require('../lib/agentless-transport')
 
@@ -83,6 +83,35 @@ test('agentless exporter reports completion through its callback', async () => {
 
   await new Promise((resolve) => {
     result = exporter.sendV04(Buffer.alloc(0), () => {
+      completed++
+      resolve()
+    }, log)
+  })
+
+  assert.strictEqual(result, undefined)
+  assert.strictEqual(completed, 1)
+})
+
+test('agentless exporter reports stats completion through its callback', async () => {
+  class BindingExporter {
+    /**
+     * @param {Uint8Array} payload
+     * @param {BindingDone} done
+     */
+    sendStats (payload, done) {
+      done()
+    }
+
+    cancelAll () {}
+  }
+
+  const exporter = createTestExporter(BindingExporter)
+  const log = { error: assert.fail }
+  let completed = 0
+  let result
+
+  await new Promise((resolve) => {
+    result = exporter.sendStats(Buffer.alloc(0), () => {
       completed++
       resolve()
     }, log)
@@ -185,13 +214,18 @@ test('agentless exporter logs failures settled before close', async () => {
   ]])
 })
 
-test('agentless exporter reports sends after close without calling the binding', () => {
+test('agentless exporter reports trace and stats sends after close without calling the binding', () => {
   let cancellations = 0
-  let sends = 0
+  let traceSends = 0
+  let statsSends = 0
 
   class BindingExporter {
     sendV04 () {
-      sends++
+      traceSends++
+    }
+
+    sendStats () {
+      statsSends++
     }
 
     cancelAll () {
@@ -205,20 +239,192 @@ test('agentless exporter reports sends after close without calling the binding',
 
   const result = exporter.close()
   exporter.sendV04(Buffer.alloc(0), () => completed++, log)
+  exporter.sendStats(Buffer.alloc(0), () => completed++, log)
 
   assert.strictEqual(result, undefined)
   assert.strictEqual(cancellations, 1)
-  assert.strictEqual(completed, 1)
-  assert.strictEqual(sends, 0)
-  assert.deepStrictEqual(log.errors, [[
-    'Cannot send data-pipeline export after the exporter is closed',
-  ]])
+  assert.strictEqual(completed, 2)
+  assert.strictEqual(traceSends, 0)
+  assert.strictEqual(statsSends, 0)
+  assert.deepStrictEqual(log.errors, [
+    ['Cannot send data-pipeline export after the exporter is closed'],
+    ['Cannot send agentless stats after the exporter is closed'],
+  ])
 })
 
 test('package entry point compresses agentless v0.4 exports with Zstandard', {
   skip: !fs.existsSync(wasmArtifact),
 }, async () => {
   await assertExport(require('..'))
+})
+
+test('package entry point exports agentless client stats', {
+  skip: !fs.existsSync(wasmArtifact) || !zstdDecompressSync,
+}, async () => {
+  const pipeline = require('..')
+  const requests = await withRecordingIntake(async (endpoint, server) => {
+    const exporter = createExporter(pipeline, server, {
+      statsEndpoint: statsEndpoint(endpoint),
+      hostname: 'host',
+      env: 'test',
+      runtimeId: 'runtime-id',
+      containerId: 'container-id',
+    })
+    try {
+      await sendStatsExport(exporter, statsPayload())
+    } finally {
+      exporter.close()
+    }
+  })
+
+  assert.strictEqual(requests.length, 1)
+  const received = requests[0]
+  assert.strictEqual(received.method, 'POST')
+  assert.strictEqual(received.path, '/api/v0.2/stats')
+  assert.strictEqual(received.headers['dd-api-key'], 'test-api-key')
+  assert.strictEqual(received.headers['datadog-container-id'], 'container-id')
+  assert.strictEqual(received.headers['datadog-obfuscation-version'], '1')
+  assert.match(received.headers['content-type'], /^application\/msgpack/)
+  assert.strictEqual(received.headers['content-encoding'], 'zstd')
+  assert.deepStrictEqual(received.body.subarray(0, zstdMagic.length), zstdMagic)
+
+  const payload = decodeStatsRequest(received)
+  assert.strictEqual(payload.AgentHostname, 'host')
+  assert.strictEqual(payload.AgentEnv, 'test')
+  assert.strictEqual(payload.AgentVersion, '0.1.0-nodejs')
+  assert.strictEqual(payload.ClientComputed, true)
+  assert.strictEqual(payload.SplitPayload, false)
+  assert.strictEqual(payload.Stats[0].Lang, 'nodejs')
+  assert.strictEqual(payload.Stats[0].TracerVersion, '0.1.0')
+  assert.strictEqual(payload.Stats[0].RuntimeID, 'runtime-id')
+  assert.strictEqual(payload.Stats[0].ContainerID, 'container-id')
+  assert.strictEqual(payload.Stats[0].Stats[0].Stats[0].Resource, 'SELECT * FROM users WHERE id = ?')
+})
+
+test('package entry point exports stats without an optional span type', {
+  skip: !fs.existsSync(wasmArtifact) || !zstdDecompressSync,
+}, async () => {
+  const pipeline = require('..')
+  const requests = await withRecordingIntake(async (endpoint, server) => {
+    const exporter = createExporter(pipeline, server, {
+      statsEndpoint: statsEndpoint(endpoint),
+    })
+    try {
+      await sendStatsExport(exporter, statsPayload(1, false))
+    } finally {
+      exporter.close()
+    }
+  })
+
+  assert.strictEqual(requests.length, 1)
+  const stats = decodeStatsRequest(requests[0]).Stats[0].Stats[0].Stats[0]
+  assert.strictEqual(Object.hasOwn(stats, 'Type'), false)
+})
+
+test('agentless client stats split at the intake limit', {
+  skip: !fs.existsSync(wasmArtifact) || !zstdDecompressSync,
+}, async () => {
+  for (const [groupedStatsCount, expectedRequests] of [[4000, 1], [4001, 2]]) {
+    const pipeline = require('../wasm')
+    const requests = await withRecordingIntake(async (endpoint, server) => {
+      const exporter = createExporter(pipeline, server, {
+        statsEndpoint: statsEndpoint(endpoint),
+      })
+      try {
+        await sendStatsExport(exporter, statsPayload(groupedStatsCount))
+      } finally {
+        exporter.close()
+      }
+    })
+
+    let receivedStats = 0
+    assert.strictEqual(requests.length, expectedRequests)
+    for (const request of requests) {
+      const payload = decodeStatsRequest(request)
+      assert.strictEqual(payload.SplitPayload, expectedRequests > 1)
+      assert.strictEqual(payload.Stats[0].Sequence, 1)
+      const requestStats = payload.Stats[0].Stats[0].Stats.length
+      assert.ok(requestStats <= 4000)
+      receivedStats += requestStats
+    }
+    assert.strictEqual(receivedStats, groupedStatsCount)
+  }
+})
+
+test('stats endpoint suppresses backend stats computation for v0.4 traces', {
+  skip: !fs.existsSync(wasmArtifact) || !zstdDecompressSync,
+}, async () => {
+  const pipeline = require('../wasm')
+  const requests = await withRecordingIntake(async (endpoint, server) => {
+    const exporter = createExporter(pipeline, server, {
+      statsEndpoint: statsEndpoint(endpoint),
+    })
+    try {
+      await sendExport(exporter)
+    } finally {
+      exporter.close()
+    }
+  })
+
+  assert.strictEqual(requests.length, 1)
+  const payload = JSON.parse(zstdDecompressSync(requests[0].body).toString())
+  assert.strictEqual(Object.hasOwn(payload.traces[0].spans[0].meta, '_dd.compute_stats'), false)
+})
+
+test('agentless exporter skips empty stats and reports malformed stats', {
+  skip: !fs.existsSync(wasmArtifact),
+}, async () => {
+  const pipeline = require('../wasm')
+  const log = testLog()
+  const requests = await withRecordingIntake(async (endpoint, server) => {
+    const exporter = createExporter(pipeline, server, {
+      statsEndpoint: statsEndpoint(endpoint),
+    })
+    try {
+      await sendStatsExport(exporter, statsPayload(0), log)
+      await sendStatsExport(exporter, Buffer.from([0xC0]), log)
+      await sendStatsExport(exporter, Buffer.from([0x81]), log)
+      await sendStatsExport(exporter, Buffer.from([0x80, 0xC0]), log)
+    } finally {
+      exporter.close()
+    }
+  })
+
+  assert.strictEqual(requests.length, 0)
+  assert.strictEqual(log.errors.length, 3)
+  assert.strictEqual(log.errors[0][0], 'Failed to send agentless stats: %s')
+  assert.match(log.errors[0][1], /expected a MessagePack map/)
+  assert.match(log.errors[1][1], /failed to decode client stats/)
+  assert.match(log.errors[2][1], /trailing bytes/)
+})
+
+test('agentless exporter reports missing and invalid stats endpoints', {
+  skip: !fs.existsSync(wasmArtifact),
+}, async () => {
+  const pipeline = require('../wasm')
+  const log = testLog()
+  const requests = await withRecordingIntake(async (endpoint, server) => {
+    const exporter = createExporter(pipeline, server)
+    const invalidExporter = createExporter(pipeline, server, {
+      statsEndpoint: 'not a URL',
+    })
+    try {
+      await sendStatsExport(exporter, statsPayload(), log)
+      await sendStatsExport(invalidExporter, statsPayload(), log)
+    } finally {
+      exporter.close()
+      invalidExporter.close()
+    }
+  })
+
+  assert.strictEqual(requests.length, 0)
+  assert.strictEqual(log.errors.length, 2)
+  assert.deepStrictEqual(log.errors[0], [
+    'Failed to send agentless stats: %s',
+    'statsEndpoint must be configured before sending stats',
+  ])
+  assert.strictEqual(log.errors[1][0], 'Failed to send agentless stats: %s')
+  assert.match(log.errors[1][1], /invalid agentless stats endpoint URL/)
 })
 
 test('package entry point uses a borrowed transport agent', {
@@ -257,12 +463,17 @@ test('inline-WASM backend validates optional values', {
     runtimeId: null,
     containerId: null,
     timeoutMs: null,
+    statsEndpoint: null,
   })
   exporter.close()
 
   assert.throws(
     () => pipeline.createAgentlessExporter({ ...options, timeoutMs: 1.5 }),
     /timeoutMs must be an unsigned integer/,
+  )
+  assert.throws(
+    () => pipeline.createAgentlessExporter({ ...options, statsEndpoint: 1 }),
+    /statsEndpoint must be a string/,
   )
 })
 
@@ -356,7 +567,7 @@ test('agentless exporter applies Rust timeouts and retry policy', {
   }
 })
 
-test('agentless exporter close cancels a send started in the same turn', {
+test('agentless exporter close cancels trace and stats sends started in the same turn', {
   skip: !fs.existsSync(wasmArtifact),
 }, async () => {
   const pipeline = require('../wasm')
@@ -368,12 +579,18 @@ test('agentless exporter close cancels a send started in the same turn', {
   })
 
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
-  const exporter = createExporter(pipeline, server)
+  const { port } = server.address()
+  const exporter = createExporter(pipeline, server, {
+    statsEndpoint: `http://127.0.0.1:${port}/api/v0.2/stats`,
+  })
   try {
     const log = testLog()
-    const send = sendExport(exporter, log)
+    const sends = Promise.all([
+      sendExport(exporter, log),
+      sendStatsExport(exporter, statsPayload(), log),
+    ])
     exporter.close()
-    await send
+    await sends
     assert.strictEqual(requests, 0)
     assert.deepStrictEqual(log.errors, [])
   } finally {
@@ -484,6 +701,7 @@ async function assertExport (pipeline, transportOptions, count = 1) {
     assert.strictEqual(body.traces[0].runtimeID, 'runtime-id')
     assert.strictEqual(body.traces[0].spans[0].name, 'operation')
     assert.strictEqual(body.traces[0].spans[0].service, 'service')
+    assert.strictEqual(body.traces[0].spans[0].meta['_dd.compute_stats'], '1')
   }
 }
 
@@ -550,7 +768,7 @@ function testLog () {
 }
 
 /**
- * @param {{ sendV04: (payload: Uint8Array, done: () => void, log: ReturnType<typeof testLog>) => void }} exporter
+ * @param {import('../index').AgentlessExporter} exporter
  * @param {ReturnType<typeof testLog>} [log]
  */
 function sendExport (exporter, log = testLog()) {
@@ -562,18 +780,100 @@ function sendExport (exporter, log = testLog()) {
   return completed
 }
 
-async function withIntake (send) {
-  let resolveRequest
-  const request = new Promise((resolve) => {
-    resolveRequest = resolve
+/**
+ * @param {import('../index').AgentlessExporter} exporter
+ * @param {Uint8Array} payload
+ * @param {ReturnType<typeof testLog>} [log]
+ */
+function sendStatsExport (exporter, payload, log = testLog()) {
+  let result
+  const completed = new Promise((resolve) => {
+    result = exporter.sendStats(payload, resolve, log)
   })
+  assert.strictEqual(result, undefined)
+  return completed
+}
+
+/**
+ * @param {number} [groupedStatsCount]
+ * @param {boolean} [includeType]
+ */
+function statsPayload (groupedStatsCount = 1, includeType = true) {
+  const stats = []
+  for (let i = 0; i < groupedStatsCount; i++) {
+    const groupedStats = {
+      Service: 'service',
+      Name: 'operation',
+      Resource: 'SELECT * FROM users WHERE id = 42',
+      HTTPStatusCode: 200,
+      Hits: 1,
+      Errors: 0,
+      Duration: 1,
+      OkSummary: Buffer.alloc(0),
+      ErrorSummary: Buffer.alloc(0),
+      Synthetics: false,
+      TopLevelHits: 1,
+      HTTPMethod: '',
+      HTTPEndpoint: '',
+      srv_src: '',
+      SpanKind: 'server',
+      GRPCStatusCode: '',
+    }
+    if (includeType) groupedStats.Type = 'sql'
+    stats.push(groupedStats)
+  }
+  return encode({
+    Hostname: 'host',
+    Env: 'test',
+    Version: '1.0.0',
+    Stats: [{
+      Start: 1,
+      Duration: 10_000_000_000,
+      Stats: stats,
+    }],
+    Lang: 'javascript',
+    TracerVersion: '0.1.0',
+    RuntimeID: 'runtime-id',
+    Sequence: 1,
+  })
+}
+
+/**
+ * @param {{ body: Buffer }} request
+ */
+function decodeStatsRequest (request) {
+  return decode(zstdDecompressSync(request.body))
+}
+
+/**
+ * @param {string} endpoint
+ */
+function statsEndpoint (endpoint) {
+  return new URL('/api/v0.2/stats', endpoint).href
+}
+
+/**
+ * @param {(endpoint: string) => Promise<void>} send
+ */
+async function withIntake (send) {
+  const requests = await withRecordingIntake(send)
+  return requests[0]
+}
+
+/**
+ * @param {(endpoint: string, server: import('node:http').Server) => Promise<void>} send
+ */
+async function withRecordingIntake (send) {
+  const requests = []
   const server = http.createServer((incoming, response) => {
     const chunks = []
     incoming.on('data', chunk => chunks.push(chunk))
     incoming.on('end', () => {
-      resolveRequest({
+      requests.push({
         headers: incoming.headers,
         body: Buffer.concat(chunks),
+        method: incoming.method,
+        path: incoming.url,
       })
       response.end()
     })
@@ -582,8 +882,8 @@ async function withIntake (send) {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
   try {
     const { port } = server.address()
-    await send(`http://127.0.0.1:${port}/api/v2/spans`)
-    return await request
+    await send(`http://127.0.0.1:${port}/api/v2/spans`, server)
+    return requests
   } finally {
     await new Promise(resolve => server.close(resolve))
   }

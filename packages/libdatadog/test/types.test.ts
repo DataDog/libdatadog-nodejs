@@ -17,6 +17,7 @@ const compressed: Uint8Array = zstd_compress(new Uint8Array(16), 3)
 const sketch = new DDSketch()
 const agentlessExporter = createAgentlessExporter({
   endpoint: 'https://example.test/api/v2/spans',
+  statsEndpoint: 'https://example.test/api/v0.2/stats',
   apiKey: 'test-api-key',
   tracerVersion: '1.2.3',
   languageVersion: '22.0.0',
@@ -39,6 +40,7 @@ sketch.addWithCount(2, 3)
 const count: number = sketch.count()
 const encoded: Uint8Array = sketch.encode()
 agentlessExporter.sendV04(new Uint8Array(16), () => {}, logger)
+agentlessExporter.sendStats(new Uint8Array(16), () => {}, logger)
 agentlessExporter.close()
 
 const wasmBackend: typeof backend = wasm.backend
