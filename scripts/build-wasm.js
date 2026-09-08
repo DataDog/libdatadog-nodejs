@@ -90,8 +90,13 @@ function buildWasm (cratePath, outputDirectory, options = {}) {
   childProcess.execFileSync('wasm-pack', args, {
     env: {
       ...env,
-      // Cargo's release profile strips the function names needed for size attribution.
-      ...(profiling && { CARGO_PROFILE_RELEASE_STRIP: 'false' }),
+      // wasm-pack 0.14's profiling mode uses Cargo's release profile without
+      // enabling debug info. Generate and retain the names needed for size
+      // attribution.
+      ...(profiling && {
+        CARGO_PROFILE_RELEASE_DEBUG: 'true',
+        CARGO_PROFILE_RELEASE_STRIP: 'false',
+      }),
     },
   })
   // wasm-pack ignores its output by default. These outputs are package inputs,
