@@ -1206,7 +1206,7 @@ dependencies = [
  "libdd-data-pipeline-core",
  "libdd-trace-obfuscation",
  "libdd-trace-utils",
- "thiserror 1.0.69",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
