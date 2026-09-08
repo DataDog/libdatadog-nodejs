@@ -73,11 +73,18 @@ export interface AgentlessExporterOptions {
   version?: string
   runtimeId?: string
   containerId?: string
+  entityId?: string
   tracerVersion: string
   languageVersion: string
   languageInterpreter: string
   timeoutMs?: number
   obfuscation?: ObfuscationConfig
+  stats?: AgentlessStatsOptions
+}
+
+export interface AgentlessStatsOptions {
+  endpoint: string
+  intervalMs: number
 }
 
 interface AgentlessTransportAgent {
@@ -91,6 +98,7 @@ export interface AgentlessTransportOptions {
 
 export interface AgentlessExporter {
   sendV04(payload: Uint8Array, done: () => void, log: AgentlessLogger): void
+  flush(done?: () => void, log?: AgentlessLogger): void
   close(): void
 }
 

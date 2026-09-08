@@ -21,6 +21,11 @@ const agentlessExporter = createAgentlessExporter({
   tracerVersion: '1.2.3',
   languageVersion: '22.0.0',
   languageInterpreter: 'v8',
+  entityId: 'in-1234',
+  stats: {
+    endpoint: 'https://trace.agent.datadoghq.com/api/v0.2/stats',
+    intervalMs: 10_000,
+  },
 }, {
   agent: {
     addRequest () {},
@@ -39,6 +44,7 @@ sketch.addWithCount(2, 3)
 const count: number = sketch.count()
 const encoded: Uint8Array = sketch.encode()
 agentlessExporter.sendV04(new Uint8Array(16), () => {}, logger)
+agentlessExporter.flush(() => {}, logger)
 agentlessExporter.close()
 
 const wasmBackend: typeof backend = wasm.backend

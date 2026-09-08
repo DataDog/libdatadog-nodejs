@@ -7,7 +7,7 @@ const path = require('node:path')
 const { test } = require('node:test')
 const { zstdDecompressSync } = require('node:zlib')
 
-const { encode } = require('@msgpack/msgpack')
+const { decode, encode } = require('@msgpack/msgpack')
 
 const { createHostTransport } = require('../lib/agentless-transport')
 
@@ -92,6 +92,211 @@ test('agentless exporter reports completion through its callback', async () => {
   assert.strictEqual(completed, 1)
 })
 
+test('agentless exporter does not configure stats when they are disabled', () => {
+  let bindingOptions
+  class BindingExporter {
+    constructor (options) {
+      bindingOptions = options
+    }
+
+    sendV04 (payload, done) {
+      done()
+    }
+
+    cancelAll () {}
+  }
+
+  const exporter = createTestExporter(BindingExporter)
+  try {
+    assert.strictEqual(bindingOptions.stats, undefined)
+  } finally {
+    exporter.close()
+  }
+})
+
+test('agentless exporter forwards stats configuration with the sent payload', async () => {
+  let bindingOptions
+  let sentPayload
+  class BindingExporter {
+    constructor (options) {
+      bindingOptions = options
+    }
+
+    sendV04 (payload, done) {
+      sentPayload = payload
+      done()
+    }
+
+    flushStats (force, done) {
+      done()
+    }
+
+    cancelAll () {}
+  }
+
+  const exporter = createTestExporter(BindingExporter, {
+    containerId: 'container-id',
+    env: 'prod',
+    hostname: 'host-1',
+    runtimeId: 'runtime-id',
+    service: 'service-1',
+    timeoutMs: 2000,
+    version: '2.0.0',
+    stats: {
+      endpoint: 'https://stats.example.test/api/v0.2/stats',
+      intervalMs: 10_000,
+    },
+  })
+  const payload = tracePayload()
+  try {
+    await new Promise(resolve => exporter.sendV04(payload, resolve, { error: assert.fail }))
+    assert.strictEqual(sentPayload, payload)
+    assert.deepStrictEqual(bindingOptions.stats, {
+      endpoint: 'https://stats.example.test/api/v0.2/stats',
+      intervalMs: 10_000,
+    })
+  } finally {
+    exporter.close()
+  }
+})
+
+test('agentless exporter runs a queued force flush after an interval flush', async (t) => {
+  const flushes = []
+  let intervalCallback
+  let intervalDelay
+  let timerCleared = false
+  let timerUnrefed = false
+  const timer = {
+    unref () {
+      timerUnrefed = true
+    },
+  }
+  t.mock.method(globalThis, 'setInterval', (callback, delay) => {
+    intervalCallback = callback
+    intervalDelay = delay
+    return timer
+  })
+  t.mock.method(globalThis, 'clearInterval', (value) => {
+    if (value === timer) timerCleared = true
+  })
+
+  class BindingExporter {
+    sendV04 (payload, done) {
+      done()
+    }
+
+    flushStats (force, done) {
+      flushes.push({ done, force })
+    }
+
+    cancelAll () {}
+  }
+
+  const exporter = createTestExporter(BindingExporter, {
+    stats: {
+      endpoint: 'https://stats.example.test/api/v0.2/stats',
+      intervalMs: 10_000,
+    },
+  })
+  try {
+    await new Promise(resolve => exporter.sendV04(tracePayload(), resolve, { error: assert.fail }))
+    assert.strictEqual(intervalDelay, 10_000)
+    assert.strictEqual(timerUnrefed, true)
+
+    intervalCallback()
+    let completed = false
+    exporter.flush(() => {
+      completed = true
+    }, { error: assert.fail })
+    assert.strictEqual(flushes.length, 1)
+    assert.strictEqual(flushes[0].force, false)
+    assert.strictEqual(completed, false)
+
+    flushes[0].done()
+    assert.strictEqual(flushes.length, 2)
+    assert.strictEqual(flushes[1].force, true)
+    assert.strictEqual(completed, false)
+
+    flushes[1].done()
+    assert.strictEqual(completed, true)
+  } finally {
+    exporter.close()
+  }
+  assert.strictEqual(timerCleared, true)
+})
+
+test('agentless exporter registers a standalone beforeExit flush', () => {
+  const previousListeners = new Set(process.listeners('beforeExit'))
+  const flushes = []
+  class BindingExporter {
+    flushStats (force, done) {
+      flushes.push(force)
+      done()
+    }
+
+    cancelAll () {}
+  }
+
+  const exporter = createTestExporter(BindingExporter, {
+    stats: {
+      endpoint: 'https://stats.example.test/api/v0.2/stats',
+      intervalMs: 10_000,
+    },
+  })
+  const beforeExitHandler = process.listeners('beforeExit')
+    .find(listener => !previousListeners.has(listener))
+  try {
+    assert.notStrictEqual(beforeExitHandler, undefined)
+    beforeExitHandler()
+    assert.deepStrictEqual(flushes, [true])
+  } finally {
+    exporter.close()
+  }
+  assert.strictEqual(process.listeners('beforeExit').includes(beforeExitHandler), false)
+})
+
+test('agentless exporter owns beforeExit when dd-trace is present', () => {
+  const tracerState = Symbol.for('dd-trace')
+  const previousState = globalThis[tracerState]
+  const previousListeners = new Set(process.listeners('beforeExit'))
+  Object.defineProperty(globalThis, tracerState, {
+    configurable: true,
+    value: { beforeExitHandlers: [] },
+  })
+
+  class BindingExporter {
+    flushStats (force, done) {
+      done()
+    }
+
+    cancelAll () {}
+  }
+
+  let exporter
+  let beforeExitHandler
+  try {
+    exporter = createTestExporter(BindingExporter, {
+      stats: {
+        endpoint: 'https://stats.example.test/api/v0.2/stats',
+        intervalMs: 10_000,
+      },
+    })
+    beforeExitHandler = process.listeners('beforeExit')
+      .find(listener => !previousListeners.has(listener))
+    assert.notStrictEqual(beforeExitHandler, undefined)
+  } finally {
+    exporter?.close()
+    if (previousState === undefined) delete globalThis[tracerState]
+    else {
+      Object.defineProperty(globalThis, tracerState, {
+        configurable: true,
+        value: previousState,
+      })
+    }
+  }
+  assert.strictEqual(process.listeners('beforeExit').includes(beforeExitHandler), false)
+})
+
 test('agentless exporter logs asynchronous failures before reporting completion', async () => {
   class BindingExporter {
     /**
@@ -147,6 +352,45 @@ test('agentless exporter logs synchronous failures before reporting completion',
     'Failed to send data-pipeline export: %s',
     'binding unavailable',
   ]])
+})
+
+test('agentless exporter accepts the maximum stats interval', () => {
+  class BindingExporter {
+    cancelAll () {}
+  }
+
+  const exporter = createTestExporter(BindingExporter, {
+    stats: {
+      endpoint: 'https://stats.example.test/api/v0.2/stats',
+      intervalMs: 0x7F_FF_FF_FF,
+    },
+  })
+  exporter.close()
+})
+
+test('agentless exporter rejects invalid stats intervals before loading WASM', () => {
+  class BindingExporter {
+    cancelAll () {}
+  }
+
+  for (const intervalMs of [-1, 0, 1.5, 0x80_00_00_00]) {
+    assert.throws(() => createTestExporter(BindingExporter, {
+      stats: {
+        endpoint: 'https://stats.example.test/api/v0.2/stats',
+        intervalMs,
+      },
+    }), /stats\.intervalMs must be a positive integer no greater than 2147483647/)
+  }
+})
+
+test('agentless exporter rejects an invalid entity ID before loading WASM', () => {
+  class BindingExporter {
+    cancelAll () {}
+  }
+
+  assert.throws(() => createTestExporter(BindingExporter, {
+    entityId: 42,
+  }), /entityId must be a string/)
 })
 
 test('agentless exporter logs failures settled before close', async () => {
@@ -219,6 +463,69 @@ test('package entry point compresses agentless v0.4 exports with Zstandard', {
   skip: !fs.existsSync(wasmArtifact),
 }, async () => {
   await assertExport(require('..'))
+})
+
+test('package entry point generates agentless stats from the sent v0.4 payload', {
+  skip: !fs.existsSync(wasmArtifact),
+}, async () => {
+  const pipeline = require('../wasm')
+  const requests = []
+  const server = http.createServer((incoming, response) => {
+    const chunks = []
+    incoming.on('data', chunk => chunks.push(chunk))
+    incoming.on('end', () => {
+      requests.push({
+        body: Buffer.concat(chunks),
+        headers: incoming.headers,
+        url: incoming.url,
+      })
+      response.writeHead(202)
+      response.end()
+    })
+  })
+
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  const { port } = server.address()
+  const exporter = createExporter(pipeline, server, {
+    containerId: 'container-id',
+    env: 'prod',
+    hostname: 'host-1',
+    runtimeId: 'runtime-id',
+    service: 'service',
+    version: '2.0.0',
+    stats: {
+      endpoint: `http://127.0.0.1:${port}/api/v0.2/stats`,
+      intervalMs: 10_000,
+    },
+  })
+  try {
+    await sendExport(exporter)
+    await flushExport(exporter)
+  } finally {
+    exporter.close()
+    await new Promise(resolve => server.close(resolve))
+  }
+
+  assert.strictEqual(requests.length, 2)
+  const traceRequest = requests.find(request => request.url === '/api/v2/spans')
+  const statsRequest = requests.find(request => request.url === '/api/v0.2/stats')
+  assert.notStrictEqual(traceRequest, undefined)
+  assert.notStrictEqual(statsRequest, undefined)
+  assert.strictEqual(traceRequest.headers['datadog-client-computed-stats'], 'true')
+  assert.strictEqual(statsRequest.headers['dd-api-key'], 'test-api-key')
+  assert.strictEqual(statsRequest.headers['content-type'], 'application/msgpack')
+  assert.strictEqual(statsRequest.headers['content-encoding'], 'zstd')
+  assert.deepStrictEqual(statsRequest.body.subarray(0, zstdMagic.length), zstdMagic)
+  if (zstdDecompressSync) {
+    const payload = decode(zstdDecompressSync(statsRequest.body), { useBigInt64: true })
+    assert.strictEqual(payload.AgentHostname, 'host-1')
+    assert.strictEqual(payload.AgentEnv, 'prod')
+    assert.strictEqual(payload.AgentVersion, '0.1.0-nodejs')
+    assert.strictEqual(payload.ClientComputed, true)
+    assert.strictEqual(payload.Stats[0].RuntimeID, 'runtime-id')
+    assert.strictEqual(payload.Stats[0].ContainerID, 'container-id')
+    assert.strictEqual(payload.Stats[0].Stats[0].Stats[0].Resource, 'resource')
+  }
 })
 
 test('package entry point uses a borrowed transport agent', {
@@ -528,15 +835,20 @@ function exporterOptions () {
 /**
  * @typedef {object} TestBindingExporter
  * @property {(payload: Uint8Array, done: BindingDone) => void} sendV04
+ * @property {(force: boolean, done: BindingDone) => void} [flushStats]
  * @property {() => void} cancelAll
  */
 
 /**
  * @param {new (...args: unknown[]) => TestBindingExporter} BindingExporter
+ * @param {Partial<import('../index').AgentlessExporterOptions>} [options]
  */
-function createTestExporter (BindingExporter) {
+function createTestExporter (BindingExporter, options) {
   const { createAgentlessExporter } = require('../lib/agentless')
-  return createAgentlessExporter({ AgentlessExporter: BindingExporter }, exporterOptions())
+  return createAgentlessExporter(
+    { AgentlessExporter: BindingExporter },
+    { ...exporterOptions(), ...options },
+  )
 }
 
 function testLog () {
@@ -560,6 +872,14 @@ function sendExport (exporter, log = testLog()) {
   })
   assert.strictEqual(result, undefined)
   return completed
+}
+
+/**
+ * @param {{ flush: (done: () => void, log: ReturnType<typeof testLog>) => void }} exporter
+ * @param {ReturnType<typeof testLog>} [log]
+ */
+function flushExport (exporter, log = testLog()) {
+  return new Promise(resolve => exporter.flush(resolve, log))
 }
 
 async function withIntake (send) {

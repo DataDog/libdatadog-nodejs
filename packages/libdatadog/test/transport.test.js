@@ -26,6 +26,31 @@ function sendRequest (transport, plan) {
   })
 }
 
+test('host transport applies the configured entity ID', async () => {
+  const transport = createHostTransport(undefined, 'in-1234')
+  let entityId
+  const server = http.createServer((request, response) => {
+    entityId = request.headers['datadog-entity-id']
+    request.resume()
+    request.once('end', () => response.end())
+  })
+
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  try {
+    const { port } = server.address()
+    await sendRequest(transport, {
+      id: 1,
+      url: `http://127.0.0.1:${port}`,
+      method: 'POST',
+      headers: [],
+      body: Buffer.alloc(0),
+    })
+    assert.strictEqual(entityId, 'in-1234')
+  } finally {
+    await new Promise(resolve => server.close(resolve))
+  }
+})
+
 test('host transport rejects when a response is aborted', async () => {
   const transport = createHostTransport()
   let resolveResponseClosed
