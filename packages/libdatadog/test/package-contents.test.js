@@ -42,11 +42,16 @@ test('published packages contain only the intended artifacts', () => {
     'WASM package must contain the inline-WASM JavaScript fallback')
   assert(wasmNames.includes('dist/remote-config/remote_config.js'),
     'WASM package must contain the dedicated remote config artifact')
+  assert(wasmNames.includes('dist/zstd/libdatadog_wasm_zstd.js'),
+    'WASM package must contain the dedicated Zstandard artifact')
   assert.strictEqual(wasmNames.includes('remote-config.js'), false)
   assert(wasmNames.includes('remote-config.d.ts'))
   assert(names.includes('remote-config.js'))
   assert.strictEqual(names.includes('remote-config.mjs'), false)
   assert(names.includes('remote-config.d.ts'))
+  assert(names.includes('zstd.js'))
+  assert(names.includes('zstd.mjs'))
+  assert(names.includes('zstd.d.ts'))
   assert.strictEqual(libdatadogWasm.name, '@datadog/libdatadog-wasm')
   assert.strictEqual(
     metapackageJson.dependencies['@datadog/libdatadog-wasm'],
@@ -97,6 +102,8 @@ test('installed package uses its WASM dependency', () => {
     })
 
     const requireInstalled = createRequire(path.join(installRoot, 'package.json'))
+    const wasmPath = requireInstalled.resolve('@datadog/libdatadog-wasm')
+    const zstdWasmPath = requireInstalled.resolve('@datadog/libdatadog-wasm/zstd')
     const libdatadog = requireInstalled('@datadog/libdatadog')
     const explicitWasm = requireInstalled('@datadog/libdatadog/wasm')
     const directRemoteConfig = requireInstalled('@datadog/libdatadog-wasm/remote-config')
@@ -108,7 +115,21 @@ test('installed package uses its WASM dependency', () => {
     assert.strictEqual(remoteConfig.RemoteConfigFetcher, directRemoteConfig.RemoteConfigFetcher)
     assert.strictEqual(libdatadog.backend(), 'wasm')
     assert.strictEqual(explicitWasm.backend(), 'wasm')
+    assert(require.cache[wasmPath])
+    assert.strictEqual(require.cache[zstdWasmPath], undefined)
     assert(libdatadog.zstd_compress(Buffer.alloc(16), 3) instanceof Uint8Array)
+    assert(require.cache[zstdWasmPath])
+
+    delete require.cache[wasmPath]
+    delete require.cache[zstdWasmPath]
+
+    const directZstd = requireInstalled('@datadog/libdatadog-wasm/zstd')
+    const zstd = requireInstalled('@datadog/libdatadog/zstd')
+
+    assert(require.cache[zstdWasmPath])
+    assert.strictEqual(require.cache[wasmPath], undefined)
+    assert(zstd.zstd_compress(Buffer.alloc(16), 3) instanceof Uint8Array)
+    assert.strictEqual(zstd.zstd_compress, directZstd.zstd_compress)
     assert.strictEqual(new libdatadog.DDSketch().count(), 0)
     assertEsmImports(installRoot, environment)
   } finally {
@@ -143,6 +164,8 @@ function assertEsmImports (installRoot, environment) {
       RemoteConfigFetcher as DirectRemoteConfigFetcher,
       setStorage as setDirectStorage,
     } from '@datadog/libdatadog-wasm/remote-config'
+    import zstd, { zstd_compress as zstdCompress } from '@datadog/libdatadog/zstd'
+    import directZstd, { zstd_compress as directZstdCompress } from '@datadog/libdatadog-wasm/zstd'
 
     assert.strictEqual(libdatadog.RemoteConfigFetcher, undefined)
     assert.strictEqual(wasm.RemoteConfigFetcher, undefined)
@@ -151,6 +174,9 @@ function assertEsmImports (installRoot, environment) {
     assert.strictEqual(directRemoteConfig.RemoteConfigFetcher, DirectRemoteConfigFetcher)
     assert.strictEqual(directRemoteConfig.setStorage, setDirectStorage)
     assert.strictEqual(RemoteConfigFetcher, DirectRemoteConfigFetcher)
+    assert.strictEqual(zstd.zstd_compress, zstdCompress)
+    assert.strictEqual(directZstd.zstd_compress, directZstdCompress)
+    assert.strictEqual(zstdCompress, directZstdCompress)
     assert.strictEqual(backend(), 'wasm')
     assert.strictEqual(libdatadog.backend, backend)
     assert.strictEqual(libdatadog.createAgentlessExporter, createAgentlessExporter)
