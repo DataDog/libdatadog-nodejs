@@ -110,6 +110,7 @@ export function createAgentlessExporter(
   options: AgentlessExporterOptions,
   transportOptions?: AgentlessTransportOptions
 ): AgentlessExporter
+export const supportsAgentlessStats: true
 export function backend(): 'wasm'
 
 export function zstd_compress(data: Uint8Array, level: number): Uint8Array

@@ -15,6 +15,7 @@ const maxTimerInterval = 0x7F_FF_FF_FF
 class AgentlessExporter {
   #binding
   #beforeExitHandler
+  #beforeExitHandlers
   #closed = false
   #log
   #pendingForceFlushes
@@ -48,7 +49,13 @@ class AgentlessExporter {
     this.#statsInterval = stats?.intervalMs
     if (this.#statsInterval !== undefined) {
       this.#beforeExitHandler = () => this.flush()
-      process.once('beforeExit', this.#beforeExitHandler)
+      const beforeExitHandlers = globalThis[Symbol.for('dd-trace')]?.beforeExitHandlers
+      if (typeof beforeExitHandlers?.add === 'function' && typeof beforeExitHandlers?.delete === 'function') {
+        this.#beforeExitHandlers = beforeExitHandlers
+        beforeExitHandlers.add(this.#beforeExitHandler)
+      } else {
+        process.once('beforeExit', this.#beforeExitHandler)
+      }
     }
   }
 
@@ -82,7 +89,10 @@ class AgentlessExporter {
     const complete = (error) => {
       this.#statsFlushInFlight = false
       if (error !== undefined) {
-        log?.error('Failed to flush data-pipeline stats: %s', errorMessage(error))
+        const message = errorMessage(error)
+        if (!this.#closed || message !== canceledError) {
+          log?.error('Failed to flush data-pipeline stats: %s', message)
+        }
       }
       done()
       const pending = this.#pendingForceFlushes
@@ -144,7 +154,11 @@ class AgentlessExporter {
   close () {
     this.#closed = true
     clearInterval(this.#statsTimer)
-    if (this.#beforeExitHandler) process.removeListener('beforeExit', this.#beforeExitHandler)
+    if (this.#beforeExitHandlers) {
+      this.#beforeExitHandlers.delete(this.#beforeExitHandler)
+    } else if (this.#beforeExitHandler) {
+      process.removeListener('beforeExit', this.#beforeExitHandler)
+    }
     this.#binding.cancelAll()
   }
 }

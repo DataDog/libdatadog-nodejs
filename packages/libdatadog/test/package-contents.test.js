@@ -127,12 +127,14 @@ function assertEsmImports (installRoot, environment) {
       backend,
       createAgentlessExporter,
       DDSketch,
+      supportsAgentlessStats,
       zstd_compress,
     } from '@datadog/libdatadog'
     import wasm, {
       backend as wasmBackend,
       createAgentlessExporter as createWasmAgentlessExporter,
       DDSketch as WasmDDSketch,
+      supportsAgentlessStats as wasmSupportsAgentlessStats,
       zstd_compress as wasmCompress,
     } from '@datadog/libdatadog/wasm'
     import remoteConfig, {
@@ -154,12 +156,16 @@ function assertEsmImports (installRoot, environment) {
     assert.strictEqual(backend(), 'wasm')
     assert.strictEqual(libdatadog.backend, backend)
     assert.strictEqual(libdatadog.createAgentlessExporter, createAgentlessExporter)
+    assert.strictEqual(libdatadog.supportsAgentlessStats, supportsAgentlessStats)
+    assert.strictEqual(supportsAgentlessStats, true)
     assert(zstd_compress(new Uint8Array(16), 3) instanceof Uint8Array)
     assert.strictEqual(new DDSketch().count(), 0)
 
     assert.strictEqual(wasmBackend(), 'wasm')
     assert.strictEqual(wasm.backend, wasmBackend)
     assert.strictEqual(wasm.createAgentlessExporter, createWasmAgentlessExporter)
+    assert.strictEqual(wasm.supportsAgentlessStats, wasmSupportsAgentlessStats)
+    assert.strictEqual(wasmSupportsAgentlessStats, true)
     assert(wasmCompress(new Uint8Array(16), 3) instanceof Uint8Array)
     assert.strictEqual(new WasmDDSketch().count(), 0)
   `

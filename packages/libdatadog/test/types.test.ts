@@ -4,6 +4,7 @@ import {
   backend,
   createAgentlessExporter,
   DDSketch,
+  supportsAgentlessStats,
   zstd_compress,
 } from '@datadog/libdatadog'
 import {
@@ -13,6 +14,7 @@ import {
 import * as wasm from '@datadog/libdatadog/wasm'
 
 const selectedBackend: 'wasm' = backend()
+const agentlessStatsSupported: true = supportsAgentlessStats
 const compressed: Uint8Array = zstd_compress(new Uint8Array(16), 3)
 const sketch = new DDSketch()
 const agentlessExporter = createAgentlessExporter({
@@ -73,6 +75,7 @@ function runInStorage (callback: () => void): void {
 }
 
 void selectedBackend
+void agentlessStatsSupported
 void compressed
 void count
 void encoded

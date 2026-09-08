@@ -11,6 +11,7 @@ const { decode, encode } = require('@msgpack/msgpack')
 
 const { createHostTransport } = require('../lib/agentless-transport')
 
+const canceledError = 'data-pipeline export was cancelled'
 const zstdMagic = Buffer.from([0x28, 0xB5, 0x2F, 0xFD])
 
 const packageRoot = path.join(__dirname, '..')
@@ -255,17 +256,20 @@ test('agentless exporter registers a standalone beforeExit flush', () => {
   assert.strictEqual(process.listeners('beforeExit').includes(beforeExitHandler), false)
 })
 
-test('agentless exporter owns beforeExit when dd-trace is present', () => {
+test('agentless exporter joins an active dd-trace beforeExit flush', () => {
   const tracerState = Symbol.for('dd-trace')
   const previousState = globalThis[tracerState]
   const previousListeners = new Set(process.listeners('beforeExit'))
+  const beforeExitHandlers = new Set()
   Object.defineProperty(globalThis, tracerState, {
     configurable: true,
-    value: { beforeExitHandlers: [] },
+    value: { beforeExitHandlers },
   })
 
+  const flushes = []
   class BindingExporter {
     flushStats (force, done) {
+      flushes.push(force)
       done()
     }
 
@@ -273,17 +277,19 @@ test('agentless exporter owns beforeExit when dd-trace is present', () => {
   }
 
   let exporter
-  let beforeExitHandler
   try {
-    exporter = createTestExporter(BindingExporter, {
-      stats: {
-        endpoint: 'https://stats.example.test/api/v0.2/stats',
-        intervalMs: 10_000,
-      },
+    beforeExitHandlers.add(() => {
+      exporter = createTestExporter(BindingExporter, {
+        stats: {
+          endpoint: 'https://stats.example.test/api/v0.2/stats',
+          intervalMs: 10_000,
+        },
+      })
     })
-    beforeExitHandler = process.listeners('beforeExit')
-      .find(listener => !previousListeners.has(listener))
-    assert.notStrictEqual(beforeExitHandler, undefined)
+    for (const beforeExitHandler of beforeExitHandlers) beforeExitHandler()
+
+    assert.deepStrictEqual(flushes, [true])
+    assert.deepStrictEqual(process.listeners('beforeExit'), [...previousListeners])
   } finally {
     exporter?.close()
     if (previousState === undefined) delete globalThis[tracerState]
@@ -294,7 +300,37 @@ test('agentless exporter owns beforeExit when dd-trace is present', () => {
       })
     }
   }
-  assert.strictEqual(process.listeners('beforeExit').includes(beforeExitHandler), false)
+  assert.strictEqual(beforeExitHandlers.size, 1)
+})
+
+test('agentless exporter does not log an expected stats cancellation during close', () => {
+  let flushDone
+  class BindingExporter {
+    flushStats (force, done) {
+      flushDone = done
+    }
+
+    cancelAll () {
+      flushDone?.(canceledError)
+    }
+  }
+
+  const exporter = createTestExporter(BindingExporter, {
+    stats: {
+      endpoint: 'https://stats.example.test/api/v0.2/stats',
+      intervalMs: 10_000,
+    },
+  })
+  const log = testLog()
+  let completed = false
+
+  exporter.flush(() => {
+    completed = true
+  }, log)
+  exporter.close()
+
+  assert.strictEqual(completed, true)
+  assert.deepStrictEqual(log.errors, [])
 })
 
 test('agentless exporter logs asynchronous failures before reporting completion', async () => {
@@ -465,11 +501,22 @@ test('package entry point compresses agentless v0.4 exports with Zstandard', {
   await assertExport(require('..'))
 })
 
-test('package entry point generates agentless stats from the sent v0.4 payload', {
+test('package entry point generates stats when created during dd-trace beforeExit', {
   skip: !fs.existsSync(wasmArtifact),
 }, async () => {
   const pipeline = require('../wasm')
+  const tracerState = Symbol.for('dd-trace')
+  const previousState = globalThis[tracerState]
+  const beforeExitHandlers = new Set()
+  Object.defineProperty(globalThis, tracerState, {
+    configurable: true,
+    value: { beforeExitHandlers },
+  })
   const requests = []
+  let resolveRequests
+  const received = new Promise((resolve) => {
+    resolveRequests = resolve
+  })
   const server = http.createServer((incoming, response) => {
     const chunks = []
     incoming.on('data', chunk => chunks.push(chunk))
@@ -479,6 +526,7 @@ test('package entry point generates agentless stats from the sent v0.4 payload',
         headers: incoming.headers,
         url: incoming.url,
       })
+      if (requests.length === 2) resolveRequests()
       response.writeHead(202)
       response.end()
     })
@@ -486,23 +534,37 @@ test('package entry point generates agentless stats from the sent v0.4 payload',
 
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
   const { port } = server.address()
-  const exporter = createExporter(pipeline, server, {
-    containerId: 'container-id',
-    env: 'prod',
-    hostname: 'host-1',
-    runtimeId: 'runtime-id',
-    service: 'service',
-    version: '2.0.0',
-    stats: {
-      endpoint: `http://127.0.0.1:${port}/api/v0.2/stats`,
-      intervalMs: 10_000,
-    },
-  })
+  let exporter
+  let send
   try {
-    await sendExport(exporter)
-    await flushExport(exporter)
+    beforeExitHandlers.add(() => {
+      exporter = createExporter(pipeline, server, {
+        containerId: 'container-id',
+        env: 'prod',
+        hostname: 'host-1',
+        runtimeId: 'runtime-id',
+        service: 'service',
+        version: '2.0.0',
+        stats: {
+          endpoint: `http://127.0.0.1:${port}/api/v0.2/stats`,
+          intervalMs: 10_000,
+        },
+      })
+      send = sendExport(exporter)
+    })
+    for (const beforeExitHandler of beforeExitHandlers) beforeExitHandler()
+
+    assert.strictEqual(beforeExitHandlers.size, 2)
+    await Promise.all([send, received])
   } finally {
-    exporter.close()
+    exporter?.close()
+    if (previousState === undefined) delete globalThis[tracerState]
+    else {
+      Object.defineProperty(globalThis, tracerState, {
+        configurable: true,
+        value: previousState,
+      })
+    }
     await new Promise(resolve => server.close(resolve))
   }
 
@@ -872,14 +934,6 @@ function sendExport (exporter, log = testLog()) {
   })
   assert.strictEqual(result, undefined)
   return completed
-}
-
-/**
- * @param {{ flush: (done: () => void, log: ReturnType<typeof testLog>) => void }} exporter
- * @param {ReturnType<typeof testLog>} [log]
- */
-function flushExport (exporter, log = testLog()) {
-  return new Promise(resolve => exporter.flush(resolve, log))
 }
 
 async function withIntake (send) {
