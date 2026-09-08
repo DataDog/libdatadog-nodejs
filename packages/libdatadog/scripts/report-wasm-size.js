@@ -278,6 +278,14 @@ function readCrateSizes (wasm) {
 
   const entries = []
   for (const [name, bytes] of sizes) insertBySize(entries, { bytes, name })
+  if (!entries.some(entry => ![
+    'bindings / unattributed',
+    'Rust runtime',
+    'Rust standard library',
+    'wasm-bindgen runtime',
+  ].includes(entry.name))) {
+    throw new Error('symbolized WASM does not contain attributable Rust crate names')
+  }
   return { entries, totalBytes }
 }
 
@@ -405,11 +413,13 @@ if (require.main === module) {
     throw new Error(`expected ${artifacts.length} symbolized WASM paths, received ${profilePaths.length}`)
   }
   const failures = []
+  const reports = []
 
   for (const [index, artifact] of artifacts.entries()) {
     const { gluePath, maximumInlineBytes, name } = artifact
     const profilePath = profilePaths[index] && path.resolve(profilePaths[index])
     const report = createReport(gluePath, profilePath, name)
+    reports.push(report)
     console.log(report)
 
     if (process.env.GITHUB_STEP_SUMMARY) {
@@ -425,6 +435,9 @@ if (require.main === module) {
     for (const failure of findForbiddenWasmCode(readCrateSizes(profileWasm).entries)) {
       failures.push(`${failure.dependency} via ${failure.name}: ${formatBytes(failure.bytes)} bytes`)
     }
+  }
+  if (process.env.WASM_SIZE_REPORT) {
+    fs.writeFileSync(process.env.WASM_SIZE_REPORT, `${reports.join('\n')}\n`)
   }
 
   if (failures.length > 0) {
