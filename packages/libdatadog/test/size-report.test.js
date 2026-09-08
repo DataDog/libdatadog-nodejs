@@ -12,6 +12,7 @@ const {
   createReport: createWasmReport,
   findForbiddenWasmCode,
   inferCrate,
+  readCrateSizes,
   readSections,
 } = require('../scripts/report-wasm-size')
 
@@ -58,10 +59,28 @@ test('attributes symbolized functions to their Rust crate', () => {
   )
 })
 
+test('rejects symbolized WASM without attributable Rust crate names', () => {
+  // The fixture defines one empty `core::noop` function and its function-name custom section.
+  const wasm = Buffer.from(
+    '0061736d01000000'
+    + '010401600000'
+    + '03020100'
+    + '0014046e616d65010d01000a636f72653a3a6e6f6f70'
+    + '0a040102000b',
+    'hex',
+  )
+
+  assert.throws(
+    () => readCrateSizes(wasm),
+    /symbolized WASM does not contain attributable Rust crate names/,
+  )
+})
+
 test('enforces each inline artifact size budget through the CLI', (t) => {
   const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'wasm-size-report-'))
   const fixtureScript = path.join(fixtureRoot, 'scripts', 'report-wasm-size.js')
   const mainGlue = path.join(fixtureRoot, 'wasm', 'dist', 'libdatadog_wasm.js')
+  const reportPath = path.join(fixtureRoot, 'wasm-size-report.md')
   const remoteGlue = path.join(fixtureRoot, 'wasm', 'dist', 'remote-config', 'remote_config.js')
 
   t.after(() => fs.rmSync(fixtureRoot, { force: true, recursive: true }))
@@ -72,8 +91,14 @@ test('enforces each inline artifact size budget through the CLI', (t) => {
   writeInlineWasm(mainGlue, 210 * 1024)
   writeInlineWasm(remoteGlue, 330 * 1024)
 
-  const accepted = spawnSync(process.execPath, [fixtureScript], { encoding: 'utf8' })
+  const accepted = spawnSync(process.execPath, [fixtureScript], {
+    encoding: 'utf8',
+    env: { ...process.env, WASM_SIZE_REPORT: reportPath },
+  })
   assert.equal(accepted.status, 0, accepted.stderr)
+  const report = fs.readFileSync(reportPath, 'utf8')
+  assert.match(report, /## libdatadog WASM size/)
+  assert.match(report, /## remote config WASM size/)
 
   writeInlineWasm(mainGlue, 210 * 1024 + 1)
   const mainRejected = spawnSync(process.execPath, [fixtureScript], { encoding: 'utf8' })
