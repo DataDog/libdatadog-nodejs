@@ -9,7 +9,7 @@ use futures::channel::oneshot;
 use futures::future::{AbortHandle, Abortable};
 use js_sys::{Array, Function, Object, Reflect, Uint8Array};
 use libdatadog_data_pipeline::{
-    send_agentless_v04, AgentlessTraceConfig, ObfuscationConfig, SendAgentlessV04Error,
+    send_agentless_stats, send_agentless_v04, AgentlessTraceConfig, ObfuscationConfig,
     TracerMetadata, DEFAULT_AGENTLESS_TIMEOUT,
 };
 use libdd_capabilities::{HttpClientCapability, HttpError, SleepCapability};
@@ -32,11 +32,18 @@ struct AgentlessExporterOptions {
     version: Option<String>,
     runtime_id: Option<String>,
     container_id: Option<String>,
+    client_computed_top_level: bool,
     tracer_version: String,
     language_version: String,
     language_interpreter: String,
     timeout_ms: Option<u32>,
+    stats_endpoint: Option<String>,
     obfuscation_config: ObfuscationConfig,
+}
+
+enum AgentlessPayload {
+    V04(Vec<u8>),
+    Stats(Vec<u8>),
 }
 
 #[derive(Clone)]
@@ -173,6 +180,7 @@ pub struct AgentlessExporter {
     capabilities: HostCapabilities,
     in_flight: Rc<RefCell<HashMap<u32, AbortHandle>>>,
     next_operation_id: Cell<u32>,
+    stats_endpoint: Option<Rc<str>>,
 }
 
 #[wasm_bindgen]
@@ -194,10 +202,12 @@ impl AgentlessExporter {
             version: optional_string(&value, "version")?,
             runtime_id: optional_string(&value, "runtimeId")?,
             container_id: optional_string(&value, "containerId")?,
+            client_computed_top_level: field_bool(&value, "clientComputedTopLevel", false)?,
             tracer_version: required_string(&value, "tracerVersion")?,
             language_version: required_string(&value, "languageVersion")?,
             language_interpreter: required_string(&value, "languageInterpreter")?,
             timeout_ms: optional_number(&value, "timeoutMs")?,
+            stats_endpoint: optional_string(&value, "statsEndpoint")?,
             obfuscation_config: optional_obfuscation_config(&value, "obfuscation")?,
         };
         let metadata = TracerMetadata {
@@ -211,6 +221,8 @@ impl AgentlessExporter {
             language_version: options.language_version,
             language_interpreter: options.language_interpreter,
             container_id: options.container_id.unwrap_or_default(),
+            client_computed_stats: options.stats_endpoint.is_some(),
+            client_computed_top_level: options.client_computed_top_level,
             ..Default::default()
         };
         let timeout = options
@@ -237,11 +249,30 @@ impl AgentlessExporter {
             capabilities,
             in_flight: Rc::new(RefCell::new(HashMap::new())),
             next_operation_id: Cell::new(1),
+            stats_endpoint: options.stats_endpoint.map(Rc::from),
         })
     }
 
     #[wasm_bindgen(js_name = sendV04)]
     pub fn send_v04(&self, payload: Vec<u8>, done: Function) {
+        self.send(AgentlessPayload::V04(payload), done);
+    }
+
+    #[wasm_bindgen(js_name = sendStats)]
+    pub fn send_stats(&self, payload: Vec<u8>, done: Function) {
+        self.send(AgentlessPayload::Stats(payload), done);
+    }
+
+    #[wasm_bindgen(js_name = cancelAll)]
+    pub fn cancel_all(&self) {
+        for abort in self.in_flight.borrow().values() {
+            abort.abort();
+        }
+    }
+}
+
+impl AgentlessExporter {
+    fn send(&self, payload: AgentlessPayload, done: Function) {
         let operation_id = self.next_operation_id.get();
         self.next_operation_id.set(operation_id.wrapping_add(1));
         let (abort, registration) = AbortHandle::new_pair();
@@ -250,26 +281,46 @@ impl AgentlessExporter {
         let config = self.config.clone();
         let in_flight = self.in_flight.clone();
         let metadata = self.metadata.clone();
+        let client_side_stats = self.stats_endpoint.is_some();
+        let stats_endpoint = match &payload {
+            AgentlessPayload::Stats(_) => self.stats_endpoint.clone(),
+            AgentlessPayload::V04(_) => None,
+        };
         spawn_local(async move {
             let _guard = OperationGuard {
                 id: operation_id,
                 in_flight,
             };
-            let send = send_agentless_v04(&capabilities, &payload, &metadata, &config, false);
+            let send = async {
+                match payload {
+                    AgentlessPayload::V04(payload) => send_agentless_v04(
+                        &capabilities,
+                        &payload,
+                        &metadata,
+                        &config,
+                        client_side_stats,
+                    )
+                    .await
+                    .map_err(send_error),
+                    AgentlessPayload::Stats(payload) => {
+                        let endpoint = stats_endpoint.as_deref().ok_or_else(|| {
+                            JsValue::from_str(
+                                "statsEndpoint must be configured before sending stats",
+                            )
+                        })?;
+                        send_agentless_stats(&capabilities, &payload, &metadata, &config, endpoint)
+                            .await
+                            .map_err(send_error)
+                    }
+                }
+            };
             let error = match Abortable::new(send, registration).await {
                 Ok(Ok(_)) => JsValue::UNDEFINED,
-                Ok(Err(error)) => send_error(error),
+                Ok(Err(error)) => error,
                 Err(_) => JsValue::from_str("data-pipeline export was cancelled"),
             };
             let _ = done.call1(&JsValue::UNDEFINED, &error);
         });
-    }
-
-    #[wasm_bindgen(js_name = cancelAll)]
-    pub fn cancel_all(&self) {
-        for abort in self.in_flight.borrow().values() {
-            abort.abort();
-        }
     }
 }
 
@@ -340,7 +391,7 @@ fn callback_dropped(name: &str) -> HttpError {
     HttpError::Network(anyhow::anyhow!("JavaScript {name} callback was dropped"))
 }
 
-fn send_error(error: SendAgentlessV04Error) -> JsValue {
+fn send_error(error: impl fmt::Display) -> JsValue {
     JsValue::from_str(&error.to_string())
 }
 
