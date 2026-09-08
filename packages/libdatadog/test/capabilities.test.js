@@ -16,6 +16,10 @@ test('package entry points exclude optional extras', () => {
 })
 
 for (const [name, backend] of backends) {
+  test(`${name} backend reports agentless stats support`, () => {
+    assert.strictEqual(backend.supportsAgentlessStats, true)
+  })
+
   test(`${name} backend compresses a Uint8Array with Zstandard`, () => {
     const input = new Uint8Array(4096).fill(42)
     const compressed = backend.zstd_compress(input, 3)
