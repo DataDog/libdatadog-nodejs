@@ -32,6 +32,7 @@ struct AgentlessExporterOptions {
     version: Option<String>,
     runtime_id: Option<String>,
     container_id: Option<String>,
+    client_computed_top_level: bool,
     tracer_version: String,
     language_version: String,
     language_interpreter: String,
@@ -201,6 +202,7 @@ impl AgentlessExporter {
             version: optional_string(&value, "version")?,
             runtime_id: optional_string(&value, "runtimeId")?,
             container_id: optional_string(&value, "containerId")?,
+            client_computed_top_level: field_bool(&value, "clientComputedTopLevel", false)?,
             tracer_version: required_string(&value, "tracerVersion")?,
             language_version: required_string(&value, "languageVersion")?,
             language_interpreter: required_string(&value, "languageInterpreter")?,
@@ -219,6 +221,8 @@ impl AgentlessExporter {
             language_version: options.language_version,
             language_interpreter: options.language_interpreter,
             container_id: options.container_id.unwrap_or_default(),
+            client_computed_stats: options.stats_endpoint.is_some(),
+            client_computed_top_level: options.client_computed_top_level,
             ..Default::default()
         };
         let timeout = options

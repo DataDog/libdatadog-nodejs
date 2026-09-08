@@ -18,6 +18,8 @@ const sketch = new DDSketch()
 const agentlessExporter = createAgentlessExporter({
   endpoint: 'https://example.test/api/v2/spans',
   statsEndpoint: 'https://example.test/api/v0.2/stats',
+  clientComputedTopLevel: true,
+  entityId: 'in-1234',
   apiKey: 'test-api-key',
   tracerVersion: '1.2.3',
   languageVersion: '22.0.0',

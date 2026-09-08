@@ -21,11 +21,14 @@ class AgentlessExporter {
    * @param {AgentlessTransportOptions} [transportOptions]
    */
   constructor (binding, options, transportOptions) {
-    const { runtimeId } = options
+    const { entityId, runtimeId } = options
+    if (entityId !== undefined && entityId !== null && typeof entityId !== 'string') {
+      throw new TypeError('entityId must be a string')
+    }
     const bindingOptions = runtimeId === undefined || runtimeId === null
       ? { ...options, runtimeId: randomUUID() }
       : options
-    const transport = createHostTransport(transportOptions)
+    const transport = createHostTransport(transportOptions, entityId ?? undefined)
     this.#binding = new binding.AgentlessExporter(
       bindingOptions,
       transport.request,

@@ -75,6 +75,8 @@ export interface AgentlessExporterOptions {
   version?: string
   runtimeId?: string
   containerId?: string
+  entityId?: string
+  clientComputedTopLevel?: boolean
   tracerVersion: string
   languageVersion: string
   languageInterpreter: string

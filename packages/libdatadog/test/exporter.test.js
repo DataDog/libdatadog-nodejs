@@ -269,6 +269,8 @@ test('package entry point exports agentless client stats', {
       env: 'test',
       runtimeId: 'runtime-id',
       containerId: 'container-id',
+      entityId: 'in-1234',
+      clientComputedTopLevel: true,
     })
     try {
       await sendStatsExport(exporter, statsPayload())
@@ -283,6 +285,9 @@ test('package entry point exports agentless client stats', {
   assert.strictEqual(received.path, '/api/v0.2/stats')
   assert.strictEqual(received.headers['dd-api-key'], 'test-api-key')
   assert.strictEqual(received.headers['datadog-container-id'], 'container-id')
+  assert.strictEqual(received.headers['datadog-entity-id'], 'in-1234')
+  assert.strictEqual(received.headers['datadog-client-computed-stats'], 'true')
+  assert.strictEqual(received.headers['datadog-client-computed-top-level'], 'true')
   assert.strictEqual(received.headers['datadog-obfuscation-version'], '1')
   assert.match(received.headers['content-type'], /^application\/msgpack/)
   assert.strictEqual(received.headers['content-encoding'], 'zstd')
@@ -462,6 +467,8 @@ test('inline-WASM backend validates optional values', {
     version: null,
     runtimeId: null,
     containerId: null,
+    entityId: null,
+    clientComputedTopLevel: null,
     timeoutMs: null,
     statsEndpoint: null,
   })
@@ -474,6 +481,14 @@ test('inline-WASM backend validates optional values', {
   assert.throws(
     () => pipeline.createAgentlessExporter({ ...options, statsEndpoint: 1 }),
     /statsEndpoint must be a string/,
+  )
+  assert.throws(
+    () => pipeline.createAgentlessExporter({ ...options, entityId: 1 }),
+    /entityId must be a string/,
+  )
+  assert.throws(
+    () => pipeline.createAgentlessExporter({ ...options, clientComputedTopLevel: 'true' }),
+    /clientComputedTopLevel must be a boolean/,
   )
 })
 
@@ -687,6 +702,8 @@ async function assertExport (pipeline, transportOptions, count = 1) {
       runtimeId: 'runtime-id',
       service: 'service',
       containerId: 'container-id',
+      entityId: 'in-1234',
+      clientComputedTopLevel: true,
     }, transportOptions)
 
     try {
@@ -701,6 +718,8 @@ async function assertExport (pipeline, transportOptions, count = 1) {
   assert.strictEqual(pipeline.backend(), 'wasm')
   assert.strictEqual(received.headers['dd-api-key'], 'test-api-key')
   assert.strictEqual(received.headers['datadog-container-id'], 'container-id')
+  assert.strictEqual(received.headers['datadog-entity-id'], 'in-1234')
+  assert.strictEqual(received.headers['datadog-client-computed-top-level'], 'true')
   assert.match(received.headers['content-type'], /^application\/json/)
   assert.strictEqual(received.headers['content-encoding'], 'zstd')
   assert.deepStrictEqual(received.body.subarray(0, zstdMagic.length), zstdMagic)

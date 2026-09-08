@@ -22,6 +22,9 @@ Set `statsEndpoint` to enable client-computed stats for trace exports.
 intake. It applies agentless resource obfuscation and payload wrapping before
 delivery.
 
+Set `clientComputedTopLevel` when the payload already marks top-level spans.
+Set `entityId` to add the standard Datadog entity header to every export.
+
 `createAgentlessExporter(options, { agent })` accepts an optional borrowed
 Node.js HTTP agent. The caller owns the agent and its lifetime.
 
