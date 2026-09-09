@@ -6,12 +6,12 @@ publish = false
 
 [dependencies.libdd-data-pipeline-core]
 git = "https://github.com/DataDog/libdatadog.git"
-rev = "8659106064a0df44972d26bf76fb6235e9b4e195"
+rev = "63e7f235b372b395e9a2ecae874e7aae3e3a4e5c"
 default-features = false
 
 [dependencies.libdd-trace-obfuscation]
 git = "https://github.com/DataDog/libdatadog.git"
-rev = "8659106064a0df44972d26bf76fb6235e9b4e195"
+rev = "63e7f235b372b395e9a2ecae874e7aae3e3a4e5c"
 default-features = false
 
 [features]
