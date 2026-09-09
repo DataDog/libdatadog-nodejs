@@ -42,7 +42,7 @@ const artifacts = [
   {
     name: 'libdatadog',
     gluePath: path.join(__dirname, '..', 'wasm', 'dist', 'libdatadog_wasm.js'),
-    maximumInlineBytes: 210 * 1024,
+    maximumInlineBytes: 240 * 1024,
   },
   {
     name: 'remote config',

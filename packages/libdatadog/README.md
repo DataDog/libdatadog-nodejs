@@ -17,6 +17,15 @@ The package accepts Datadog v0.4 MessagePack payloads and exports them to an
 agentless intake. `sendV04()` reports completion through a callback and sends
 delivery failures to the supplied logger. It does not return a promise.
 
+The optional `stats` configuration supplies the direct stats intake endpoint
+and aggregation interval. When configured, libdatadog decodes each v0.4 payload
+and generates the stats payload. The wrapper flushes on its interval and on
+`beforeExit`. The configuration owner calls `flush()` before replacing the
+exporter.
+
+Use `supportsAgentlessStats` to select native aggregation without inspecting
+the package version.
+
 `createAgentlessExporter(options, { agent })` accepts an optional borrowed
 Node.js HTTP agent. The caller owns the agent and its lifetime.
 

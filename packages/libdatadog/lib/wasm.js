@@ -6,6 +6,7 @@ module.exports = {
   backend: () => 'wasm',
   DDSketch: binding.DDSketch,
   createAgentlessExporter,
+  supportsAgentlessStats: true,
   zstd_compress: binding.zstd_compress,
 }
 
