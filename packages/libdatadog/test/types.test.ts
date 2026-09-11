@@ -44,7 +44,7 @@ agentlessExporter.close()
 const wasmBackend: typeof backend = wasm.backend
 const wasmSketch: typeof DDSketch = wasm.DDSketch
 const wasmCompress: typeof zstd_compress = wasm.zstd_compress
-const remoteConfigFetcher = new RemoteConfigFetcher({
+const remoteConfigOptions = {
   clientId: 'client-id',
   runtimeId: 'runtime-id',
   service: 'service',
@@ -56,7 +56,17 @@ const remoteConfigFetcher = new RemoteConfigFetcher({
   tracerVersion: '1.0.0',
   url: 'http://127.0.0.1:8126',
   timeoutMs: 5000,
-})
+  apiKey: 'api-key',
+  hostname: 'host',
+}
+
+const remoteConfigFetcher = new RemoteConfigFetcher(remoteConfigOptions)
+
+// @ts-expect-error apiKey is required
+new RemoteConfigFetcher({ ...remoteConfigOptions, apiKey: undefined })
+
+// @ts-expect-error hostname is required
+new RemoteConfigFetcher({ ...remoteConfigOptions, hostname: undefined })
 
 remoteConfigFetcher.setExtraServices([])
 remoteConfigFetcher.setProductCapabilities([], [])
