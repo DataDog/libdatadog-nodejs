@@ -130,12 +130,11 @@ struct FetcherConfig {
     runtime_id: String,
     client_id: String,
     invariants: ConfigInvariants,
-    agentless: AgentlessConfig,
 }
 
 impl FetcherConfig {
     async fn build(&self) -> Result<Fetcher, JsValue> {
-        Ok(SingleChangesFetcher::new_agentless(
+        Ok(SingleChangesFetcher::new(
             SimpleFileStorage::default(),
             self.target.clone(),
             self.runtime_id.clone(),
@@ -146,7 +145,6 @@ impl FetcherConfig {
                 products: vec![],
                 capabilities: vec![],
             },
-            self.agentless.clone(),
             WasmCapabilities::new_without_connection_pooling(),
         )
         .await
@@ -206,9 +204,8 @@ impl RemoteConfigFetcher {
                 language: options.language,
                 tracer_version: options.tracer_version,
                 endpoint,
-                agentless: None,
+                agentless: Some(agentless),
             },
-            agentless,
         };
 
         Ok(RemoteConfigFetcher {
