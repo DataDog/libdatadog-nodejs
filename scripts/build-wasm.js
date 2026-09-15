@@ -90,10 +90,9 @@ function buildWasm (cratePath, outputDirectory, options = {}) {
   childProcess.execFileSync('wasm-pack', args, {
     env: {
       ...env,
-      // wasm-pack 0.14's profiling mode uses Cargo's release profile without
-      // enabling debug info. Generate and retain the names needed for size
-      // attribution.
-      ...(profiling && {
+      // Keep optimized release and profiling builds on one Cargo artifact.
+      // wasm-opt removes debug data from release output on supported platforms.
+      ...((profiling || !skipOptimization) && {
         CARGO_PROFILE_RELEASE_DEBUG: 'true',
         CARGO_PROFILE_RELEASE_STRIP: 'false',
       }),
