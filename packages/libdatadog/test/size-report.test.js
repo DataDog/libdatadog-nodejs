@@ -145,13 +145,26 @@ test('compares before and after artifact sizes through the CLI', (t) => {
 
   assert.equal(result.status, 0, result.stderr)
   const report = fs.readFileSync(reportPath, 'utf8')
+  assert.equal(report.match(/^## WASM size comparison$/gm)?.length, 1)
   assert.match(report, /Compared `1111111` \(base\) with `2222222` \(PR merge\)\./)
-  assert.match(report, /\| \*\*Final inlined JavaScript\*\* .* \*\*\+20 \(\+10\.00%\)\*\* \| \*\*regression\*\* \|/)
-  assert.match(report, /\| \*\*Final inlined JavaScript\*\* .* \*\*-20 \(-8\.33%\)\*\* \| \*\*improvement\*\* \|/)
-  assert.match(report, /\| new-crate .* \| regression \(added\) \|/)
-  assert.match(report, /\| old-crate .* \| improvement \(removed\) \|/)
+  assert.match(report, /\| libdatadog \| 200 \(0\.2 KiB\) \| 220 \(0\.2 KiB\) \| \+20 \(\+10\.00%\) \|/)
+  assert.match(report, /\| remote config \| 240 \(0\.2 KiB\) \| 220 \(0\.2 KiB\) \| -20 \(-8\.33%\) \|/)
+  assert.equal(report.match(/<details>/g)?.length, 2)
+  assert.match(report, /<summary>libdatadog: \d+ changed, \d+ unchanged<\/summary>/)
+  assert.match(report, /<summary>remote config: \d+ changed, \d+ unchanged<\/summary>/)
+  assert.match(report, /\| \*\*Final inlined JavaScript\*\* .* \*\*\+20 \(\+10\.00%\)\*\* \|/)
+  assert.match(report, /\| \*\*Final inlined JavaScript\*\* .* \*\*-20 \(-8\.33%\)\*\* \|/)
+  assert.match(report, /\| new-crate .* \+2,302 \(new\) \|/)
+  assert.match(report, /\| old-crate .* -2,202 \(removed\) \|/)
   assert.match(report, /\| other crates \(<2 KiB in both builds\) /)
   assert.doesNotMatch(report, /tiny-crate/)
+  assert.doesNotMatch(report, /\| Result \|/)
+
+  const libdatadogBreakdown = report.slice(
+    report.indexOf('<summary>libdatadog:'),
+    report.indexOf('<summary>remote config:'),
+  )
+  assert(libdatadogBreakdown.indexOf('Final inlined JavaScript') < libdatadogBreakdown.indexOf('Raw WASM'))
 })
 
 test('rejects forbidden code linked into WASM', () => {

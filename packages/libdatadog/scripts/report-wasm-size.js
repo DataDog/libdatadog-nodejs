@@ -436,6 +436,7 @@ function formatChange (beforeBytes, afterBytes) {
   const change = afterBytes - beforeBytes
   if (change === 0) return '0 (0.00%)'
   if (beforeBytes === 0) return `+${formatBytes(change)} (new)`
+  if (afterBytes === 0) return `-${formatBytes(-change)} (removed)`
 
   const sign = change > 0 ? '+' : '-'
   const percentage = Math.abs(change / beforeBytes * 100).toFixed(2)
@@ -443,15 +444,19 @@ function formatChange (beforeBytes, afterBytes) {
 }
 
 /**
- * @param {number} beforeBytes
- * @param {number} afterBytes
- * @returns {string}
+ * @param {Array<{ afterBytes: number, beforeBytes: number, name: string }>} entries
+ * @returns {Array<{ afterBytes: number, beforeBytes: number, name: string }>}
  */
-function formatResult (beforeBytes, afterBytes) {
-  if (afterBytes === beforeBytes) return 'unchanged'
-  if (beforeBytes === 0) return 'regression (added)'
-  if (afterBytes === 0) return 'improvement (removed)'
-  return afterBytes > beforeBytes ? 'regression' : 'improvement'
+function orderChangedFirst (entries) {
+  const changed = []
+  const unchanged = []
+
+  for (const entry of entries) {
+    if (entry.afterBytes === entry.beforeBytes) unchanged.push(entry)
+    else changed.push(entry)
+  }
+
+  return [...changed, ...unchanged]
 }
 
 /**
@@ -462,8 +467,8 @@ function formatResult (beforeBytes, afterBytes) {
  */
 function appendComparisonTable (lines, firstColumn, entries, emphasizedName) {
   lines.push(
-    `| ${firstColumn} | Before | After | Change | Result |`,
-    '| --- | ---: | ---: | ---: | --- |',
+    `| ${firstColumn} | Before | After | Change |`,
+    '| --- | ---: | ---: | ---: |',
   )
 
   for (const { afterBytes, beforeBytes, name } of entries) {
@@ -472,7 +477,6 @@ function appendComparisonTable (lines, firstColumn, entries, emphasizedName) {
       formatMeasurement(beforeBytes),
       formatMeasurement(afterBytes),
       formatChange(beforeBytes, afterBytes),
-      formatResult(beforeBytes, afterBytes),
     ]
     if (name === emphasizedName) {
       lines.push(`| ${values.map(value => `**${value}**`).join(' | ')} |`)
@@ -514,7 +518,7 @@ function alignCrates (beforeCrates, afterCrates) {
  * @param {string} beforeRoot
  * @param {string} afterRoot
  * @param {{ comparisonGluePath: string, name: string, profilePath: string }} artifact
- * @returns {string}
+ * @returns {{ afterBytes: number, artifactName: string, beforeBytes: number, report: string }}
  */
 function createComparisonReport (beforeRoot, afterRoot, artifact) {
   const before = readArtifactSizes(
@@ -527,28 +531,69 @@ function createComparisonReport (beforeRoot, afterRoot, artifact) {
     path.join(afterRoot, artifact.profilePath),
     artifact.name,
   )
-  const lines = [`## ${artifact.name} WASM size comparison`, '']
+  const layers = orderChangedFirst(alignEntries(before.layers, after.layers))
+  const sections = orderChangedFirst(alignEntries(before.sections, after.sections))
+  const crates = orderChangedFirst(alignCrates(before.crateSizes, after.crateSizes))
+  const entries = [...layers, ...sections, ...crates]
+  const changedCount = entries.filter(entry => entry.afterBytes !== entry.beforeBytes).length
+  const finalArtifact = layers.find(entry => entry.name === 'Final inlined JavaScript')
+  const lines = [
+    '<details>',
+    `<summary>${artifact.name}: ${changedCount} changed, ${entries.length - changedCount} unchanged</summary>`,
+    '',
+    '### Inline artifact layers',
+    '',
+  ]
+  appendComparisonTable(
+    lines,
+    'Inline artifact layer',
+    layers,
+    'Final inlined JavaScript',
+  )
+  lines.push('', '### Raw WebAssembly sections', '')
+  appendComparisonTable(lines, 'Section', sections)
+  lines.push('', '### Code by Rust crate', '')
+  appendComparisonTable(lines, 'Crate/function owner', crates)
+  lines.push('', '</details>', '')
+  return {
+    afterBytes: finalArtifact.afterBytes,
+    artifactName: artifact.name,
+    beforeBytes: finalArtifact.beforeBytes,
+    report: lines.join('\n'),
+  }
+}
+
+/**
+ * @param {Array<{ afterBytes: number, artifactName: string, beforeBytes: number }>} comparisons
+ * @returns {string}
+ */
+function createComparisonSummary (comparisons) {
+  const lines = [
+    '## WASM size comparison',
+    '',
+  ]
   const beforeRef = process.env.WASM_SIZE_BEFORE_REF
   const afterRef = process.env.WASM_SIZE_AFTER_REF
 
   if (beforeRef && afterRef) {
     lines.push(`Compared \`${beforeRef.slice(0, 7)}\` (base) with \`${afterRef.slice(0, 7)}\` (PR merge).`, '')
   }
-  lines.push('Results classify each row by byte size. The final artifact row shows the overall effect.', '')
-  appendComparisonTable(
-    lines,
-    'Inline artifact layer',
-    alignEntries(before.layers, after.layers),
-    'Final inlined JavaScript',
+  lines.push(
+    '| Artifact | Before | After | Change |',
+    '| --- | ---: | ---: | ---: |',
   )
-  lines.push('', '### Raw WebAssembly sections', '')
-  appendComparisonTable(lines, 'Section', alignEntries(before.sections, after.sections))
-  lines.push('', '### Code by Rust crate', '')
-  appendComparisonTable(lines, 'Crate/function owner', alignCrates(before.crateSizes, after.crateSizes))
+  for (const { afterBytes, artifactName, beforeBytes } of comparisons) {
+    lines.push(
+      `| ${artifactName} | ${formatMeasurement(beforeBytes)} | ${formatMeasurement(afterBytes)} | `
+      + `${formatChange(beforeBytes, afterBytes)} |`,
+    )
+  }
   lines.push(
     '',
-    'Crate ownership comes from separate symbol-preserving builds with the same size settings.',
-    'Debug-name bytes are excluded; generic functions are assigned to their symbol owner.',
+    'Negative changes reduce size.',
+    'Crate sizes come from symbol-preserving builds with debug names excluded '
+    + 'and generic functions assigned to their symbol owner.',
+    '',
   )
   return lines.join('\n')
 }
@@ -607,7 +652,8 @@ function main () {
     if (args.length !== 3) throw new Error('expected --compare <before-root> <after-root>')
     const beforeRoot = path.resolve(args[1])
     const afterRoot = path.resolve(args[2])
-    writeReports(artifacts.map(artifact => createComparisonReport(beforeRoot, afterRoot, artifact)))
+    const comparisons = artifacts.map(artifact => createComparisonReport(beforeRoot, afterRoot, artifact))
+    writeReports([createComparisonSummary(comparisons), ...comparisons.map(comparison => comparison.report)])
     return
   }
 
