@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use libdd_capabilities::{HttpClientCapability, SleepCapability};
+use libdd_trace_utils::span::span_pool::PooledChunks;
 use thiserror::Error;
 
 pub use libdd_data_pipeline_core::{
@@ -31,7 +32,7 @@ where
         .map_err(SendAgentlessV04Error::Deserialization)?;
     libdd_data_pipeline_core::send_agentless_traces(
         capabilities,
-        traces,
+        PooledChunks::unpooled(traces),
         metadata,
         config,
         client_side_stats,
