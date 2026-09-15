@@ -40,14 +40,18 @@ const forbiddenWasmCode = [
 
 const artifacts = [
   {
-    name: 'libdatadog',
+    comparisonGluePath: 'packages/libdatadog/wasm/dist/libdatadog_wasm.js',
     gluePath: path.join(__dirname, '..', 'wasm', 'dist', 'libdatadog_wasm.js'),
+    name: 'libdatadog',
     maximumInlineBytes: 210 * 1024,
+    profilePath: 'target/size/libdatadog-wasm/libdatadog_wasm_bg.wasm',
   },
   {
-    name: 'remote config',
+    comparisonGluePath: 'packages/libdatadog/wasm/dist/remote-config/remote_config.js',
     gluePath: path.join(__dirname, '..', 'wasm', 'dist', 'remote-config', 'remote_config.js'),
+    name: 'remote config',
     maximumInlineBytes: 330 * 1024,
+    profilePath: 'target/size/remote-config/remote_config_bg.wasm',
   },
 ]
 
@@ -308,6 +312,12 @@ function formatKibibytes (bytes) {
   return (bytes / 1024).toFixed(1)
 }
 
+/**
+ * @param {string} name
+ * @param {number} bytes
+ * @param {boolean} [emphasis]
+ * @returns {string}
+ */
 function layerRow (name, bytes, emphasis = false) {
   const formattedBytes = formatBytes(bytes)
   const kibibytes = formatKibibytes(bytes)
@@ -315,9 +325,12 @@ function layerRow (name, bytes, emphasis = false) {
   return `| ${name} | ${formattedBytes} | ${kibibytes} |`
 }
 
-function appendCrateReport (lines, profilePath) {
-  const profileWasm = fs.readFileSync(profilePath)
-  const { entries, totalBytes } = readCrateSizes(profileWasm)
+/**
+ * @param {string[]} lines
+ * @param {{ entries: Array<{ bytes: number, name: string }>, totalBytes: number }} crateSizes
+ */
+function appendCrateReport (lines, crateSizes) {
+  const { entries, totalBytes } = crateSizes
   const visibleEntries = entries.filter(entry => entry.bytes >= 2048)
   const otherBytes = entries
     .filter(entry => entry.bytes < 2048)
@@ -352,9 +365,16 @@ function appendCrateReport (lines, profilePath) {
 /**
  * @param {string} gluePath
  * @param {string | undefined} profilePath
- * @param {string} [artifactName]
+ * @param {string} artifactName
+ * @returns {{
+ *   artifactName: string,
+ *   crateSizes: { entries: Array<{ bytes: number, name: string }>, totalBytes: number } | undefined,
+ *   gluePath: string,
+ *   layers: Array<{ bytes: number, name: string }>,
+ *   sections: Array<{ bytes: number, name: string }>
+ * }}
  */
-function createReport (gluePath, profilePath, artifactName = 'libdatadog') {
+function readArtifactSizes (gluePath, profilePath, artifactName) {
   const glue = fs.readFileSync(gluePath, 'utf8')
   const match = glue.match(/Buffer\.from\('([A-Za-z0-9+/=]+)', 'base64'\)/)
   if (!match) throw new Error('could not find the inline base64 WASM payload')
@@ -362,36 +382,202 @@ function createReport (gluePath, profilePath, artifactName = 'libdatadog') {
   const base64Bytes = Buffer.byteLength(match[1])
   const compressed = Buffer.from(match[1], 'base64')
   const wasm = brotliDecompressSync(compressed)
-  const glueBytes = Buffer.byteLength(glue) - base64Bytes
-  const inlineBytes = Buffer.byteLength(glue)
-  const base64Overhead = base64Bytes - compressed.length
-  const sections = readSections(wasm)
+
+  return {
+    artifactName,
+    crateSizes: profilePath ? readCrateSizes(fs.readFileSync(profilePath)) : undefined,
+    gluePath,
+    layers: [
+      { bytes: wasm.length, name: 'Raw WASM (before Brotli)' },
+      { bytes: compressed.length, name: 'Brotli-compressed WASM' },
+      { bytes: base64Bytes - compressed.length, name: 'Base64 encoding overhead' },
+      { bytes: Buffer.byteLength(glue) - base64Bytes, name: 'JavaScript glue/loader' },
+      { bytes: Buffer.byteLength(glue), name: 'Final inlined JavaScript' },
+    ],
+    sections: readSections(wasm),
+  }
+}
+
+/**
+ * @param {Array<{ bytes: number, name: string }>} beforeEntries
+ * @param {Array<{ bytes: number, name: string }>} afterEntries
+ * @returns {Array<{ afterBytes: number, beforeBytes: number, name: string }>}
+ */
+function alignEntries (beforeEntries, afterEntries) {
+  const beforeByName = new Map(beforeEntries.map(entry => [entry.name, entry.bytes]))
+  const afterByName = new Map(afterEntries.map(entry => [entry.name, entry.bytes]))
+  const names = afterEntries.map(entry => entry.name)
+
+  for (const entry of beforeEntries) {
+    if (!afterByName.has(entry.name)) names.push(entry.name)
+  }
+
+  return names.map(name => ({
+    afterBytes: afterByName.get(name) ?? 0,
+    beforeBytes: beforeByName.get(name) ?? 0,
+    name,
+  }))
+}
+
+/**
+ * @param {number} bytes
+ * @returns {string}
+ */
+function formatMeasurement (bytes) {
+  return `${formatBytes(bytes)} (${formatKibibytes(bytes)} KiB)`
+}
+
+/**
+ * @param {number} beforeBytes
+ * @param {number} afterBytes
+ * @returns {string}
+ */
+function formatChange (beforeBytes, afterBytes) {
+  const change = afterBytes - beforeBytes
+  if (change === 0) return '0 (0.00%)'
+  if (beforeBytes === 0) return `+${formatBytes(change)} (new)`
+
+  const sign = change > 0 ? '+' : '-'
+  const percentage = Math.abs(change / beforeBytes * 100).toFixed(2)
+  return `${sign}${formatBytes(Math.abs(change))} (${sign}${percentage}%)`
+}
+
+/**
+ * @param {number} beforeBytes
+ * @param {number} afterBytes
+ * @returns {string}
+ */
+function formatResult (beforeBytes, afterBytes) {
+  if (afterBytes === beforeBytes) return 'unchanged'
+  if (beforeBytes === 0) return 'regression (added)'
+  if (afterBytes === 0) return 'improvement (removed)'
+  return afterBytes > beforeBytes ? 'regression' : 'improvement'
+}
+
+/**
+ * @param {string[]} lines
+ * @param {string} firstColumn
+ * @param {Array<{ afterBytes: number, beforeBytes: number, name: string }>} entries
+ * @param {string} [emphasizedName]
+ */
+function appendComparisonTable (lines, firstColumn, entries, emphasizedName) {
+  lines.push(
+    `| ${firstColumn} | Before | After | Change | Result |`,
+    '| --- | ---: | ---: | ---: | --- |',
+  )
+
+  for (const { afterBytes, beforeBytes, name } of entries) {
+    const values = [
+      name,
+      formatMeasurement(beforeBytes),
+      formatMeasurement(afterBytes),
+      formatChange(beforeBytes, afterBytes),
+      formatResult(beforeBytes, afterBytes),
+    ]
+    if (name === emphasizedName) {
+      lines.push(`| ${values.map(value => `**${value}**`).join(' | ')} |`)
+    } else {
+      lines.push(`| ${values.join(' | ')} |`)
+    }
+  }
+}
+
+/**
+ * @param {{ entries: Array<{ bytes: number, name: string }> }} beforeCrates
+ * @param {{ entries: Array<{ bytes: number, name: string }> }} afterCrates
+ * @returns {Array<{ afterBytes: number, beforeBytes: number, name: string }>}
+ */
+function alignCrates (beforeCrates, afterCrates) {
+  const entries = []
+
+  for (const entry of alignEntries(beforeCrates.entries, afterCrates.entries)) {
+    const bytes = Math.max(entry.beforeBytes, entry.afterBytes)
+    const index = entries.findIndex(candidate => Math.max(candidate.beforeBytes, candidate.afterBytes) < bytes)
+    if (index === -1) entries.push(entry)
+    else entries.splice(index, 0, entry)
+  }
+
+  const visibleEntries = entries.filter(entry => Math.max(entry.beforeBytes, entry.afterBytes) >= 2048)
+  const hiddenEntries = entries.filter(entry => Math.max(entry.beforeBytes, entry.afterBytes) < 2048)
+  const other = { afterBytes: 0, beforeBytes: 0, name: 'other crates (<2 KiB in both builds)' }
+
+  for (const entry of hiddenEntries) {
+    other.afterBytes += entry.afterBytes
+    other.beforeBytes += entry.beforeBytes
+  }
+
+  if (other.afterBytes > 0 || other.beforeBytes > 0) visibleEntries.push(other)
+  return visibleEntries
+}
+
+/**
+ * @param {string} beforeRoot
+ * @param {string} afterRoot
+ * @param {{ comparisonGluePath: string, name: string, profilePath: string }} artifact
+ * @returns {string}
+ */
+function createComparisonReport (beforeRoot, afterRoot, artifact) {
+  const before = readArtifactSizes(
+    path.join(beforeRoot, artifact.comparisonGluePath),
+    path.join(beforeRoot, artifact.profilePath),
+    artifact.name,
+  )
+  const after = readArtifactSizes(
+    path.join(afterRoot, artifact.comparisonGluePath),
+    path.join(afterRoot, artifact.profilePath),
+    artifact.name,
+  )
+  const lines = [`## ${artifact.name} WASM size comparison`, '']
+  const beforeRef = process.env.WASM_SIZE_BEFORE_REF
+  const afterRef = process.env.WASM_SIZE_AFTER_REF
+
+  if (beforeRef && afterRef) {
+    lines.push(`Compared \`${beforeRef.slice(0, 7)}\` (base) with \`${afterRef.slice(0, 7)}\` (PR merge).`, '')
+  }
+  lines.push('Results classify each row by byte size. The final artifact row shows the overall effect.', '')
+  appendComparisonTable(
+    lines,
+    'Inline artifact layer',
+    alignEntries(before.layers, after.layers),
+    'Final inlined JavaScript',
+  )
+  lines.push('', '### Raw WebAssembly sections', '')
+  appendComparisonTable(lines, 'Section', alignEntries(before.sections, after.sections))
+  lines.push('', '### Code by Rust crate', '')
+  appendComparisonTable(lines, 'Crate/function owner', alignCrates(before.crateSizes, after.crateSizes))
+  lines.push(
+    '',
+    'Crate ownership comes from separate symbol-preserving builds with the same size settings.',
+    'Debug-name bytes are excluded; generic functions are assigned to their symbol owner.',
+  )
+  return lines.join('\n')
+}
+
+/**
+ * @param {string} gluePath
+ * @param {string | undefined} profilePath
+ * @param {string} [artifactName]
+ */
+function createReport (gluePath, profilePath, artifactName = 'libdatadog') {
+  const { crateSizes, layers, sections } = readArtifactSizes(gluePath, profilePath, artifactName)
   const lines = [
     `## ${artifactName} WASM size`,
     '',
     '| Inline artifact layer | Bytes | KiB |',
     '| --- | ---: | ---: |',
-    layerRow('Raw WASM (before Brotli)', wasm.length),
-    layerRow('Brotli-compressed WASM', compressed.length),
-    layerRow('Base64 encoding overhead', base64Overhead),
-    layerRow('JavaScript glue/loader', glueBytes),
-    layerRow('Final inlined JavaScript', inlineBytes, true),
-    '',
-    '### Raw WebAssembly sections',
-    '',
-    '| Section | Bytes | KiB | Share |',
-    '| --- | ---: | ---: | ---: |',
   ]
+  for (const layer of layers) lines.push(layerRow(layer.name, layer.bytes, layer.name === 'Final inlined JavaScript'))
+  lines.push('', '### Raw WebAssembly sections', '', '| Section | Bytes | KiB | Share |', '| --- | ---: | ---: | ---: |')
 
   for (const section of sections) {
-    const share = `${(section.bytes / wasm.length * 100).toFixed(1)}%`
+    const share = `${(section.bytes / layers[0].bytes * 100).toFixed(1)}%`
     lines.push(
       `| ${section.name} | ${formatBytes(section.bytes)} | `
       + `${formatKibibytes(section.bytes)} | ${share} |`,
     )
   }
 
-  if (profilePath) appendCrateReport(lines, profilePath)
+  if (crateSizes) appendCrateReport(lines, crateSizes)
 
   lines.push('', `Generated from \`${path.relative(process.cwd(), gluePath)}\`.`)
   return lines.join('\n')
@@ -407,8 +593,25 @@ function getSizeBudgetFailure (artifactName, inlineBytes, maximumInlineBytes) {
   return `${artifactName}: ${formatBytes(inlineBytes)} bytes exceeds ${formatBytes(maximumInlineBytes)} bytes`
 }
 
-if (require.main === module) {
-  const profilePaths = process.argv.slice(2)
+/** @param {string[]} reports */
+function writeReports (reports) {
+  const report = reports.join('\n')
+  console.log(report)
+  if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${report}\n`)
+  if (process.env.WASM_SIZE_REPORT) fs.writeFileSync(process.env.WASM_SIZE_REPORT, `${report}\n`)
+}
+
+function main () {
+  const args = process.argv.slice(2)
+  if (args[0] === '--compare') {
+    if (args.length !== 3) throw new Error('expected --compare <before-root> <after-root>')
+    const beforeRoot = path.resolve(args[1])
+    const afterRoot = path.resolve(args[2])
+    writeReports(artifacts.map(artifact => createComparisonReport(beforeRoot, afterRoot, artifact)))
+    return
+  }
+
+  const profilePaths = args
   if (profilePaths.length > 0 && profilePaths.length !== artifacts.length) {
     throw new Error(`expected ${artifacts.length} symbolized WASM paths, received ${profilePaths.length}`)
   }
@@ -420,11 +623,6 @@ if (require.main === module) {
     const profilePath = profilePaths[index] && path.resolve(profilePaths[index])
     const report = createReport(gluePath, profilePath, name)
     reports.push(report)
-    console.log(report)
-
-    if (process.env.GITHUB_STEP_SUMMARY) {
-      fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${report}\n`)
-    }
 
     const inlineBytes = fs.statSync(gluePath).size
     const budgetFailure = getSizeBudgetFailure(name, inlineBytes, maximumInlineBytes)
@@ -436,9 +634,7 @@ if (require.main === module) {
       failures.push(`${failure.dependency} via ${failure.name}: ${formatBytes(failure.bytes)} bytes`)
     }
   }
-  if (process.env.WASM_SIZE_REPORT) {
-    fs.writeFileSync(process.env.WASM_SIZE_REPORT, `${reports.join('\n')}\n`)
-  }
+  writeReports(reports)
 
   if (failures.length > 0) {
     console.error('WASM size validation failed:')
@@ -446,6 +642,8 @@ if (require.main === module) {
     process.exitCode = 1
   }
 }
+
+if (require.main === module) main()
 
 module.exports = {
   createReport,
