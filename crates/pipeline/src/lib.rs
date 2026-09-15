@@ -19,6 +19,7 @@ mod trace_data;
 use trace_data::*;
 
 use libdd_trace_utils::change_buffer::{ChangeBuffer, ChangeBufferState};
+use libdd_trace_utils::span::span_pool::PooledChunks;
 use libdd_trace_utils::span::v04::{AttributeAnyValue, AttributeArrayValue, SpanEvent};
 use span_string::SpanString;
 use std::collections::HashMap;
@@ -336,9 +337,15 @@ impl WasmSpanState {
     /// endpoint set, before the first send.
     #[wasm_bindgen(js_name = "setOtlpProtocol")]
     pub fn set_otlp_protocol(&self, protocol: String) -> Result<(), JsValue> {
-        let parsed = protocol
-            .parse::<OtlpProtocol>()
-            .map_err(|e| JsValue::from_str(&format!("setOtlpProtocol: {e}")))?;
+        let parsed = match protocol.as_str() {
+            "http/json" => OtlpProtocol::HttpJson,
+            "http/protobuf" => OtlpProtocol::HttpProtobuf,
+            _ => {
+                return Err(JsValue::from_str(&format!(
+                    "setOtlpProtocol: {protocol} is not supported"
+                )))
+            }
+        };
         self.otlp_protocol.set(Some(parsed));
         Ok(())
     }
@@ -551,7 +558,9 @@ impl WasmSpanState {
             // Unreachable: the block above either set `Some` or returned early.
             None => return Err(build_failure_error("native exporter unavailable")),
         };
-        let resp = exporter.send_trace_chunks_async(chunks).await;
+        let resp = exporter
+            .send_trace_chunks_async(PooledChunks::unpooled(chunks))
+            .await;
         let response_str = resp.map(|resp| match resp {
             AgentResponse::Unchanged => "unchanged".to_string(),
             AgentResponse::Changed { body } => body,
