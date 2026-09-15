@@ -14,4 +14,4 @@ js-sys = "0.3"
 http = "1"
 bytes = "1.4"
 anyhow = "1"
-libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", tag = "v43.0.0" }
+libdd-capabilities = { git = "https://github.com/DataDog/libdatadog.git", rev = "5d495df91d7a3bff7f4807a36405a8efcb7c735c" }

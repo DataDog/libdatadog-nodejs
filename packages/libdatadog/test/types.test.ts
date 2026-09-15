@@ -59,6 +59,7 @@ const remoteConfigFetcher = new RemoteConfigFetcher({
 })
 
 remoteConfigFetcher.setExtraServices([])
+remoteConfigFetcher.setIdentity('client-id-2', 'runtime-id-2', [])
 remoteConfigFetcher.setProductCapabilities([], [])
 setStorage(runInStorage)
 

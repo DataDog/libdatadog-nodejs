@@ -123,9 +123,16 @@ fn to_change_record(change: Change<Arc<RawFile<Vec<u8>>>, Vec<u8>>) -> ChangeRec
 /// take it -- they would find it already borrowed and have nowhere to put the update.
 #[derive(Default)]
 struct PendingUpdates {
+    identity: Option<ClientIdentity>,
     product_capabilities: Option<(Vec<RemoteConfigProduct>, Vec<RemoteConfigCapabilities>)>,
     extra_services: Option<Vec<String>>,
     config_states: Vec<(RemoteConfigPath, ConfigApplyState)>,
+}
+
+struct ClientIdentity {
+    client_id: String,
+    runtime_id: String,
+    tags: Vec<String>,
 }
 
 /// Everything needed to build the fetcher, kept around because building it is deferred.
@@ -251,6 +258,9 @@ impl RemoteConfigFetcher {
         };
 
         let updates = std::mem::take(&mut *pending.borrow_mut());
+        if let Some(identity) = updates.identity {
+            fetcher.set_identity(identity.client_id, identity.runtime_id, identity.tags);
+        }
         if let Some((products, capabilities)) = updates.product_capabilities {
             fetcher.set_product_capabilities(products, capabilities);
         }
@@ -300,6 +310,16 @@ impl RemoteConfigFetcher {
     #[wasm_bindgen(js_name = "setExtraServices")]
     pub fn set_extra_services(&self, services: Vec<String>) {
         self.pending.borrow_mut().extra_services = Some(services);
+    }
+
+    /// Replaces the client identity reported on the next poll.
+    #[wasm_bindgen(js_name = "setIdentity")]
+    pub fn set_identity(&self, client_id: String, runtime_id: String, tags: Vec<String>) {
+        self.pending.borrow_mut().identity = Some(ClientIdentity {
+            client_id,
+            runtime_id,
+            tags,
+        });
     }
 
     /// Replaces the set of subscribed products and capabilities.

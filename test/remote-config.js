@@ -3,6 +3,7 @@
 const assert = require('node:assert')
 const { createHash } = require('node:crypto')
 const { execFileSync } = require('node:child_process')
+const { once } = require('node:events')
 const { createServer } = require('node:http')
 const { test } = require('node:test')
 
@@ -75,10 +76,11 @@ async function withAgent (run) {
     const chunks = []
     req
       .on('data', chunk => chunks.push(chunk))
-      .on('end', () => {
+      .on('end', async () => {
         requests.push(JSON.parse(Buffer.concat(chunks).toString('utf8')))
+        const response = await (responses.shift() ?? '{}')
         res.writeHead(200, { 'content-type': 'application/json' })
-        res.end(responses.shift() ?? '{}')
+        res.end(Array.isArray(response) ? response[0].data : response)
       })
   })
 
@@ -89,7 +91,7 @@ async function withAgent (run) {
   }))
 
   try {
-    await run({ fetcher, requests, responses })
+    await run({ fetcher, requests, responses, server })
   } finally {
     await new Promise(resolve => server.close(resolve))
   }
@@ -113,6 +115,50 @@ test('reports the client identity, products and capabilities', async () => {
     assert.strictEqual(client.client_tracer.service, 'my_svc')
     assert.deepStrictEqual(client.client_tracer.extra_services, ['other_svc'])
     assert.deepStrictEqual(client.client_tracer.process_tags, ['entrypoint.type:script'])
+  })
+})
+
+test('updates identity without resetting remote config state', async () => {
+  await withAgent(async ({ fetcher, requests, responses, server }) => {
+    fetcher.setProductCapabilities(['ASM_FEATURES'], ['ASM_ACTIVATION'])
+    const responseEvents = new EventTarget()
+    responses.push(once(responseEvents, 'response'))
+
+    const requestStarted = once(server, 'request')
+    const firstPoll = fetcher.fetchChanges()
+    await requestStarted
+    try {
+      fetcher.setIdentity(
+        'intermediate-client-id',
+        'intermediate-runtime-id',
+        ['runtime-id:intermediate-runtime-id'],
+      )
+      fetcher.setIdentity(
+        'client-id-2',
+        'runtime-id-2',
+        ['runtime-id:runtime-id-2', '_dd.rc.client_id:client-id-2'],
+      )
+    } finally {
+      responseEvents.dispatchEvent(new MessageEvent('response', {
+        data: agentResponse([{ path: CONFIG_PATH, file: { asm: { enabled: true } }, version: 1 }], 1),
+      }))
+    }
+    const [change] = await firstPoll
+    fetcher.setConfigState(change.path, APPLY_STATE_ACKNOWLEDGED, '')
+
+    responses.push(agentResponse([{ path: CONFIG_PATH, file: { asm: { enabled: true } }, version: 1 }], 2))
+    assert.deepStrictEqual(await fetcher.fetchChanges(), [])
+
+    assert.strictEqual(requests[0].client.id, 'client-id-1')
+    const { client } = requests[1]
+    assert.strictEqual(client.id, 'client-id-2')
+    assert.strictEqual(client.client_tracer.runtime_id, 'runtime-id-2')
+    assert.deepStrictEqual(client.client_tracer.tags, [
+      'runtime-id:runtime-id-2',
+      '_dd.rc.client_id:client-id-2',
+    ])
+    assert.strictEqual(Buffer.from(client.state.backend_client_state).toString(), 'backend-state-1')
+    assert.strictEqual(client.state.config_states[0].apply_state, APPLY_STATE_ACKNOWLEDGED)
   })
 })
 
