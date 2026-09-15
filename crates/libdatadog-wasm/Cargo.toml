@@ -15,9 +15,8 @@ anyhow = "1"
 bytes = "1"
 futures = "0.3"
 http = "1"
-# The agentless v0.4 path does not compile or evaluate user-provided patterns.
-# Use the smaller regex engine so the full engine and its Unicode tables are
-# removed by the WASM linker.
+# Replacement rules accept caller-provided patterns. Keep the smaller engine so
+# the full engine and its Unicode tables are removed by the WASM linker.
 libdd-ddsketch = "1.1.1"
 # Keep this aligned with the pure-Rust WASM encoder used by libdatadog.
 zrip = { version = "=0.6.0", default-features = false, features = ["alloc"] }

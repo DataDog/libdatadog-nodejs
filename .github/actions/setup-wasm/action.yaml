@@ -42,3 +42,19 @@ runs:
         echo "$install_directory" >> "$GITHUB_PATH"
         "$install_directory/wasm-pack" --version
       shell: bash
+    - name: Install Binaryen
+      env:
+        BINARYEN_SHA256: 195ddc94f9bc89f45abdabb0b9eea86023d727ba90eac8b35b80f2544fc30572
+        BINARYEN_VERSION: 132
+      run: |
+        archive="binaryen-version_${BINARYEN_VERSION}-x86_64-linux.tar.gz"
+        install_directory="$RUNNER_TEMP/binaryen"
+        curl --fail --location --silent --show-error \
+          --output "$RUNNER_TEMP/$archive" \
+          "https://github.com/WebAssembly/binaryen/releases/download/version_${BINARYEN_VERSION}/$archive"
+        echo "$BINARYEN_SHA256  $RUNNER_TEMP/$archive" | sha256sum --check
+        mkdir --parents "$install_directory"
+        tar --extract --gzip --file "$RUNNER_TEMP/$archive" --directory "$install_directory" --strip-components=1
+        echo "$install_directory/bin" >> "$GITHUB_PATH"
+        "$install_directory/bin/wasm-opt" --version
+      shell: bash
