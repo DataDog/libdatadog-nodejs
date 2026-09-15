@@ -25,9 +25,16 @@ console_error_panic_hook = "0.1"
 getrandom = { version = "0.2", features = ["js"] }
 uuid = { version = "1", features = ["js"] }
 
-# The pipeline wasm uses post-MVP features (bulk-memory for change-buffer
-# copies, sign-extension, etc.) that the wasm-opt bundled with wasm-pack does
-# not enable by default. Pass --all-features so wasm-opt validation passes
-# (the smaller wasm crates don't hit this, so it's set per-crate here).
+# Do not use --all-features: Binaryen may then emit WebAssembly GC instructions,
+# which are not supported by Node.js 18. Keep this list to features used by the
+# Rust output and supported by every Node.js version that we test.
 [package.metadata.wasm-pack.profile.release]
-wasm-opt = ['-O', '--all-features']
+wasm-opt = [
+  "-O",
+  "--enable-mutable-globals",
+  "--enable-nontrapping-float-to-int",
+  "--enable-bulk-memory",
+  "--enable-sign-ext",
+  "--enable-reference-types",
+  "--enable-multivalue",
+]
