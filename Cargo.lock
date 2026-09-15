@@ -330,7 +330,6 @@ name = "crashtracker"
 version = "0.2.0"
 dependencies = [
  "anyhow",
- "libdd-common 5.2.0",
  "libdd-crashtracker",
  "napi",
  "napi-derive",
