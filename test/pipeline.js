@@ -941,7 +941,7 @@ describe('pipeline', { skip }, () => {
       assert.strictEqual(req.url, '/v0.5/traces')
     })
 
-    it('exports via OTLP HTTP after setOtlpEndpoint(url)', async () => {
+    it('exports via default and explicit OTLP HTTP JSON protocols', async () => {
       // libdatadog maps its internal traces to OTLP and POSTs them to the
       // configured endpoint instead of the Datadog agent. Confirms the OTLP
       // path runs end-to-end over the wasm HTTP transport.
@@ -964,28 +964,32 @@ describe('pipeline', { skip }, () => {
       })
       await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
       const { port } = server.address()
-      const ns = new NativeSpansInterface({
-        agentUrl: `http://127.0.0.1:${port}`,
-        tracerVersion: '7.0.0-pre',
-      })
-      ns.state.setOtlpEndpoint(`http://127.0.0.1:${port}/v1/traces`)
-      const span = ns.createSpan()
-      span.name = 'otlp-span'
-      span.service = 'test-service'
-      span.resource = 'test-resource'
-      span.type = 'web'
-      span.duration = 1_000_000n
       try {
-        await ns.flushSpans(span)
-        const req = seen.find(r => r.method === 'POST')
-        assert.ok(req, 'OTLP endpoint received a POST')
-        assert.strictEqual(req.url, '/v1/traces')
-        // No setOtlpProtocol call — pins the default wire protocol (http/json).
-        assert.match(req.ct || '', /json/)
-        assert.ok(req.len > 0, 'OTLP body is non-empty')
-        const body = JSON.parse(req.body)
-        assert.strictEqual(body.resourceSpans[0].scopeSpans[0].scope.name, 'dd-trace-js')
-        assert.strictEqual(body.resourceSpans[0].scopeSpans[0].scope.version, '7.0.0-pre')
+        for (const { name, protocol } of [
+          { name: 'default' },
+          { name: 'explicit', protocol: 'http/json' },
+        ]) {
+          const ns = new NativeSpansInterface({
+            agentUrl: `http://127.0.0.1:${port}`,
+            tracerVersion: '7.0.0-pre',
+          })
+          ns.state.setOtlpEndpoint(`http://127.0.0.1:${port}/v1/traces/${name}`)
+          if (protocol) ns.state.setOtlpProtocol(protocol)
+          const span = ns.createSpan()
+          span.name = 'otlp-span'
+          span.service = 'test-service'
+          span.resource = 'test-resource'
+          span.type = 'web'
+          span.duration = 1_000_000n
+          await ns.flushSpans(span)
+          const req = seen.find(request => request.url === `/v1/traces/${name}`)
+          assert.ok(req, `${name} OTLP endpoint received a POST`)
+          assert.match(req.ct || '', /json/)
+          assert.ok(req.len > 0, 'OTLP body is non-empty')
+          const body = JSON.parse(req.body)
+          assert.strictEqual(body.resourceSpans[0].scopeSpans[0].scope.name, 'dd-trace-js')
+          assert.strictEqual(body.resourceSpans[0].scopeSpans[0].scope.version, '7.0.0-pre')
+        }
       } finally {
         server.closeAllConnections?.()
         server.close()

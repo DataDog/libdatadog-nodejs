@@ -24,17 +24,17 @@ zrip = { version = "=0.6.0", default-features = false, features = ["alloc"] }
 
 [dependencies.libdd-capabilities]
 git = "https://github.com/DataDog/libdatadog.git"
-tag = "v43.0.0"
+tag = "v44.0.0"
 default-features = false
 
 [dependencies.libdd-trace-obfuscation]
 git = "https://github.com/DataDog/libdatadog.git"
-tag = "v43.0.0"
+tag = "v44.0.0"
 default-features = false
 
 [dependencies.libdd-common]
 git = "https://github.com/DataDog/libdatadog.git"
-tag = "v43.0.0"
+tag = "v44.0.0"
 default-features = false
 features = ["regex-lite"]
 
