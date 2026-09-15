@@ -14,9 +14,7 @@ path = "src/bin/receiver.rs"
 
 [dependencies]
 anyhow = "1"
-libdd-crashtracker = { git = "https://github.com/DataDog/libdatadog.git", tag = "v43.0.0"  }
-# Pulls in proxy support for crashtracker
-libdd-common = { git = "https://github.com/DataDog/libdatadog.git", tag = "v43.0.0", default-features = false, features = ["hyper-proxy"] }
+libdd-crashtracker = { git = "https://github.com/DataDog/libdatadog.git", tag = "v44.0.0"  }
 napi = { version = "3", features = ["serde-json"] }
 napi-derive = { version = "3", default-features = false }
 rustls = { version = "*", default-features = false, features = ["aws-lc-rs"] }
