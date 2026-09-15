@@ -20,36 +20,77 @@ jobs:
 
   build-libdatadog:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
+    strategy:
+      fail-fast: false
+      matrix:
+        revision: ${{ fromJSON(github.event_name == 'pull_request' && '["after", "before"]' || '["after"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ matrix.revision == 'before' && github.event.pull_request.base.sha || github.sha }}
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
       - uses: ./.github/actions/setup-wasm
       - name: Validate artifact dependencies
+        if: matrix.revision == 'after'
         run: npm run check:dependencies
       - run: npm ci --prefix packages/libdatadog
       - run: npm run build --prefix packages/libdatadog
       - name: Build symbolized WASM for size attribution
         run: npm run size:profile --prefix packages/libdatadog
       - name: Report and validate WASM binary size
-        env:
-          WASM_SIZE_REPORT: ${{ runner.temp }}/wasm-size-report.md
+        if: matrix.revision == 'after'
         run: >-
           npm run report:wasm-size --prefix packages/libdatadog --
           ../../target/size/libdatadog-wasm/libdatadog_wasm_bg.wasm
           ../../target/size/remote-config/remote_config_bg.wasm
+      - name: Upload WASM size inputs
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: libdatadog-wasm-size-${{ matrix.revision }}
+          path: |
+            packages/libdatadog/wasm/dist/libdatadog_wasm.js
+            packages/libdatadog/wasm/dist/remote-config/remote_config.js
+            target/size/libdatadog-wasm/libdatadog_wasm_bg.wasm
+            target/size/remote-config/remote_config_bg.wasm
+          if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: matrix.revision == 'after'
+        with:
+          name: libdatadog-wasm
+          path: packages/libdatadog/wasm/dist
+
+  report-libdatadog-size:
+    if: always() && github.event_name == 'pull_request'
+    needs: build-libdatadog
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: libdatadog-wasm-size-before
+          path: ${{ runner.temp }}/wasm-size-before
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: libdatadog-wasm-size-after
+          path: ${{ runner.temp }}/wasm-size-after
+      - name: Compare WASM binary sizes
+        env:
+          WASM_SIZE_AFTER_REF: ${{ github.sha }}
+          WASM_SIZE_BEFORE_REF: ${{ github.event.pull_request.base.sha }}
+          WASM_SIZE_REPORT: ${{ runner.temp }}/wasm-size-report.md
+        run: >-
+          node packages/libdatadog/scripts/report-wasm-size.js --compare
+          "${{ runner.temp }}/wasm-size-before"
+          "${{ runner.temp }}/wasm-size-after"
       - name: Post WASM size report
-        if: >-
-          ${{
-            always() &&
-            github.event_name == 'pull_request' &&
-            github.event.pull_request.head.repo.full_name == github.repository
-          }}
+        if: github.event.pull_request.head.repo.full_name == github.repository
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
@@ -93,10 +134,6 @@ jobs:
                 body,
               })
             }
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: libdatadog-wasm
-          path: packages/libdatadog/wasm/dist
 
   test-libdatadog:
     needs: build-libdatadog
