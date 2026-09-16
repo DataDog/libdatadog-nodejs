@@ -19,8 +19,6 @@ http = "1"
 # Use the smaller regex engine so the full engine and its Unicode tables are
 # removed by the WASM linker.
 libdd-ddsketch = "1.1.1"
-# Keep this aligned with the pure-Rust WASM encoder used by libdatadog.
-zrip = { version = "=0.6.0", default-features = false, features = ["alloc"] }
 
 [dependencies.libdd-capabilities]
 git = "https://github.com/DataDog/libdatadog.git"

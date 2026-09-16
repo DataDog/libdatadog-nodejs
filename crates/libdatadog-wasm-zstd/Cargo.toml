@@ -1,0 +1,25 @@
+[package]
+name = "libdatadog-wasm-zstd"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+name = "libdatadog_wasm_zstd"
+
+[dependencies]
+js-sys = "0.3"
+wasm-bindgen = "0.2"
+zrip = { version = "=0.6.0", default-features = false, features = ["alloc"] }
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = [
+  "-Oz",
+  "--enable-mutable-globals",
+  "--enable-nontrapping-float-to-int",
+  "--enable-bulk-memory",
+  "--enable-sign-ext",
+  "--enable-reference-types",
+  "--enable-multivalue",
+  "--converge",
+]
