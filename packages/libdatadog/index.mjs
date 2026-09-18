@@ -4,6 +4,7 @@ export const {
   backend,
   createAgentlessExporter,
   DDSketch,
+  supportsAgentlessStats,
   zstd_compress,
 } = libdatadog
 

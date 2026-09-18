@@ -81,6 +81,26 @@ test('dependency validation allows Tokio only through remote config', () => {
   assert.deepStrictEqual(names, ['tokio'])
 })
 
+test('dependency validation allows Tokio only through trace stats', () => {
+  const dependencies = parseCargoTree([
+    '0libdatadog-wasm v0.1.0',
+    '1libdd-data-pipeline-core v1.0.0',
+    '2libdd-trace-stats v9.0.0',
+    '3tokio v1.53.1',
+    '4tokio-macros v2.7.2',
+    '3tokio-util v0.7.19',
+    '1tokio v1.53.1',
+  ].join('\n'))
+  const tree = { package: 'libdatadog-wasm' }
+  const names = []
+
+  for (const { name } of findForbiddenDependencies(dependencies, tree)) {
+    names.push(name)
+  }
+
+  assert.deepStrictEqual(names, ['tokio'])
+})
+
 test('dependency validation still finds multiple versions in one artifact tree', () => {
   const dependencies = parseCargoTree([
     '0libdatadog v0.1.0',
