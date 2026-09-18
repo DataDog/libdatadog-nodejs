@@ -43,7 +43,7 @@ const artifacts = [
     comparisonGluePath: 'packages/libdatadog/wasm/dist/libdatadog_wasm.js',
     gluePath: path.join(__dirname, '..', 'wasm', 'dist', 'libdatadog_wasm.js'),
     name: 'libdatadog',
-    maximumInlineBytes: 210 * 1024,
+    maximumInlineBytes: 240 * 1024,
     profilePath: 'target/size/libdatadog-wasm/libdatadog_wasm_bg.wasm',
   },
   {

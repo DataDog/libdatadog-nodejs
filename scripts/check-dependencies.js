@@ -26,7 +26,16 @@ const allowedDuplicatePackagesByTree = new Map([
   ['remote-config', remoteConfigDuplicatePackages],
   ['libdatadog-wasm', libdatadogWasmDuplicatePackages],
 ])
-const remoteConfigTokioPackages = new Set(['tokio', 'tokio-macros', 'tokio-util'])
+const allowedTokioRuntimeByTree = new Map([
+  ['libdatadog-wasm', {
+    owner: 'libdd-trace-stats',
+    packages: new Set(['tokio', 'tokio-macros', 'tokio-util']),
+  }],
+  ['remote-config', {
+    owner: 'libdd-remote-config',
+    packages: new Set(['tokio', 'tokio-macros', 'tokio-util']),
+  }],
+])
 
 /**
  * @param {Set<string>} actual
@@ -99,10 +108,10 @@ function findForbiddenDependencies (dependencies, tree = {}) {
     const isTokioCompanion = dependency.name.startsWith('tokio-')
     if (!isTokio && !isTokioCompanion) continue
 
-    const allowedRemoteConfigRuntime = tree.package === 'remote-config'
-      && remoteConfigTokioPackages.has(dependency.name)
-      && dependency.path.includes('libdd-remote-config')
-    if (!allowedRemoteConfigRuntime) failures.push(dependency)
+    const allowedRuntime = allowedTokioRuntimeByTree.get(tree.package)
+    const isAllowedRuntime = allowedRuntime?.packages.has(dependency.name)
+      && dependency.path.includes(allowedRuntime.owner)
+    if (!isAllowedRuntime) failures.push(dependency)
   }
 
   return failures
@@ -156,7 +165,7 @@ function checkTrees () {
       )
     }
   } else {
-    console.log('Tokio is limited to the dedicated remote config artifact.')
+    console.log('Tokio is limited to approved artifact owners.')
   }
 
   if (duplicateFailures.length > 0 || forbiddenFailures.length > 0) {

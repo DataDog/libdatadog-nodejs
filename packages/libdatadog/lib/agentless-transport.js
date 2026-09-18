@@ -11,8 +11,11 @@ const discardedResponse = { status: 200, body: Buffer.alloc(0) }
 
 let activeBufferSize = 0
 
-/** @param {AgentlessTransportOptions} [options] */
-function createHostTransport ({ agent } = {}) {
+/**
+ * @param {AgentlessTransportOptions} [options]
+ * @param {string} [entityId]
+ */
+function createHostTransport ({ agent } = {}, entityId) {
   const requestAgent = agent ?? false
   const requests = new Map()
   const timers = new Map()
@@ -31,6 +34,7 @@ function createHostTransport ({ agent } = {}) {
     const target = new URL(url)
     const client = target.protocol === 'https:' ? require('node:https') : require('node:http')
     const headers = Object.fromEntries(headerList.map(({ name, value }) => [name, value]))
+    if (entityId !== undefined) headers['datadog-entity-id'] = entityId
     if (requestAgent === false) headers.connection = 'close'
 
     let settled = false

@@ -4,6 +4,7 @@ import {
   backend,
   createAgentlessExporter,
   DDSketch,
+  supportsAgentlessStats,
   zstd_compress,
 } from '@datadog/libdatadog'
 import {
@@ -13,6 +14,7 @@ import {
 import * as wasm from '@datadog/libdatadog/wasm'
 
 const selectedBackend: 'wasm' = backend()
+const agentlessStatsSupported: true = supportsAgentlessStats
 const compressed: Uint8Array = zstd_compress(new Uint8Array(16), 3)
 const sketch = new DDSketch()
 const agentlessExporter = createAgentlessExporter({
@@ -21,6 +23,11 @@ const agentlessExporter = createAgentlessExporter({
   tracerVersion: '1.2.3',
   languageVersion: '22.0.0',
   languageInterpreter: 'v8',
+  entityId: 'in-1234',
+  stats: {
+    endpoint: 'https://trace.agent.datadoghq.com/api/v0.2/stats',
+    intervalMs: 10_000,
+  },
 }, {
   agent: {
     addRequest () {},
@@ -39,6 +46,7 @@ sketch.addWithCount(2, 3)
 const count: number = sketch.count()
 const encoded: Uint8Array = sketch.encode()
 agentlessExporter.sendV04(new Uint8Array(16), () => {}, logger)
+agentlessExporter.flush(() => {}, logger)
 agentlessExporter.close()
 
 const wasmBackend: typeof backend = wasm.backend
@@ -67,6 +75,7 @@ function runInStorage (callback: () => void): void {
 }
 
 void selectedBackend
+void agentlessStatsSupported
 void compressed
 void count
 void encoded
