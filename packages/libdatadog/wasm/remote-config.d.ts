@@ -10,8 +10,8 @@ export interface RemoteConfigFetcherOptions {
   tracerVersion: string
   url: string
   timeoutMs: number
-  apiKey?: string
-  hostname?: string
+  apiKey: string
+  hostname: string
 }
 
 export interface RemoteConfigChange {

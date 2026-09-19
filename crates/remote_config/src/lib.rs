@@ -56,15 +56,11 @@ struct FetcherOptions {
     process_tags: Vec<String>,
     language: String,
     tracer_version: String,
-    /// In agent mode the agent base URL, either `http(s)://host:port` or `unix:///path/to/socket`;
-    /// in agentless mode the Datadog site, e.g. `https://api.datadoghq.com`.
+    /// The Datadog site, e.g. `https://api.datadoghq.com`.
     url: String,
     timeout_ms: u64,
-    /// Enables agentless if set.
-    #[serde(default)]
-    api_key: Option<String>,
-    #[serde(default)]
-    hostname: Option<String>,
+    api_key: String,
+    hostname: String,
 }
 
 /// A single add/update/remove of one remote config file, as diffed against the previous poll.
@@ -188,17 +184,11 @@ impl RemoteConfigFetcher {
         let endpoint = libdd_common::Endpoint {
             url,
             timeout_ms: options.timeout_ms,
-            api_key: options.api_key.map(Into::into),
+            api_key: Some(options.api_key.into()),
             ..Default::default()
         };
 
-        let agentless = match endpoint.api_key {
-            Some(_) => Some(
-                AgentlessConfig::new(options.hostname.unwrap_or_default(), &endpoint)
-                    .map_err(to_js_err)?,
-            ),
-            None => None,
-        };
+        let agentless = AgentlessConfig::new(options.hostname, &endpoint).map_err(to_js_err)?;
 
         let config = FetcherConfig {
             target: Target::new(
@@ -214,7 +204,7 @@ impl RemoteConfigFetcher {
                 language: options.language,
                 tracer_version: options.tracer_version,
                 endpoint,
-                agentless,
+                agentless: Some(agentless),
             },
         };
 

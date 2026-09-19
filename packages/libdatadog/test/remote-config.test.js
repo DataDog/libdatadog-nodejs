@@ -44,6 +44,18 @@ test('keeps remote config out of the universal WASM entry point', () => {
   assert.strictEqual(typeof RemoteConfigFetcher, 'function')
 })
 
+test('requires agentless credentials', () => {
+  for (const name of ['apiKey', 'hostname']) {
+    const options = fetcherOptions()
+    delete options[name]
+
+    assert.throws(
+      () => new RemoteConfigFetcher(options),
+      new RegExp('missing field `' + name + '`'),
+    )
+  }
+})
+
 test('exports agentless remote config from the dedicated entry point', async () => {
   const requests = []
   const storage = new AsyncLocalStorage()

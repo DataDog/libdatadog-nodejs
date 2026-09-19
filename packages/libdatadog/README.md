@@ -12,6 +12,7 @@ published separately as `@datadog/libdatadog-extras`.
 
 Remote configuration is available from `@datadog/libdatadog/remote-config`.
 It uses a dedicated wasm-bindgen artifact that loads only with this entry point.
+The fetcher is agentless and requires an API key and hostname.
 
 The package accepts Datadog v0.4 MessagePack payloads and exports them to an
 agentless intake. `sendV04()` reports completion through a callback and sends
