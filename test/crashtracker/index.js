@@ -8,6 +8,7 @@ const { execSync, exec } = require('node:child_process')
 
 let currentTest
 let PORT
+const MAX_BODY_SIZE = 10 * 1024 * 1024
 
 execSync('yarn install', getExecOptions())
 
@@ -38,21 +39,48 @@ const server = http.createServer((req, res) => {
   }
 
   const chunks = []
-  req.on('data', chunk => chunks.push(chunk))
+  let bodySize = 0
+  let bodyTooLarge = false
+  req.on('data', (chunk) => {
+    if (bodyTooLarge) return
+
+    bodySize += chunk.length
+    if (bodySize > MAX_BODY_SIZE) {
+      bodyTooLarge = true
+      res.writeHead(413).end()
+      return
+    }
+
+    chunks.push(chunk)
+  })
   req.on('end', () => {
-    res.writeHead(200).end()
+    if (bodyTooLarge) return
+
+    let body
+    try {
+      body = JSON.parse(Buffer.concat(chunks, bodySize).toString())
+    } catch {
+      res.writeHead(400).end()
+      return
+    }
+
+    const logPayload = body?.payload?.logs?.[0]
+    if (!logPayload) {
+      res.writeHead(400).end()
+      return
+    }
+
+    // Only process crash reports (not pings)
+    if (!logPayload.is_crash) {
+      res.writeHead(200).end()
+      return
+    }
 
     if (!currentTest) {
       throw new Error('Received unexpected crash report with no active test.')
     }
 
-    const body = JSON.parse(Buffer.concat(chunks).toString())
-    const logPayload = body.payload.logs[0]
-
-    // Only process crash reports (not pings)
-    if (!logPayload.is_crash) {
-      return
-    }
+    res.writeHead(200).end()
 
     const tags = logPayload.tags ? logPayload.tags.split(',') : []
 
@@ -63,6 +91,7 @@ const server = http.createServer((req, res) => {
 server.listen(async () => {
   PORT = server.address().port
 
+  await testReceiverValidation()
   await testSegfault()
   await testUnhandledError('uncaught-exception', 'app-uncaught-exception', {
     expectedType: 'TypeError',
@@ -100,6 +129,60 @@ server.listen(async () => {
   clearTimeout(timeout)
   server.close()
 })
+
+async function testReceiverValidation () {
+  console.log('Running test: testReceiverValidation')
+
+  const logPayload = { is_crash: false, padding: '' }
+  const body = { payload: { logs: [logPayload] } }
+  const baseBody = JSON.stringify(body)
+  const paddingSize = MAX_BODY_SIZE - Buffer.byteLength(baseBody)
+  logPayload.padding = 'x'.repeat(paddingSize)
+  const validBodyText = JSON.stringify(body)
+  const validBody = Buffer.from(validBodyText)
+  assert.strictEqual(validBody.length, MAX_BODY_SIZE)
+  const extraByte = Buffer.from('x')
+  const oversizedBody = Buffer.concat([validBody, extraByte])
+
+  const [validStatus, invalidStatus, missingPayloadStatus, oversizedStatus] = await Promise.all([
+    sendReceiverRequest(validBody),
+    sendReceiverRequest('not JSON'),
+    sendReceiverRequest('{}'),
+    sendReceiverRequest(oversizedBody),
+  ])
+
+  assert.strictEqual(validStatus, 200)
+  assert.strictEqual(invalidStatus, 400)
+  assert.strictEqual(missingPayloadStatus, 400)
+  assert.strictEqual(oversizedStatus, 413)
+}
+
+/**
+ * @param {string | Buffer} body
+ * @returns {Promise<number>}
+ */
+function sendReceiverRequest (body) {
+  return new Promise((resolve, reject) => {
+    const request = http.request({
+      port: PORT,
+      method: 'POST',
+      path: '/telemetry/proxy/api/v2/apmtelemetry',
+      headers: { 'content-type': 'application/json' },
+    }, (response) => {
+      if (response.statusCode === undefined) {
+        response.resume()
+        reject(new Error('Receiver response did not include a status code'))
+        return
+      }
+
+      response.resume()
+      response.once('end', () => resolve(response.statusCode))
+    })
+
+    request.once('error', reject)
+    request.end(body)
+  })
+}
 
 async function testSegfault () {
   console.log('Running test: testSegfault')
@@ -179,12 +262,16 @@ function runApp (script) {
   })
 }
 
-function getExecOptions (opts) {
+/**
+ * @param {import('node:child_process').ExecOptions} [options]
+ * @returns {import('node:child_process').ExecOptions}
+ */
+function getExecOptions (options) {
   return {
     cwd: __dirname,
     stdio: 'inherit',
     uid: process.getuid(),
     gid: process.getgid(),
-    ...opts,
+    ...options,
   }
 }
