@@ -35,8 +35,8 @@ fs.writeFileSync(
   glue.replace(
     loader,
     () => [
-      `const compressedWasmPath = \`\${__dirname}/${moduleName}_bg.wasm.br\`;`,
-      'const compressedWasm = require(\'node:fs\').readFileSync(compressedWasmPath);',
+      'const compressedWasm = /* @datadog/wasm-asset */ '
+      + `require('node:fs').readFileSync(\`\${__dirname}/${moduleName}_bg.wasm.br\`);`,
       'const wasmBytes = require(\'node:zlib\').brotliDecompressSync(compressedWasm);',
     ].join('\n'),
   ),

@@ -31,6 +31,7 @@ Node.js HTTP agent. The caller owns the agent and its lifetime.
 
 The package publishes Brotli-compressed `.wasm.br` files next to the
 wasm-bindgen JavaScript loaders. Each loader reads and decompresses its file
-synchronously before instantiation. A bundled distribution must copy the
-referenced asset next to its output JavaScript file. No raw `.wasm` asset or
-native extension is published.
+synchronously before instantiation. The read expression carries a marker that
+allows build tools to inline the compressed bytes. Other bundled distributions
+must copy the referenced asset next to their output JavaScript file. No raw
+`.wasm` asset or native extension is published.

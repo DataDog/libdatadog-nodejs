@@ -143,6 +143,7 @@ function readPackagedWasm (gluePath) {
   const compressedWasmPath = gluePath.replace(/\.js$/, '_bg.wasm.br')
   const compressedWasm = fs.readFileSync(compressedWasmPath)
 
+  assert.match(glue, /\/\* @datadog\/wasm-asset \*\//)
   assert.match(glue, /brotliDecompressSync\(compressedWasm\)/)
   return {
     wasm: brotliDecompressSync(compressedWasm),
