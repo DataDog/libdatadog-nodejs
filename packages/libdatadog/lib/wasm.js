@@ -2,6 +2,11 @@
 
 const binding = require('@datadog/libdatadog-wasm')
 
+/** @typedef {typeof import('@datadog/libdatadog-wasm/zstd')} ZstdBinding */
+
+/** @type {ZstdBinding | undefined} */
+let zstdBinding
+
 module.exports = {
   backend: () => 'wasm',
   DDSketch: binding.DDSketch,
@@ -24,5 +29,6 @@ function createAgentlessExporter (options, transportOptions) {
  * @returns {Uint8Array}
  */
 function zstdCompress (data, level) {
-  return require('@datadog/libdatadog-wasm/zstd').zstd_compress(data, level)
+  zstdBinding ??= require('@datadog/libdatadog-wasm/zstd')
+  return zstdBinding.zstd_compress(data, level)
 }
