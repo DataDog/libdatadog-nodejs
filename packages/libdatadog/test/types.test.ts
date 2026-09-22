@@ -11,11 +11,13 @@ import {
   RemoteConfigFetcher,
   setStorage,
 } from '@datadog/libdatadog/remote-config'
+import { zstd_compress as zstdCompress } from '@datadog/libdatadog/zstd'
 import * as wasm from '@datadog/libdatadog/wasm'
 
 const selectedBackend: 'wasm' = backend()
 const agentlessStatsSupported: true = supportsAgentlessStats
 const compressed: Uint8Array = zstd_compress(new Uint8Array(16), 3)
+const directlyCompressed: Uint8Array = zstdCompress(new Uint8Array(16), 3)
 const sketch = new DDSketch()
 const agentlessExporter = createAgentlessExporter({
   endpoint: 'https://example.test/api/v2/spans',
@@ -78,6 +80,7 @@ function runInStorage (callback: () => void): void {
 void selectedBackend
 void agentlessStatsSupported
 void compressed
+void directlyCompressed
 void count
 void encoded
 void wasmBackend
