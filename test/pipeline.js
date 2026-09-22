@@ -325,8 +325,7 @@ class NativeSpansInterface {
       index += 8
     }
     const hasSpans = this.state.prepareChunk(spans.length, true, this.flushBuffer)
-    if (!hasSpans) return false
-    return this.state.sendPreparedChunk()
+    return hasSpans ? this.state.sendPreparedChunk() : false
   }
 }
 

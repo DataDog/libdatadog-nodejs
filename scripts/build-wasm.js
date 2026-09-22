@@ -104,10 +104,19 @@ function buildWasm (cratePath, outputDirectory, options = {}) {
     }
   }
   fs.rmSync(resolvedOutputDirectory, { force: true, recursive: true })
-  const args = ['build']
-  if (profiling) args.push('--profiling')
-  if (skipOptimization) args.push('--no-opt')
-  args.push('--target', 'nodejs', cratePath, '--out-dir', resolvedOutputDirectory, '--', '-Z', 'build-std=std')
+  const args = [
+    'build',
+    ...(profiling ? ['--profiling'] : []),
+    ...(skipOptimization ? ['--no-opt'] : []),
+    '--target',
+    'nodejs',
+    cratePath,
+    '--out-dir',
+    resolvedOutputDirectory,
+    '--',
+    '-Z',
+    'build-std=std',
+  ]
   childProcess.execFileSync('wasm-pack', args, {
     env: {
       ...buildEnvironment,
