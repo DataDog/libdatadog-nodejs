@@ -43,14 +43,14 @@ const artifacts = [
     comparisonGluePath: 'packages/libdatadog/wasm/dist/libdatadog_wasm.js',
     gluePath: path.join(__dirname, '..', 'wasm', 'dist', 'libdatadog_wasm.js'),
     name: 'libdatadog',
-    maximumInlineBytes: 240 * 1024,
+    maximumPackagedBytes: 240 * 1024,
     profilePath: 'target/size/libdatadog-wasm/libdatadog_wasm_bg.wasm',
   },
   {
     comparisonGluePath: 'packages/libdatadog/wasm/dist/remote-config/remote_config.js',
     gluePath: path.join(__dirname, '..', 'wasm', 'dist', 'remote-config', 'remote_config.js'),
     name: 'remote config',
-    maximumInlineBytes: 330 * 1024,
+    maximumPackagedBytes: 330 * 1024,
     profilePath: 'target/size/remote-config/remote_config_bg.wasm',
   },
 ]
@@ -75,7 +75,7 @@ function validateWasm (wasm) {
     0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00,
   ])
   if (wasm.length < expectedHeader.length || !wasm.subarray(0, 8).equals(expectedHeader)) {
-    throw new Error('inline payload is not a WebAssembly 1 binary')
+    throw new Error('payload is not a WebAssembly 1 binary')
   }
 }
 
@@ -362,12 +362,18 @@ function appendCrateReport (lines, crateSizes) {
   lines.push('', attributionNote)
 }
 
+/** @param {string} gluePath */
+function getCompressedPath (gluePath) {
+  return `${gluePath.slice(0, -3)}_bg.wasm.br`
+}
+
 /**
  * @param {string} gluePath
  * @param {string | undefined} profilePath
  * @param {string} artifactName
  * @returns {{
  *   artifactName: string,
+ *   compressedPath: string,
  *   crateSizes: { entries: Array<{ bytes: number, name: string }>, totalBytes: number } | undefined,
  *   gluePath: string,
  *   layers: Array<{ bytes: number, name: string }>,
@@ -376,24 +382,34 @@ function appendCrateReport (lines, crateSizes) {
  */
 function readArtifactSizes (gluePath, profilePath, artifactName) {
   const glue = fs.readFileSync(gluePath, 'utf8')
-  const match = glue.match(/Buffer\.from\('([A-Za-z0-9+/=]+)', 'base64'\)/)
-  if (!match) throw new Error('could not find the inline base64 WASM payload')
+  const compressedPath = getCompressedPath(gluePath)
+  const hasCompressedAsset = fs.existsSync(compressedPath)
+  const encodedWasm = hasCompressedAsset
+    ? undefined
+    : glue.match(/Buffer\.from\('([A-Za-z0-9+/=]+)', 'base64'\)/)?.[1]
+  if (!hasCompressedAsset && !encodedWasm) throw new Error('could not find the compressed WASM payload')
 
-  const base64Bytes = Buffer.byteLength(match[1])
-  const compressed = Buffer.from(match[1], 'base64')
+  const compressed = hasCompressedAsset ? fs.readFileSync(compressedPath) : Buffer.from(encodedWasm, 'base64')
   const wasm = brotliDecompressSync(compressed)
+  const glueBytes = Buffer.byteLength(glue) - (encodedWasm ? Buffer.byteLength(encodedWasm) : 0)
+  const layers = [
+    { bytes: wasm.length, name: 'Raw WASM (before Brotli)' },
+    { bytes: compressed.length, name: 'Brotli-compressed WASM' },
+  ]
+  if (encodedWasm) {
+    layers.push({ bytes: Buffer.byteLength(encodedWasm) - compressed.length, name: 'Base64 encoding overhead' })
+  }
+  layers.push(
+    { bytes: glueBytes, name: 'JavaScript glue/loader' },
+    { bytes: Buffer.byteLength(glue) + (hasCompressedAsset ? compressed.length : 0), name: 'Final packaged artifacts' },
+  )
 
   return {
     artifactName,
+    compressedPath,
     crateSizes: profilePath ? readCrateSizes(fs.readFileSync(profilePath)) : undefined,
     gluePath,
-    layers: [
-      { bytes: wasm.length, name: 'Raw WASM (before Brotli)' },
-      { bytes: compressed.length, name: 'Brotli-compressed WASM' },
-      { bytes: base64Bytes - compressed.length, name: 'Base64 encoding overhead' },
-      { bytes: Buffer.byteLength(glue) - base64Bytes, name: 'JavaScript glue/loader' },
-      { bytes: Buffer.byteLength(glue), name: 'Final inlined JavaScript' },
-    ],
+    layers,
     sections: readSections(wasm),
   }
 }
@@ -536,19 +552,19 @@ function createComparisonReport (beforeRoot, afterRoot, artifact) {
   const crates = orderChangedFirst(alignCrates(before.crateSizes, after.crateSizes))
   const entries = [...layers, ...sections, ...crates]
   const changedCount = entries.filter(entry => entry.afterBytes !== entry.beforeBytes).length
-  const finalArtifact = layers.find(entry => entry.name === 'Final inlined JavaScript')
+  const finalArtifact = layers.find(entry => entry.name === 'Final packaged artifacts')
   const lines = [
     '<details>',
     `<summary>${artifact.name}: ${changedCount} changed, ${entries.length - changedCount} unchanged</summary>`,
     '',
-    '### Inline artifact layers',
+    '### Packaged artifact layers',
     '',
   ]
   appendComparisonTable(
     lines,
-    'Inline artifact layer',
+    'Packaged artifact layer',
     layers,
-    'Final inlined JavaScript',
+    'Final packaged artifacts',
   )
   lines.push('', '### Raw WebAssembly sections', '')
   appendComparisonTable(lines, 'Section', sections)
@@ -604,14 +620,14 @@ function createComparisonSummary (comparisons) {
  * @param {string} [artifactName]
  */
 function createReport (gluePath, profilePath, artifactName = 'libdatadog') {
-  const { crateSizes, layers, sections } = readArtifactSizes(gluePath, profilePath, artifactName)
+  const { compressedPath, crateSizes, layers, sections } = readArtifactSizes(gluePath, profilePath, artifactName)
   const lines = [
     `## ${artifactName} WASM size`,
     '',
-    '| Inline artifact layer | Bytes | KiB |',
+    '| Packaged artifact layer | Bytes | KiB |',
     '| --- | ---: | ---: |',
   ]
-  for (const layer of layers) lines.push(layerRow(layer.name, layer.bytes, layer.name === 'Final inlined JavaScript'))
+  for (const layer of layers) lines.push(layerRow(layer.name, layer.bytes, layer.name === 'Final packaged artifacts'))
   lines.push('', '### Raw WebAssembly sections', '', '| Section | Bytes | KiB | Share |', '| --- | ---: | ---: | ---: |')
 
   for (const section of sections) {
@@ -624,18 +640,22 @@ function createReport (gluePath, profilePath, artifactName = 'libdatadog') {
 
   if (crateSizes) appendCrateReport(lines, crateSizes)
 
-  lines.push('', `Generated from \`${path.relative(process.cwd(), gluePath)}\`.`)
+  lines.push(
+    '',
+    `Generated from \`${path.relative(process.cwd(), gluePath)}\` and `
+    + `\`${path.relative(process.cwd(), compressedPath)}\`.`,
+  )
   return lines.join('\n')
 }
 
 /**
  * @param {string} artifactName
- * @param {number} inlineBytes
- * @param {number} maximumInlineBytes
+ * @param {number} packagedBytes
+ * @param {number} maximumPackagedBytes
  */
-function getSizeBudgetFailure (artifactName, inlineBytes, maximumInlineBytes) {
-  if (inlineBytes <= maximumInlineBytes) return
-  return `${artifactName}: ${formatBytes(inlineBytes)} bytes exceeds ${formatBytes(maximumInlineBytes)} bytes`
+function getSizeBudgetFailure (artifactName, packagedBytes, maximumPackagedBytes) {
+  if (packagedBytes <= maximumPackagedBytes) return
+  return `${artifactName}: ${formatBytes(packagedBytes)} bytes exceeds ${formatBytes(maximumPackagedBytes)} bytes`
 }
 
 /** @param {string[]} reports */
@@ -665,13 +685,14 @@ function main () {
   const reports = []
 
   for (const [index, artifact] of artifacts.entries()) {
-    const { gluePath, maximumInlineBytes, name } = artifact
+    const { gluePath, maximumPackagedBytes, name } = artifact
     const profilePath = profilePaths[index] && path.resolve(profilePaths[index])
     const report = createReport(gluePath, profilePath, name)
     reports.push(report)
 
-    const inlineBytes = fs.statSync(gluePath).size
-    const budgetFailure = getSizeBudgetFailure(name, inlineBytes, maximumInlineBytes)
+    const compressedPath = getCompressedPath(gluePath)
+    const packagedBytes = fs.statSync(gluePath).size + fs.statSync(compressedPath).size
+    const budgetFailure = getSizeBudgetFailure(name, packagedBytes, maximumPackagedBytes)
     if (budgetFailure) failures.push(budgetFailure)
     if (!profilePath) continue
 
