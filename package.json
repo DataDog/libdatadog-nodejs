@@ -15,7 +15,8 @@
     "copy-artifacts": "node ./scripts/copy-artifacts",
     "check:dependencies": "node scripts/check-dependencies.js",
     "lint": "eslint .",
-    "test": "bash scripts/test.sh"
+    "test": "bash scripts/test.sh",
+    "test:coverage": "c8 --clean --all --include='index.js' --include='load.js' --reporter=lcov --reporter=text-summary yarn test"
   },
   "author": "Datadog Inc. <info@datadoghq.com>",
   "license": "Apache-2.0",
@@ -33,6 +34,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@stylistic/eslint-plugin": "^5.9.0",
+    "c8": "^9.1.0",
     "eslint": "^10.11.0",
     "eslint-plugin-import-x": "^4.17.1",
     "eslint-plugin-n": "^18.3.0",

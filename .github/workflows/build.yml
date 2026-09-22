@@ -18,6 +18,38 @@ jobs:
         working-directory: test/crashtracker
       - run: yarn lint
 
+  coverage:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - uses: ./.github/actions/setup-wasm
+      - run: yarn install
+      - run: yarn build
+      - run: yarn test:coverage
+      - name: Get Datadog API key
+        if: always()
+        id: octo-sts
+        continue-on-error: true
+        uses: DataDog/dd-octo-sts-action@c85802a58e202b7e764b5441e4378c76043c8108 # v1.0.5
+        with:
+          scope: DataDog/libdatadog-nodejs
+          policy: libdatadog-nodejs-coverage-api-key
+      - name: Upload coverage to Datadog
+        if: always() && steps.octo-sts.outputs.token != ''
+        continue-on-error: true
+        uses: DataDog/coverage-upload-github-action@d9548b1c3c4ab639d5d3ab29a1508af188975f77 # v1.0.5
+        with:
+          api_key: ${{ steps.octo-sts.outputs.token }}
+          files: coverage/lcov.info
+          format: lcov
+
   build-libdatadog:
     runs-on: ubuntu-latest
     strategy:
