@@ -13,36 +13,52 @@ const webpack = require('webpack')
 const packageRoot = path.join(__dirname, '..')
 const webpackAsync = promisify(webpack)
 const entries = new Map([
-  ['package', path.join(packageRoot, 'index.js')],
-  ['WASM', path.join(packageRoot, 'wasm.js')],
-  ['remote config', path.join(packageRoot, 'remote-config.js')],
+  ['package', {
+    asset: path.join(packageRoot, 'wasm', 'dist', 'libdatadog_wasm_bg.wasm.br'),
+    entry: path.join(packageRoot, 'index.js'),
+  }],
+  ['WASM', {
+    asset: path.join(packageRoot, 'wasm', 'dist', 'libdatadog_wasm_bg.wasm.br'),
+    entry: path.join(packageRoot, 'wasm.js'),
+  }],
+  ['remote config', {
+    asset: path.join(packageRoot, 'wasm', 'dist', 'remote-config', 'remote_config_bg.wasm.br'),
+    entry: path.join(packageRoot, 'remote-config.js'),
+  }],
 ])
 
-for (const [name, entry] of entries) {
-  test(`esbuild bundles the ${name} entry point without emitting an asset`, async () => {
-    await assertBundle(entry, bundleWithEsbuild)
+for (const [name, { asset, entry }] of entries) {
+  test(`esbuild bundles the ${name} entry point with its compressed WASM asset`, async () => {
+    await assertBundle(entry, asset, bundleWithEsbuild, name !== 'remote config')
   })
 
-  test(`webpack bundles the ${name} entry point without emitting an asset`, async () => {
-    await assertBundle(entry, bundleWithWebpack)
+  test(`webpack bundles the ${name} entry point with its compressed WASM asset`, async () => {
+    await assertBundle(entry, asset, bundleWithWebpack, true)
   })
 }
 
 /**
  * @param {string} entry
+ * @param {string} asset
  * @param {(entry: string, output: string) => Promise<void>} bundle
+ * @param {boolean} loadBundle
  */
-async function assertBundle (entry, bundle) {
+async function assertBundle (entry, asset, bundle, loadBundle) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'libdatadog-bundle-'))
   const output = path.join(directory, 'bundle.cjs')
+  const copiedAsset = path.join(directory, path.basename(asset))
 
   try {
     await bundle(entry, output)
+    fs.copyFileSync(asset, copiedAsset)
     const files = fs.readdirSync(directory)
     const contents = fs.readFileSync(output, 'utf8')
 
-    assert.deepStrictEqual(files, ['bundle.cjs'])
-    assert.doesNotMatch(contents, /\.wasm(?:['"`)]|$)/m)
+    assert.equal(files.length, 2)
+    assert(files.includes('bundle.cjs'))
+    assert(files.includes(path.basename(asset)))
+    assert.match(contents, /\.wasm\.br/)
+    if (loadBundle) require(output)
   } finally {
     fs.rmSync(directory, { force: true, recursive: true })
   }

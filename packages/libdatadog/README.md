@@ -29,8 +29,8 @@ the package version.
 `createAgentlessExporter(options, { agent })` accepts an optional borrowed
 Node.js HTTP agent. The caller owns the agent and its lifetime.
 
-The package uses a wasm-bindgen backend with the WebAssembly bytes embedded in
-JavaScript. The canonical inlined output is published as the regular
-`@datadog/libdatadog-wasm` dependency from the `wasm` workspace. The WASM
-package also contains the separate remote configuration artifact. No raw
-`.wasm` asset or native extension is published.
+The package publishes Brotli-compressed `.wasm.br` files next to the
+wasm-bindgen JavaScript loaders. Each loader reads and decompresses its file
+synchronously before instantiation. A bundled distribution must copy the
+referenced asset next to its output JavaScript file. No raw `.wasm` asset or
+native extension is published.

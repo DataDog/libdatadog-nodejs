@@ -69,8 +69,8 @@ test('root entry point uses the WASM backend', () => {
   assert.strictEqual(libdatadog.backend(), 'wasm')
 })
 
-test('embeds a Brotli-compressed WASM fallback', () => {
-  const { wasm } = readInlineWasm(path.join(
+test('packages a Brotli-compressed WASM fallback', () => {
+  const { wasm } = readPackagedWasm(path.join(
     packageRoot,
     'wasm',
     'dist',
@@ -80,8 +80,8 @@ test('embeds a Brotli-compressed WASM fallback', () => {
   assert.ok(wasm.length < 600 * 1024)
 })
 
-test('embeds dedicated remote config WASM', () => {
-  const { wasm } = readInlineWasm(path.join(
+test('packages dedicated remote config WASM', () => {
+  const { wasm } = readPackagedWasm(path.join(
     packageRoot,
     'wasm',
     'dist',
@@ -92,19 +92,19 @@ test('embeds dedicated remote config WASM', () => {
   assert.ok(wasm.length < 1024 * 1024)
 })
 
-test('requires an artifact name and output directory when inlining WASM', () => {
-  const script = path.join(packageRoot, 'scripts', 'inline-wasm.js')
+test('requires an artifact name and output directory when compressing WASM', () => {
+  const script = path.join(packageRoot, 'scripts', 'compress-wasm.js')
 
   for (const scriptArguments of [[], ['fixture']]) {
     const result = spawnSync(process.execPath, [script, ...scriptArguments])
 
     assert.notStrictEqual(result.status, 0)
-    assert.match(result.stderr.toString(), /usage: node scripts\/inline-wasm\.js/)
+    assert.match(result.stderr.toString(), /usage: node scripts\/compress-wasm\.js/)
   }
 })
 
-test('inlines a named WASM artifact into its generated module', () => {
-  const outputDirectory = fs.mkdtempSync(path.join(packageRoot, '.inline-wasm-'))
+test('compresses a named WASM artifact beside its generated module', () => {
+  const outputDirectory = fs.mkdtempSync(path.join(packageRoot, '.compress-wasm-'))
   const moduleName = 'fixture'
   const wasm = Buffer.from('fixture WASM')
   const loader = [
@@ -119,14 +119,15 @@ test('inlines a named WASM artifact into its generated module', () => {
     fs.writeFileSync(path.join(outputDirectory, 'package.json'), '{}')
 
     const result = spawnSync(process.execPath, [
-      path.join(packageRoot, 'scripts', 'inline-wasm.js'),
+      path.join(packageRoot, 'scripts', 'compress-wasm.js'),
       moduleName,
       path.relative(packageRoot, outputDirectory),
     ])
 
     assert.strictEqual(result.status, 0, result.stderr.toString())
-    assert.deepStrictEqual(readInlineWasm(path.join(outputDirectory, `${moduleName}.js`)).wasm, wasm)
+    assert.deepStrictEqual(readPackagedWasm(path.join(outputDirectory, `${moduleName}.js`)).wasm, wasm)
     assert.strictEqual(fs.existsSync(path.join(outputDirectory, `${moduleName}_bg.wasm`)), false)
+    assert.strictEqual(fs.existsSync(path.join(outputDirectory, `${moduleName}_bg.wasm.br`)), true)
     assert.strictEqual(fs.existsSync(path.join(outputDirectory, '.gitignore')), false)
     assert.strictEqual(fs.existsSync(path.join(outputDirectory, 'package.json')), false)
   } finally {
@@ -137,13 +138,13 @@ test('inlines a named WASM artifact into its generated module', () => {
 /**
  * @param {string} gluePath
  */
-function readInlineWasm (gluePath) {
+function readPackagedWasm (gluePath) {
   const glue = fs.readFileSync(gluePath, 'utf8')
-  const encodedWasm = glue.match(/brotliDecompressSync\(Buffer\.from\('([^']+)', 'base64'\)\)/)?.[1]
+  const compressedWasmPath = gluePath.replace(/\.js$/, '_bg.wasm.br')
+  const compressedWasm = fs.readFileSync(compressedWasmPath)
 
-  assert.ok(encodedWasm, 'WASM must be embedded as a Brotli-compressed base64 string')
+  assert.match(glue, /brotliDecompressSync\(compressedWasm\)/)
   return {
-    glue,
-    wasm: brotliDecompressSync(Buffer.from(encodedWasm, 'base64')),
+    wasm: brotliDecompressSync(compressedWasm),
   }
 }
