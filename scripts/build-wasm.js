@@ -46,7 +46,8 @@ env[rustupToolchainKey] = wasmRustToolchain
 
 // Keep the min-size profile while relaxing only LLVM's inlining cap for the compression hot path.
 // Rebenchmark this LLVM-internal threshold when updating rust-toolchain.toml.
-const libdatadogWasmRustFlags = '-C target-feature=+simd128 -C llvm-args=-inline-threshold=45'
+const compressionWasmRustFlags = '-C target-feature=+simd128 -C llvm-args=-inline-threshold=45'
+const compressionWasmCrates = new Set(['libdatadog-wasm', 'libdatadog-wasm-zstd'])
 
 if (isMacOS) {
   const homebrewDir = env.HOMEBREW_DIR ?? '/opt/homebrew'
@@ -87,19 +88,19 @@ function buildWasm (cratePath, outputDirectory, options = {}) {
   const { profiling = false, skipOptimization = false } = options
   const resolvedOutputDirectory = path.resolve(cratePath, outputDirectory)
   const buildEnvironment = { ...env }
-  if (path.basename(cratePath) === 'libdatadog-wasm') {
+  if (compressionWasmCrates.has(path.basename(cratePath))) {
     if (buildEnvironment.CARGO_ENCODED_RUSTFLAGS === undefined) {
       const rustFlagsName = buildEnvironment.RUSTFLAGS === undefined
         ? 'CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS'
         : 'RUSTFLAGS'
       buildEnvironment[rustFlagsName] = [
         buildEnvironment[rustFlagsName],
-        libdatadogWasmRustFlags,
+        compressionWasmRustFlags,
       ].filter(Boolean).join(' ')
     } else {
       buildEnvironment.CARGO_ENCODED_RUSTFLAGS = [
         buildEnvironment.CARGO_ENCODED_RUSTFLAGS,
-        ...libdatadogWasmRustFlags.split(' '),
+        ...compressionWasmRustFlags.split(' '),
       ].filter(Boolean).join('\x1F')
     }
   }
