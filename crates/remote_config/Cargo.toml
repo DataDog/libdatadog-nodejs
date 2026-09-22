@@ -21,8 +21,27 @@ serde_json = "1"
 console_error_panic_hook = "0.1"
 
 [package.metadata.wasm-pack.profile.release]
-# Cargo debug metadata lets Binaryen detect target features, so keep Node.js 18-incompatible GC disabled.
-wasm-opt = ["-O", "--all-features", "--disable-gc"]
+# Do not use --all-features: Binaryen may then emit WebAssembly GC instructions,
+# which are not supported by Node.js 18. Keep this list to features used by the
+# Rust output and supported by every Node.js version that we test.
+wasm-opt = [
+  "-O",
+  "--enable-mutable-globals",
+  "--enable-nontrapping-float-to-int",
+  "--enable-bulk-memory",
+  "--enable-sign-ext",
+  "--enable-reference-types",
+  "--enable-multivalue",
+]
 
 [package.metadata.wasm-pack.profile.profiling]
-wasm-opt = ["-O", "--all-features", "--disable-gc", "-g"]
+wasm-opt = [
+  "-O",
+  "--enable-mutable-globals",
+  "--enable-nontrapping-float-to-int",
+  "--enable-bulk-memory",
+  "--enable-sign-ext",
+  "--enable-reference-types",
+  "--enable-multivalue",
+  "-g",
+]

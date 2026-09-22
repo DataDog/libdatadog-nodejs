@@ -1,6 +1,8 @@
 'use strict'
 
 const assert = require('node:assert/strict')
+// eslint-disable-next-line n/no-unsupported-features/node-builtins -- Guarded before use on Node.js 18.
+const { zstdDecompressSync } = require('node:zlib')
 
 const { encode } = require('@msgpack/msgpack')
 const binding = require('@datadog/libdatadog-wasm')
@@ -10,7 +12,16 @@ const zstdMagic = Buffer.from([0x28, 0xB5, 0x2F, 0xFD])
 const richMetaStruct = encode({ attempt: 1, feature: 'checkout' })
 const selectedWorkload = process.argv[2]
 
+const tagReplaceRules = [
+  { name: '*', pattern: 'token=([^&]*)', repl: 'token=?' },
+  { name: '*', pattern: 'benchmark', repl: 'bench' },
+  { name: 'http.url', pattern: 'users', repl: 'customers' },
+  { name: 'custom.tag', pattern: '(/foo/bar/).*', repl: '${1}extra' },
+  { name: 'resource.name', pattern: 'users', repl: 'customers' },
+]
+
 /** @typedef {'http' | 'mixed-repeated-sql' | 'mixed-unique-sql' | 'rich'} WorkloadShape */
+/** @typedef {{ name: string, pattern: string, repl: string }} TagReplaceRule */
 /**
  * @typedef {object} WorkloadOptions
  * @property {string} name
@@ -18,6 +29,7 @@ const selectedWorkload = process.argv[2]
  * @property {number} spansPerTrace
  * @property {WorkloadShape} shape
  * @property {number} iterations
+ * @property {TagReplaceRule[]} [tagReplaceRules]
  */
 /**
  * @typedef {object} Workload
@@ -26,6 +38,7 @@ const selectedWorkload = process.argv[2]
  * @property {number} spansPerTrace
  * @property {number} iterations
  * @property {Uint8Array} payload
+ * @property {TagReplaceRule[]} [tagReplaceRules]
  */
 /** @typedef {{ name: string, value: string }} Header */
 /** @typedef {{ method: string, url: string, headers: Header[], body: Uint8Array }} RequestPlan */
@@ -49,6 +62,14 @@ const exporterOptions = {
 const workloadOptions = [
   { name: 'tiny', traceCount: 1, spansPerTrace: 1, shape: 'http', iterations: 5000 },
   { name: 'common-http', traceCount: 100, spansPerTrace: 3, shape: 'http', iterations: 300 },
+  {
+    name: 'common-http-replacement-rules',
+    traceCount: 100,
+    spansPerTrace: 3,
+    shape: 'http',
+    iterations: 300,
+    tagReplaceRules,
+  },
   {
     name: 'mixed-repeated-sql',
     traceCount: 100,
@@ -84,6 +105,7 @@ function createWorkload (options) {
     spansPerTrace: options.spansPerTrace,
     iterations: options.iterations,
     payload: encode(traces, { useBigInt64: true }),
+    tagReplaceRules: options.tagReplaceRules,
   }
 }
 
@@ -169,9 +191,10 @@ function createSpan (traceIndex, spanIndex, spansPerTrace, shape) {
  * @param {Uint8Array} payload
  * @param {number} iterations
  * @param {boolean} capturePlan
+ * @param {TagReplaceRule[] | undefined} tagReplaceRules
  * @returns {Promise<Sample>}
  */
-function runIterations (payload, iterations, capturePlan) {
+function runIterations (payload, iterations, capturePlan, tagReplaceRules) {
   let rejectRun
   let resolveRun
   let requests = 0
@@ -223,8 +246,11 @@ function runIterations (payload, iterations, capturePlan) {
     resolveRun({ elapsedNanoseconds, outputBytes, requests, plan })
   }
 
+  const options = tagReplaceRules === undefined
+    ? exporterOptions
+    : { ...exporterOptions, obfuscation: { tag_replace_rules: tagReplaceRules } }
   const exporter = new binding.AgentlessExporter(
-    exporterOptions,
+    options,
     request,
     cancelRequest,
     completeSleep,
@@ -268,7 +294,7 @@ function trimmedMean (samples) {
 
 /** @param {Workload} workload */
 async function validateWorkload (workload) {
-  const sample = await runIterations(workload.payload, 1, true)
+  const sample = await runIterations(workload.payload, 1, true, workload.tagReplaceRules)
   const { plan } = sample
   assert(plan)
   assert.strictEqual(sample.requests, 1)
@@ -278,6 +304,13 @@ async function validateWorkload (workload) {
   assert.strictEqual(findHeader(plan.headers, 'content-type'), 'application/json')
   assert.strictEqual(findHeader(plan.headers, 'dd-api-key'), exporterOptions.apiKey)
   assert.deepStrictEqual(plan.body.subarray(0, zstdMagic.length), zstdMagic)
+  if (workload.tagReplaceRules !== undefined && zstdDecompressSync) {
+    const body = JSON.parse(zstdDecompressSync(plan.body).toString())
+    const span = body.traces[0].spans[0]
+    assert.strictEqual(span.resource, 'GET /customers/0')
+    assert.strictEqual(span.meta.env, 'bench')
+    assert.strictEqual(span.meta['http.url'], 'https://example.test/customers/0?token=?')
+  }
 }
 
 /** @param {Header[]} headers @param {string} name */
@@ -294,7 +327,7 @@ async function benchmarkWorkload (workload) {
   let warmupElapsedNanoseconds = 0
   let warmupIterations = 0
   do {
-    const sample = await runIterations(workload.payload, warmupBatchIterations, false)
+    const sample = await runIterations(workload.payload, warmupBatchIterations, false, workload.tagReplaceRules)
     warmupElapsedNanoseconds += sample.elapsedNanoseconds
     warmupIterations += warmupBatchIterations
   } while (warmupElapsedNanoseconds < 1e9)
@@ -302,7 +335,7 @@ async function benchmarkWorkload (workload) {
   const samples = Array.from({ length: 7 })
   let outputBytes = 0
   for (let trial = 0; trial < samples.length; trial++) {
-    const sample = await runIterations(workload.payload, workload.iterations, false)
+    const sample = await runIterations(workload.payload, workload.iterations, false, workload.tagReplaceRules)
     assert.strictEqual(sample.requests, workload.iterations)
     samples[trial] = sample.elapsedNanoseconds / workload.iterations
     outputBytes = sample.outputBytes
