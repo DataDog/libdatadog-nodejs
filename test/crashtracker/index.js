@@ -122,10 +122,10 @@ async function testUnhandledError (label, script, { expectedType, expectedMessag
 
   assert(crashReport.error.message.includes(expectedType), `[${label}] Expected exception type "${expectedType}" not found in message.`)
   assert(crashReport.error.message.includes(expectedMessage), `[${label}] Expected exception message "${expectedMessage}" not found.`)
-  if (expectedFrame) {
-    const frame = crashReport.error.stack.frames.find(f => f.function && f.function.includes(expectedFrame))
-    assert(frame, `[${label}] Expected stack frame for ${expectedFrame} not found.`)
-  }
+  if (!expectedFrame) return
+
+  const frame = crashReport.error.stack.frames.find(f => f.function && f.function.includes(expectedFrame))
+  assert(frame, `[${label}] Expected stack frame for ${expectedFrame} not found.`)
 }
 
 async function testUnhandledNonError (label, script, { expectedFallbackType, expectedValue }) {
