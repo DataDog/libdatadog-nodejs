@@ -82,9 +82,9 @@ if (isMacOS) {
  * @param {string} cratePath
  * @param {string} outputDirectory
  * @param {{ profiling?: boolean, skipOptimization?: boolean }} options
- * @returns {void}
+ * @returns {Promise<void>}
  */
-function buildWasm (cratePath, outputDirectory, options = {}) {
+async function buildWasm (cratePath, outputDirectory, options = {}) {
   const { profiling = false, skipOptimization = false } = options
   const resolvedOutputDirectory = path.resolve(cratePath, outputDirectory)
   const buildEnvironment = { ...env }
@@ -109,16 +109,28 @@ function buildWasm (cratePath, outputDirectory, options = {}) {
   if (profiling) args.push('--profiling')
   if (skipOptimization) args.push('--no-opt')
   args.push('--target', 'nodejs', cratePath, '--out-dir', resolvedOutputDirectory, '--', '-Z', 'build-std=std')
-  childProcess.execFileSync('wasm-pack', args, {
-    env: {
-      ...buildEnvironment,
-      // Keep optimized release and profiling builds on one Cargo artifact.
-      // wasm-opt removes debug data from release output on supported platforms.
-      ...((profiling || !skipOptimization) && {
-        CARGO_PROFILE_RELEASE_DEBUG: 'true',
-        CARGO_PROFILE_RELEASE_STRIP: 'false',
-      }),
-    },
+  await new Promise((resolve, reject) => {
+    const wasmPack = childProcess.spawn('wasm-pack', args, {
+      env: {
+        ...buildEnvironment,
+        // Keep optimized release and profiling builds on one Cargo artifact.
+        // wasm-opt removes debug data from release output on supported platforms.
+        ...((profiling || !skipOptimization) && {
+          CARGO_PROFILE_RELEASE_DEBUG: 'true',
+          CARGO_PROFILE_RELEASE_STRIP: 'false',
+        }),
+      },
+      stdio: 'inherit',
+    })
+    wasmPack.once('error', reject)
+    wasmPack.once('close', (code, signal) => {
+      if (code === 0) {
+        resolve()
+        return
+      }
+      const status = signal === null ? `code ${code}` : `signal ${signal}`
+      reject(new Error(`wasm-pack exited with ${status}`))
+    })
   })
   // wasm-pack ignores its output by default. These outputs are package inputs,
   // so remove the nested ignore file and let each npm package's files allowlist
@@ -127,19 +139,33 @@ function buildWasm (cratePath, outputDirectory, options = {}) {
 }
 
 const [cratePath, outputDirectory, mode] = process.argv.slice(2)
-if (cratePath || outputDirectory) {
-  if (!cratePath || !outputDirectory) {
-    throw new Error('Both the WASM crate path and output directory are required')
-  }
-  if (mode && mode !== '--profiling') throw new Error(`Unknown build mode: ${mode}`)
-  buildWasm(path.resolve(cratePath), path.resolve(outputDirectory), {
-    profiling: mode === '--profiling',
-    skipOptimization: isMacOS,
-  })
-} else {
-  for (const library of libraries) {
-    buildWasm(`./crates/${library}`, `../../prebuilds/${library}`, {
+async function main () {
+  if (cratePath || outputDirectory) {
+    if (!cratePath || !outputDirectory) {
+      throw new Error('Both the WASM crate path and output directory are required')
+    }
+    if (mode && mode !== '--profiling') throw new Error(`Unknown build mode: ${mode}`)
+    await buildWasm(path.resolve(cratePath), path.resolve(outputDirectory), {
+      profiling: mode === '--profiling',
       skipOptimization: isMacOS,
     })
+    return
   }
+
+  await Promise.all(libraries.map(library => buildWasm(
+    `./crates/${library}`,
+    `../../prebuilds/${library}`,
+    { skipOptimization: isMacOS },
+  )))
+}
+
+module.exports = { buildWasm }
+
+if (require.main === module) {
+  // CommonJS does not support top-level await.
+  // eslint-disable-next-line unicorn/prefer-top-level-await
+  main().catch((error) => {
+    console.error(error)
+    process.exitCode = 1
+  })
 }

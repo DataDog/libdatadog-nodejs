@@ -21,6 +21,7 @@ wasm-opt = [
   "--enable-sign-ext",
   "--enable-reference-types",
   "--enable-multivalue",
+  "--disable-gc",
   "--enable-simd",
   "--converge",
 ]
