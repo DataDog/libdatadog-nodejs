@@ -2,8 +2,6 @@
   "private": true,
   "main": "index.js",
   "dependencies": {
-    "@datadog/segfaultify": "^0.1.1",
-    "body-parser": "^2.3.0",
-    "express": "^5.2.1"
+    "@datadog/segfaultify": "^0.1.1"
   }
 }
