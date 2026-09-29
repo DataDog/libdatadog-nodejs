@@ -7,7 +7,7 @@ edition = "2018"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-libdd-library-config = { git = "https://github.com/DataDog/libdatadog.git", tag = "v44.0.0", features = ["otel-thread-ctx"] }
+libdd-library-config = { git = "https://github.com/DataDog/libdatadog.git", tag = "v44.0.1", features = ["otel-thread-ctx"] }
 libdd-trace-protobuf = { git = "https://github.com/DataDog/libdatadog.git", tag = "v44.0.0" }
 
 napi = { version = "3" }
