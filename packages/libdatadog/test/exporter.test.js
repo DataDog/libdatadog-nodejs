@@ -578,16 +578,16 @@ test('package entry point generates stats when created during dd-trace beforeExi
   assert.strictEqual(statsRequest.headers['content-type'], 'application/msgpack')
   assert.strictEqual(statsRequest.headers['content-encoding'], 'zstd')
   assert.deepStrictEqual(statsRequest.body.subarray(0, zstdMagic.length), zstdMagic)
-  if (zstdDecompressSync) {
-    const payload = decode(zstdDecompressSync(statsRequest.body), { useBigInt64: true })
-    assert.strictEqual(payload.AgentHostname, 'host-1')
-    assert.strictEqual(payload.AgentEnv, 'prod')
-    assert.strictEqual(payload.AgentVersion, '0.1.0-nodejs')
-    assert.strictEqual(payload.ClientComputed, true)
-    assert.strictEqual(payload.Stats[0].RuntimeID, 'runtime-id')
-    assert.strictEqual(payload.Stats[0].ContainerID, 'container-id')
-    assert.strictEqual(payload.Stats[0].Stats[0].Stats[0].Resource, 'resource')
-  }
+  if (!zstdDecompressSync) return
+
+  const payload = decode(zstdDecompressSync(statsRequest.body), { useBigInt64: true })
+  assert.strictEqual(payload.AgentHostname, 'host-1')
+  assert.strictEqual(payload.AgentEnv, 'prod')
+  assert.strictEqual(payload.AgentVersion, '0.1.0-nodejs')
+  assert.strictEqual(payload.ClientComputed, true)
+  assert.strictEqual(payload.Stats[0].RuntimeID, 'runtime-id')
+  assert.strictEqual(payload.Stats[0].ContainerID, 'container-id')
+  assert.strictEqual(payload.Stats[0].Stats[0].Stats[0].Resource, 'resource')
 })
 
 test('package entry point uses a borrowed transport agent', {
@@ -848,12 +848,12 @@ async function assertExport (pipeline, transportOptions, count = 1) {
   assert.match(received.headers['content-type'], /^application\/json/)
   assert.strictEqual(received.headers['content-encoding'], 'zstd')
   assert.deepStrictEqual(received.body.subarray(0, zstdMagic.length), zstdMagic)
-  if (zstdDecompressSync) {
-    const body = JSON.parse(zstdDecompressSync(received.body).toString())
-    assert.strictEqual(body.traces[0].runtimeID, 'runtime-id')
-    assert.strictEqual(body.traces[0].spans[0].name, 'operation')
-    assert.strictEqual(body.traces[0].spans[0].service, 'service')
-  }
+  if (!zstdDecompressSync) return
+
+  const body = JSON.parse(zstdDecompressSync(received.body).toString())
+  assert.strictEqual(body.traces[0].runtimeID, 'runtime-id')
+  assert.strictEqual(body.traces[0].spans[0].name, 'operation')
+  assert.strictEqual(body.traces[0].spans[0].service, 'service')
 }
 
 function tracePayload () {

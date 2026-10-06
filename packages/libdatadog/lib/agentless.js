@@ -47,15 +47,15 @@ class AgentlessExporter {
       transport.cancelSleep,
     )
     this.#statsInterval = stats?.intervalMs
-    if (this.#statsInterval !== undefined) {
-      this.#beforeExitHandler = () => this.flush()
-      const beforeExitHandlers = globalThis[Symbol.for('dd-trace')]?.beforeExitHandlers
-      if (typeof beforeExitHandlers?.add === 'function' && typeof beforeExitHandlers?.delete === 'function') {
-        this.#beforeExitHandlers = beforeExitHandlers
-        beforeExitHandlers.add(this.#beforeExitHandler)
-      } else {
-        process.once('beforeExit', this.#beforeExitHandler)
-      }
+    if (this.#statsInterval === undefined) return
+
+    this.#beforeExitHandler = () => this.flush()
+    const beforeExitHandlers = globalThis[Symbol.for('dd-trace')]?.beforeExitHandlers
+    if (typeof beforeExitHandlers?.add === 'function' && typeof beforeExitHandlers?.delete === 'function') {
+      this.#beforeExitHandlers = beforeExitHandlers
+      beforeExitHandlers.add(this.#beforeExitHandler)
+    } else {
+      process.once('beforeExit', this.#beforeExitHandler)
     }
   }
 
@@ -96,12 +96,14 @@ class AgentlessExporter {
       }
       done()
       const pending = this.#pendingForceFlushes
-      if (pending !== undefined) {
-        this.#pendingForceFlushes = undefined
-        this.#flushStats(true, () => {
-          for (const callback of pending) callback.done()
-        }, pending[0].log)
+      if (pending === undefined) {
+        return
       }
+
+      this.#pendingForceFlushes = undefined
+      this.#flushStats(true, () => {
+        for (const callback of pending) callback.done()
+      }, pending[0].log)
     }
     try {
       this.#binding.flushStats(force, complete)

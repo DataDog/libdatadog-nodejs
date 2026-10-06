@@ -131,8 +131,7 @@ function readWasmString (wasm, start) {
 function skipLimits (wasm, start) {
   const flags = readUnsignedLeb128(wasm, start)
   const minimum = readUnsignedLeb128(wasm, flags.offset)
-  if ((flags.value & 1) === 0) return minimum.offset
-  return readUnsignedLeb128(wasm, minimum.offset).offset
+  return (flags.value & 1) === 0 ? minimum.offset : readUnsignedLeb128(wasm, minimum.offset).offset
 }
 
 function readImportedFunctionCount (wasm, sections) {
@@ -244,8 +243,7 @@ function inferCrate (functionName) {
 
   const match = decodedName.match(/(?:^|[< &(,])(?:mut )?([A-Za-z][A-Za-z0-9_]*)::/)
   if (!match) return 'bindings / unattributed'
-  if (['alloc', 'core', 'std'].includes(match[1])) return 'Rust standard library'
-  return match[1].replaceAll('_', '-')
+  return ['alloc', 'core', 'std'].includes(match[1]) ? 'Rust standard library' : match[1].replaceAll('_', '-')
 }
 
 function insertBySize (entries, entry) {
@@ -321,8 +319,7 @@ function formatKibibytes (bytes) {
 function layerRow (name, bytes, emphasis = false) {
   const formattedBytes = formatBytes(bytes)
   const kibibytes = formatKibibytes(bytes)
-  if (emphasis) return `| **${name}** | **${formattedBytes}** | **${kibibytes}** |`
-  return `| ${name} | ${formattedBytes} | ${kibibytes} |`
+  return emphasis ? `| **${name}** | **${formattedBytes}** | **${kibibytes}** |` : `| ${name} | ${formattedBytes} | ${kibibytes} |`
 }
 
 /**
@@ -634,8 +631,7 @@ function createReport (gluePath, profilePath, artifactName = 'libdatadog') {
  * @param {number} maximumInlineBytes
  */
 function getSizeBudgetFailure (artifactName, inlineBytes, maximumInlineBytes) {
-  if (inlineBytes <= maximumInlineBytes) return
-  return `${artifactName}: ${formatBytes(inlineBytes)} bytes exceeds ${formatBytes(maximumInlineBytes)} bytes`
+  return inlineBytes <= maximumInlineBytes ? undefined : `${artifactName}: ${formatBytes(inlineBytes)} bytes exceeds ${formatBytes(maximumInlineBytes)} bytes`
 }
 
 /** @param {string[]} reports */
@@ -682,11 +678,13 @@ function main () {
   }
   writeReports(reports)
 
-  if (failures.length > 0) {
-    console.error('WASM size validation failed:')
-    for (const failure of failures) console.error(`- ${failure}`)
-    process.exitCode = 1
+  if (failures.length === 0) {
+    return
   }
+
+  console.error('WASM size validation failed:')
+  for (const failure of failures) console.error(`- ${failure}`)
+  process.exitCode = 1
 }
 
 if (require.main === module) main()
