@@ -53,7 +53,9 @@ jobs:
           name: libdatadog-wasm-size-${{ matrix.revision }}
           path: |
             packages/libdatadog/wasm/dist/libdatadog_wasm.js
+            packages/libdatadog/wasm/dist/libdatadog_wasm_bg.wasm.br
             packages/libdatadog/wasm/dist/remote-config/remote_config.js
+            packages/libdatadog/wasm/dist/remote-config/remote_config_bg.wasm.br
             target/size/libdatadog-wasm/libdatadog_wasm_bg.wasm
             target/size/remote-config/remote_config_bg.wasm
           if-no-files-found: error
