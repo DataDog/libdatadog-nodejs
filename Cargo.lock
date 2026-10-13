@@ -1356,11 +1356,11 @@ dependencies = [
 [[package]]
 name = "libdd-library-config"
 version = "4.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v44.0.0#8dba9be608993b6222766ed8b7f742ce01461770"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v44.0.1#a4f7c7f30f6d634d63a6e4ab562e31d0035fd43f"
 dependencies = [
  "anyhow",
  "libc",
- "libdd-trace-protobuf 5.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v44.0.0)",
+ "libdd-trace-protobuf 5.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v44.0.1)",
  "memfd",
  "prost",
  "rand",
@@ -1554,6 +1554,16 @@ dependencies = [
 name = "libdd-trace-protobuf"
 version = "5.0.0"
 source = "git+https://github.com/DataDog/libdatadog.git?tag=v44.0.0#8dba9be608993b6222766ed8b7f742ce01461770"
+dependencies = [
+ "prost",
+ "serde",
+ "serde_bytes",
+]
+
+[[package]]
+name = "libdd-trace-protobuf"
+version = "5.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v44.0.1#a4f7c7f30f6d634d63a6e4ab562e31d0035fd43f"
 dependencies = [
  "prost",
  "serde",
