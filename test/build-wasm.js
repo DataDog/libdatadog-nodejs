@@ -16,7 +16,7 @@ test('configures WASM builds with scoped compiler flags', () => {
   const homebrewDirectory = path.join(temporaryRoot, 'homebrew')
   const llvmDirectory = path.join(homebrewDirectory, 'opt', 'llvm', 'bin')
   const existingRustFlags = '-C debuginfo=1'
-  const libdatadogWasmRustFlags = '-C target-feature=+simd128 -C llvm-args=-inline-threshold=45'
+  const compressionWasmRustFlags = '-C target-feature=+simd128 -C llvm-args=-inline-threshold=45'
 
   try {
     fs.mkdirSync(projectRoot, { recursive: true })
@@ -104,58 +104,60 @@ test('configures WASM builds with scoped compiler flags', () => {
       assert.strictEqual(rustFlags.target, existingRustFlags)
     }
 
-    const crateDirectory = path.join(projectRoot, 'crates', 'libdatadog-wasm')
-    fs.mkdirSync(crateDirectory, { recursive: true })
-
     const encodedExistingRustFlags = existingRustFlags.replaceAll(' ', '\x1F')
-    const encodedLibdatadogWasmRustFlags = libdatadogWasmRustFlags.replaceAll(' ', '\x1F')
+    const encodedCompressionWasmRustFlags = compressionWasmRustFlags.replaceAll(' ', '\x1F')
     const wasmToolchainRustFlags = '-Zunstable-options -Cpanic=immediate-abort'
     const rustFlagCases = [
       {
         environment: { CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: existingRustFlags },
-        expected: `${wasmToolchainRustFlags} ${libdatadogWasmRustFlags}`,
+        expected: `${wasmToolchainRustFlags} ${compressionWasmRustFlags}`,
         name: 'target',
         field: 'standard',
       },
       {
         environment: { RUSTFLAGS: existingRustFlags },
-        expected: `${existingRustFlags} ${wasmToolchainRustFlags} ${libdatadogWasmRustFlags}`,
+        expected: `${existingRustFlags} ${wasmToolchainRustFlags} ${compressionWasmRustFlags}`,
         name: 'standard',
         field: 'standard',
       },
       {
         environment: { CARGO_ENCODED_RUSTFLAGS: encodedExistingRustFlags },
-        expected: `${encodedExistingRustFlags}\x1F${encodedLibdatadogWasmRustFlags}`,
+        expected: `${encodedExistingRustFlags}\x1F${encodedCompressionWasmRustFlags}`,
         name: 'encoded',
         field: 'encoded',
       },
     ]
 
-    for (const { environment, expected, name, field } of rustFlagCases) {
-      const outputDirectory = path.join(projectRoot, 'prebuilds', `libdatadog-wasm-${name}`)
-      execFileSync(process.execPath, [buildScript, crateDirectory, outputDirectory], {
-        cwd: projectRoot,
-        env: {
-          ...process.env,
-          CARGO_ENCODED_RUSTFLAGS: undefined,
-          CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: undefined,
-          RUSTFLAGS: undefined,
-          ...environment,
-          HOMEBREW_DIR: homebrewDirectory,
-          PATH: `${binaryDirectory}${path.delimiter}${process.env.PATH}`,
-        },
-        stdio: 'pipe',
-      })
+    for (const crateName of ['libdatadog-wasm', 'libdatadog-wasm-zstd']) {
+      const crateDirectory = path.join(projectRoot, 'crates', crateName)
+      fs.mkdirSync(crateDirectory, { recursive: true })
 
-      const rustFlags = JSON.parse(
-        fs.readFileSync(path.join(outputDirectory, 'rustflags'), 'utf8'),
-      )
-      assert.strictEqual(
-        rustFlags[field],
-        expected,
-      )
-      if (field === 'standard') {
-        assert.strictEqual(rustFlags.target, name === 'target' ? existingRustFlags : undefined)
+      for (const { environment, expected, name, field } of rustFlagCases) {
+        const outputDirectory = path.join(projectRoot, 'prebuilds', `${crateName}-${name}`)
+        execFileSync(process.execPath, [buildScript, crateDirectory, outputDirectory], {
+          cwd: projectRoot,
+          env: {
+            ...process.env,
+            CARGO_ENCODED_RUSTFLAGS: undefined,
+            CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: undefined,
+            RUSTFLAGS: undefined,
+            ...environment,
+            HOMEBREW_DIR: homebrewDirectory,
+            PATH: `${binaryDirectory}${path.delimiter}${process.env.PATH}`,
+          },
+          stdio: 'pipe',
+        })
+
+        const rustFlags = JSON.parse(
+          fs.readFileSync(path.join(outputDirectory, 'rustflags'), 'utf8'),
+        )
+        assert.strictEqual(
+          rustFlags[field],
+          expected,
+        )
+        if (field === 'standard') {
+          assert.strictEqual(rustFlags.target, name === 'target' ? existingRustFlags : undefined)
+        }
       }
     }
 
