@@ -35,11 +35,16 @@ test('published packages contain only the intended artifacts', () => {
   const wasmNames = libdatadogWasm.files.map(file => file.path)
   const standaloneWasm = [...names, ...wasmNames]
     .filter(file => file.endsWith('.wasm'))
+  const compressedWasm = wasmNames.filter(file => file.endsWith('.wasm.br'))
 
   assert.deepStrictEqual(standaloneWasm, [],
-    `packages must not contain standalone WASM files: ${standaloneWasm.join(', ')}`)
+    `packages must not contain raw WASM files: ${standaloneWasm.join(', ')}`)
+  assert.deepStrictEqual(compressedWasm, [
+    'dist/libdatadog_wasm_bg.wasm.br',
+    'dist/remote-config/remote_config_bg.wasm.br',
+  ])
   assert(wasmNames.includes('dist/libdatadog_wasm.js'),
-    'WASM package must contain the inline-WASM JavaScript fallback')
+    'WASM package must contain the JavaScript loader')
   assert(wasmNames.includes('dist/remote-config/remote_config.js'),
     'WASM package must contain the dedicated remote config artifact')
   assert.strictEqual(wasmNames.includes('remote-config.js'), false)

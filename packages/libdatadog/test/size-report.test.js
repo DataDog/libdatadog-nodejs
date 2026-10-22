@@ -15,15 +15,14 @@ const {
   readCrateSizes,
   readSections,
 } = require('../scripts/report-wasm-size')
-
 const reportScript = path.join(__dirname, '..', 'scripts', 'report-wasm-size.js')
 
-test('reports inline packaging and WASM section sizes', () => {
+test('reports compressed packaging and WASM section sizes', () => {
   const gluePath = path.join(__dirname, '..', 'wasm', 'dist', 'libdatadog_wasm.js')
   const report = createWasmReport(gluePath)
 
   assert.match(report, /Raw WASM \(before Brotli\)/)
-  assert.match(report, /Base64 encoding overhead/)
+  assert.match(report, /Final packaged artifacts/)
   assert.match(report, /Raw WebAssembly sections/)
   assert.match(report, /\| code \|/)
   assert.match(report, /\| data \|/)
@@ -76,7 +75,7 @@ test('rejects symbolized WASM without attributable Rust crate names', () => {
   )
 })
 
-test('enforces each inline artifact size budget through the CLI', (t) => {
+test('enforces each packaged artifact size budget through the CLI', (t) => {
   const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'wasm-size-report-'))
   const fixtureScript = path.join(fixtureRoot, 'scripts', 'report-wasm-size.js')
   const mainGlue = path.join(fixtureRoot, 'wasm', 'dist', 'libdatadog_wasm.js')
@@ -88,8 +87,8 @@ test('enforces each inline artifact size budget through the CLI', (t) => {
   fs.mkdirSync(path.dirname(mainGlue), { recursive: true })
   fs.mkdirSync(path.dirname(remoteGlue), { recursive: true })
   fs.copyFileSync(reportScript, fixtureScript)
-  writeInlineWasm(mainGlue, 240 * 1024)
-  writeInlineWasm(remoteGlue, 330 * 1024)
+  writePackagedWasm(mainGlue, 240 * 1024)
+  writePackagedWasm(remoteGlue, 330 * 1024)
 
   const accepted = spawnSync(process.execPath, [fixtureScript], {
     encoding: 'utf8',
@@ -100,13 +99,13 @@ test('enforces each inline artifact size budget through the CLI', (t) => {
   assert.match(report, /## libdatadog WASM size/)
   assert.match(report, /## remote config WASM size/)
 
-  writeInlineWasm(mainGlue, 240 * 1024 + 1)
+  writePackagedWasm(mainGlue, 240 * 1024 + 1)
   const mainRejected = spawnSync(process.execPath, [fixtureScript], { encoding: 'utf8' })
   assert.equal(mainRejected.status, 1)
   assert.match(mainRejected.stderr, /libdatadog: 245,761 bytes exceeds 245,760 bytes/)
 
-  writeInlineWasm(mainGlue, 240 * 1024)
-  writeInlineWasm(remoteGlue, 330 * 1024 + 1)
+  writePackagedWasm(mainGlue, 240 * 1024)
+  writePackagedWasm(remoteGlue, 330 * 1024 + 1)
   const remoteRejected = spawnSync(process.execPath, [fixtureScript], { encoding: 'utf8' })
   assert.equal(remoteRejected.status, 1)
   assert.match(remoteRejected.stderr, /remote config: 337,921 bytes exceeds 337,920 bytes/)
@@ -126,12 +125,12 @@ test('compares before and after artifact sizes through the CLI', (t) => {
     { bytes: 2500, name: 'shared_crate::run' },
     { bytes: 2200, name: 'old_crate::run' },
     { bytes: 100, name: 'tiny_crate::run' },
-  ])
+  ], writeInlineWasm)
   writeComparisonBuild(afterRoot, [220, 220], [
     { bytes: 2600, name: 'shared_crate::run' },
     { bytes: 2300, name: 'new_crate::run' },
     { bytes: 150, name: 'tiny_crate::run' },
-  ])
+  ], writePackagedWasm)
 
   const result = spawnSync(process.execPath, [fixtureScript, '--compare', beforeRoot, afterRoot], {
     encoding: 'utf8',
@@ -152,8 +151,9 @@ test('compares before and after artifact sizes through the CLI', (t) => {
   assert.equal(report.match(/<details>/g)?.length, 2)
   assert.match(report, /<summary>libdatadog: \d+ changed, \d+ unchanged<\/summary>/)
   assert.match(report, /<summary>remote config: \d+ changed, \d+ unchanged<\/summary>/)
-  assert.match(report, /\| \*\*Final inlined JavaScript\*\* .* \*\*\+20 \(\+10\.00%\)\*\* \|/)
-  assert.match(report, /\| \*\*Final inlined JavaScript\*\* .* \*\*-20 \(-8\.33%\)\*\* \|/)
+  assert.match(report, /\| \*\*Final packaged artifacts\*\* .* \*\*\+20 \(\+10\.00%\)\*\* \|/)
+  assert.match(report, /\| \*\*Final packaged artifacts\*\* .* \*\*-20 \(-8\.33%\)\*\* \|/)
+  assert.match(report, /\| Base64 encoding overhead .* \(removed\) \|/)
   assert.match(report, /\| new-crate .* \+2,302 \(new\) \|/)
   assert.match(report, /\| old-crate .* -2,202 \(removed\) \|/)
   assert.match(report, /\| other crates \(<2 KiB in both builds\) /)
@@ -164,7 +164,7 @@ test('compares before and after artifact sizes through the CLI', (t) => {
     report.indexOf('<summary>libdatadog:'),
     report.indexOf('<summary>remote config:'),
   )
-  assert(libdatadogBreakdown.indexOf('Final inlined JavaScript') < libdatadogBreakdown.indexOf('Raw WASM'))
+  assert(libdatadogBreakdown.indexOf('Final packaged artifacts') < libdatadogBreakdown.indexOf('Raw WASM'))
 })
 
 test('rejects forbidden code linked into WASM', () => {
@@ -184,6 +184,20 @@ test('rejects forbidden code linked into WASM', () => {
  * @param {number} size
  * @param {Buffer} [wasm]
  */
+function writePackagedWasm (gluePath, size, wasm = Buffer.from([0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00])) {
+  const compressed = brotliCompressSync(wasm)
+  const loader = 'const wasmBytes = require(\'node:zlib\').brotliDecompressSync(compressedWasm)'
+
+  assert(loader.length + compressed.length <= size)
+  fs.writeFileSync(gluePath, loader.padEnd(size - compressed.length))
+  fs.writeFileSync(gluePath.replace(/\.js$/, '_bg.wasm.br'), compressed)
+}
+
+/**
+ * @param {string} gluePath
+ * @param {number} size
+ * @param {Buffer} [wasm]
+ */
 function writeInlineWasm (gluePath, size, wasm = Buffer.from([0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00])) {
   const encodedWasm = brotliCompressSync(wasm).toString('base64')
   const loader = `const wasmBytes = Buffer.from('${encodedWasm}', 'base64')`
@@ -194,10 +208,11 @@ function writeInlineWasm (gluePath, size, wasm = Buffer.from([0x00, 0x61, 0x73, 
 
 /**
  * @param {string} root
- * @param {[number, number]} inlineSizes
+ * @param {[number, number]} artifactSizes
  * @param {Array<{ bytes: number, name: string }>} functions
+ * @param {(gluePath: string, size: number) => void} writeWasm
  */
-function writeComparisonBuild (root, inlineSizes, functions) {
+function writeComparisonBuild (root, artifactSizes, functions, writeWasm) {
   const files = [
     {
       gluePath: 'packages/libdatadog/wasm/dist/libdatadog_wasm.js',
@@ -214,7 +229,7 @@ function writeComparisonBuild (root, inlineSizes, functions) {
     const profilePath = path.join(root, file.profilePath)
     fs.mkdirSync(path.dirname(gluePath), { recursive: true })
     fs.mkdirSync(path.dirname(profilePath), { recursive: true })
-    writeInlineWasm(gluePath, inlineSizes[index])
+    writeWasm(gluePath, artifactSizes[index])
     writeProfileWasm(profilePath, functions)
   }
 }
