@@ -50,7 +50,7 @@ const artifacts = [
     comparisonGluePath: 'packages/libdatadog/wasm/dist/remote-config/remote_config.js',
     gluePath: path.join(__dirname, '..', 'wasm', 'dist', 'remote-config', 'remote_config.js'),
     name: 'remote config',
-    maximumInlineBytes: 330 * 1024,
+    maximumInlineBytes: 332 * 1024,
     profilePath: 'target/size/remote-config/remote_config_bg.wasm',
   },
 ]

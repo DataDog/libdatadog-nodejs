@@ -89,7 +89,7 @@ test('enforces each inline artifact size budget through the CLI', (t) => {
   fs.mkdirSync(path.dirname(remoteGlue), { recursive: true })
   fs.copyFileSync(reportScript, fixtureScript)
   writeInlineWasm(mainGlue, 240 * 1024)
-  writeInlineWasm(remoteGlue, 330 * 1024)
+  writeInlineWasm(remoteGlue, 332 * 1024)
 
   const accepted = spawnSync(process.execPath, [fixtureScript], {
     encoding: 'utf8',
@@ -106,10 +106,10 @@ test('enforces each inline artifact size budget through the CLI', (t) => {
   assert.match(mainRejected.stderr, /libdatadog: 245,761 bytes exceeds 245,760 bytes/)
 
   writeInlineWasm(mainGlue, 240 * 1024)
-  writeInlineWasm(remoteGlue, 330 * 1024 + 1)
+  writeInlineWasm(remoteGlue, 332 * 1024 + 1)
   const remoteRejected = spawnSync(process.execPath, [fixtureScript], { encoding: 'utf8' })
   assert.equal(remoteRejected.status, 1)
-  assert.match(remoteRejected.stderr, /remote config: 337,921 bytes exceeds 337,920 bytes/)
+  assert.match(remoteRejected.stderr, /remote config: 339,969 bytes exceeds 339,968 bytes/)
 })
 
 test('compares before and after artifact sizes through the CLI', (t) => {
