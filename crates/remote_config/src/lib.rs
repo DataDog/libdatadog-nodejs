@@ -11,9 +11,7 @@ use libdd_remote_config::fetch::{
 };
 use libdd_remote_config::file_change_tracker::{Change, FilePath};
 use libdd_remote_config::file_storage::{RawFile, SimpleFileStorage};
-use libdd_remote_config::{
-    RemoteConfigCapabilities, RemoteConfigPath, RemoteConfigProduct, Target,
-};
+use libdd_remote_config::{CapabilityMask, RemoteConfigPath, RemoteConfigProduct, Target};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -32,12 +30,6 @@ type Fetcher = SingleChangesFetcher<SimpleFileStorage, WasmCapabilities>;
 /// cause by its `stack`, and the pure-JS fallback client rejects with `Error`s too.
 fn to_js_err(err: impl std::fmt::Display) -> JsValue {
     js_sys::Error::new(&err.to_string()).into()
-}
-
-/// Deserializing capabilities one name at a time keeps an unrecognized one from discarding
-/// the whole set.
-fn parse_capability(name: &str) -> Option<RemoteConfigCapabilities> {
-    serde_json::from_value(serde_json::Value::String(name.to_string())).ok()
 }
 
 /// Options accepted by [`RemoteConfigFetcher::new`]. These populate the `Client`/`ClientTracer` of
@@ -124,7 +116,7 @@ fn to_change_record(change: Change<Arc<RawFile<Vec<u8>>>, Vec<u8>>) -> ChangeRec
 #[derive(Default)]
 struct PendingUpdates {
     identity: Option<ClientIdentity>,
-    product_capabilities: Option<(Vec<RemoteConfigProduct>, Vec<RemoteConfigCapabilities>)>,
+    product_capabilities: Option<(Vec<RemoteConfigProduct>, CapabilityMask)>,
     extra_services: Option<Vec<String>>,
     config_states: Vec<(RemoteConfigPath, ConfigApplyState)>,
 }
@@ -154,7 +146,7 @@ impl FetcherConfig {
                 // Products and capabilities are only known once the subsystems that own them have
                 // registered their handlers, which always happens before the first poll.
                 products: vec![],
-                capabilities: vec![],
+                capabilities: CapabilityMask::default(),
             },
             WasmCapabilities::new_without_connection_pooling(),
         )
@@ -324,14 +316,13 @@ impl RemoteConfigFetcher {
 
     /// Replaces the set of subscribed products and capabilities.
     ///
-    /// Names this build does not know are skipped and returned, so that a tracer whose own list has
-    /// moved ahead of libdatadog's keeps working with the names that do resolve. Reporting them is
-    /// left to the caller, which owns the logger.
+    /// The unsigned big-endian capability bytes are copied before returning. Unknown
+    /// bits are preserved. Only unrecognized product names are skipped and returned.
     #[wasm_bindgen(js_name = "setProductCapabilities")]
     pub fn set_product_capabilities(
         &self,
         products: Vec<String>,
-        capabilities: Vec<String>,
+        capabilities: Vec<u8>,
     ) -> Vec<String> {
         let mut unknown = vec![];
 
@@ -346,18 +337,7 @@ impl RemoteConfigFetcher {
             })
             .collect();
 
-        let capabilities = capabilities
-            .into_iter()
-            .filter_map(|name| match parse_capability(&name) {
-                Some(capability) => Some(capability),
-                None => {
-                    unknown.push(name);
-                    None
-                }
-            })
-            .collect();
-
-        self.pending.borrow_mut().product_capabilities = Some((products, capabilities));
+        self.pending.borrow_mut().product_capabilities = Some((products, capabilities.into()));
 
         unknown
     }

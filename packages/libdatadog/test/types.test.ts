@@ -68,7 +68,9 @@ const remoteConfigFetcher = new RemoteConfigFetcher({
 
 remoteConfigFetcher.setExtraServices([])
 remoteConfigFetcher.setIdentity('client-id-2', 'runtime-id-2', [])
-remoteConfigFetcher.setProductCapabilities([], [])
+remoteConfigFetcher.setProductCapabilities([], new Uint8Array())
+// @ts-expect-error Capability masks use bytes.
+remoteConfigFetcher.setProductCapabilities([], ['ASM_ACTIVATION'])
 setStorage(runInStorage)
 
 function runInStorage (callback: () => void): void {

@@ -13,6 +13,12 @@ published separately as `@datadog/libdatadog-extras`.
 Remote configuration is available from `@datadog/libdatadog/remote-config`.
 It uses a dedicated wasm-bindgen artifact that loads only with this entry point.
 
+`setProductCapabilities(products, capabilities)` accepts a `Uint8Array` or `Buffer`
+with unsigned, big-endian capability bytes. Bit zero is the low bit of the final
+byte. The method copies the selected view and preserves unknown bits and padding.
+It returns unrecognized product names. Updates during a configuration request take effect on the
+next poll, with the final products and mask supplied together.
+
 The package accepts Datadog v0.4 MessagePack payloads and exports them to an
 agentless intake. `sendV04()` reports completion through a callback and sends
 delivery failures to the supplied logger. It does not return a promise.
