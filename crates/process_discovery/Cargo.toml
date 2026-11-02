@@ -10,5 +10,5 @@ crate-type = ["cdylib", "rlib"]
 libdd-library-config = { git = "https://github.com/DataDog/libdatadog.git", tag = "v44.0.0", features = ["otel-thread-ctx"] }
 libdd-trace-protobuf = { git = "https://github.com/DataDog/libdatadog.git", tag = "v44.0.0" }
 
-napi = { version = "3" }
+napi = { version = "3.15.0" }
 napi-derive = { version = "3", default-features = false }

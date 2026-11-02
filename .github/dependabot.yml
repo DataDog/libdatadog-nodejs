@@ -62,6 +62,13 @@ updates:
       - rust
       - semver-patch
     groups:
+      napi:
+        patterns:
+          - "napi"
+          - "napi-*"
+      libdatadog:
+        patterns:
+          - "libdd-*"
       patch-updates:
         update-types:
           - "patch"
