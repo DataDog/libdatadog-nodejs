@@ -43,8 +43,7 @@ impl FileCapability for WasmFileCapability {
     fn read(&self, path: &str) -> impl Future<Output = Result<Bytes, FileError>> + MaybeSend {
         let path = path.to_owned();
         async move {
-            let promise =
-                js_read_file(&path).map_err(|e| map_js_error(&e, &path))?;
+            let promise = js_read_file(&path).map_err(|e| map_js_error(&e, &path))?;
             let value = JsFuture::from(promise)
                 .await
                 .map_err(|e| map_js_error(&e, &path))?;
@@ -61,8 +60,7 @@ impl FileCapability for WasmFileCapability {
     ) -> impl Future<Output = Result<(), FileError>> + MaybeSend {
         let path = path.to_owned();
         async move {
-            let promise = js_write_file(&path, &contents)
-                .map_err(|e| map_js_error(&e, &path))?;
+            let promise = js_write_file(&path, &contents).map_err(|e| map_js_error(&e, &path))?;
             JsFuture::from(promise)
                 .await
                 .map_err(|e| map_js_error(&e, &path))?;
@@ -77,8 +75,7 @@ impl FileCapability for WasmFileCapability {
     ) -> impl Future<Output = Result<FileMetadata, FileError>> + MaybeSend {
         let path = path.to_owned();
         async move {
-            let promise =
-                js_metadata(&path).map_err(|e| map_js_error(&e, &path))?;
+            let promise = js_metadata(&path).map_err(|e| map_js_error(&e, &path))?;
             let value = JsFuture::from(promise)
                 .await
                 .map_err(|e| map_js_error(&e, &path))?;
@@ -94,9 +91,9 @@ impl FileCapability for WasmFileCapability {
             let value = JsFuture::from(promise)
                 .await
                 .map_err(|e| map_js_error(&e, &path))?;
-            value
-                .as_bool()
-                .ok_or_else(|| FileError::Io(anyhow::anyhow!("exists({path}) did not return a boolean")))
+            value.as_bool().ok_or_else(|| {
+                FileError::Io(anyhow::anyhow!("exists({path}) did not return a boolean"))
+            })
         }
     }
 }
@@ -133,15 +130,26 @@ fn parse_metadata(value: &JsValue, path: &str) -> Result<FileMetadata, FileError
 }
 
 fn read_bigint_u64(value: &JsValue, key: &str, path: &str) -> Result<u64, FileError> {
-    let v = Reflect::get(value, &JsValue::from_str(key))
-        .map_err(|_| FileError::Io(anyhow::anyhow!("metadata({path}) could not read field `{key}`")))?;
+    let v = Reflect::get(value, &JsValue::from_str(key)).map_err(|_| {
+        FileError::Io(anyhow::anyhow!(
+            "metadata({path}) could not read field `{key}`"
+        ))
+    })?;
     if v.is_undefined() || v.is_null() {
-        return Err(FileError::Io(anyhow::anyhow!("metadata({path}) missing field `{key}`")));
+        return Err(FileError::Io(anyhow::anyhow!(
+            "metadata({path}) missing field `{key}`"
+        )));
     }
-    let bigint = js_sys::BigInt::try_from(v)
-        .map_err(|_| FileError::Io(anyhow::anyhow!("metadata({path}) field `{key}` is not a BigInt")))?;
-    u64::try_from(bigint)
-        .map_err(|_| FileError::Io(anyhow::anyhow!("metadata({path}) field `{key}` overflows u64")))
+    let bigint = js_sys::BigInt::try_from(v).map_err(|_| {
+        FileError::Io(anyhow::anyhow!(
+            "metadata({path}) field `{key}` is not a BigInt"
+        ))
+    })?;
+    u64::try_from(bigint).map_err(|_| {
+        FileError::Io(anyhow::anyhow!(
+            "metadata({path}) field `{key}` overflows u64"
+        ))
+    })
 }
 
 fn read_bool(value: &JsValue, key: &str, path: &str) -> Result<bool, FileError> {
