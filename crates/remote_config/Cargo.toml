@@ -8,8 +8,8 @@ description = "Wasm binding for libdatadog's remote config client"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-libdd-remote-config = { git = "https://github.com/DataDog/libdatadog.git", tag = "v44.0.0", default-features = false, features = ["client", "agentless"] }
-libdd-common = { git = "https://github.com/DataDog/libdatadog.git", tag = "v44.0.0", default-features = false }
+libdd-remote-config = { git = "https://github.com/DataDog/libdatadog.git", rev = "3b33629dc01df839ee5b040748ff76702f5e7f9d", default-features = false, features = ["client", "agentless"] }
+libdd-common = { git = "https://github.com/DataDog/libdatadog.git", rev = "3b33629dc01df839ee5b040748ff76702f5e7f9d", default-features = false }
 libdatadog-nodejs-capabilities = { path = "../capabilities" }
 
 wasm-bindgen = "0.2"

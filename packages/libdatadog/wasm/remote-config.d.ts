@@ -30,7 +30,10 @@ export class RemoteConfigFetcher {
   setConfigState(path: string, applyState: number, applyError?: string): void
   setExtraServices(services: string[]): void
   setIdentity(clientId: string, runtimeId: string, tags: string[]): void
+  /** Returns unrecognized product and capability names. */
   setProductCapabilities(products: string[], capabilities: string[]): string[]
+  /** Copies an unsigned, big-endian mask. Returns unrecognized product names. */
+  setProductCapabilityMask(products: string[], capabilities: Uint8Array): string[]
 }
 
 export function setStorage(storage: (callback: () => void) => void): void

@@ -1,6 +1,6 @@
 'use strict'
 
-const assert = require('node:assert')
+const assert = require('node:assert/strict')
 const { createHash } = require('node:crypto')
 const { execFileSync } = require('node:child_process')
 const { once } = require('node:events')
@@ -8,13 +8,40 @@ const { createServer } = require('node:http')
 const { test } = require('node:test')
 
 const libdatadog = require('..')
-const { RemoteConfigFetcher } = libdatadog.load('remote_config')
+const originalInstance = WebAssembly.Instance
+let guestMemory
+let binding
+WebAssembly.Instance = new Proxy(originalInstance, {
+  /**
+   * @param {typeof WebAssembly.Instance} target
+   * @param {ConstructorParameters<typeof WebAssembly.Instance>} args
+   */
+  construct (target, args) {
+    const instance = Reflect.construct(target, args)
+    guestMemory = instance.exports.memory
+    return instance
+  },
+})
+try {
+  binding = libdatadog.load('remote_config')
+} finally {
+  WebAssembly.Instance = originalInstance
+}
+const { RemoteConfigFetcher } = binding
 assert(RemoteConfigFetcher !== undefined)
 
 const APPLY_STATE_ACKNOWLEDGED = 2
 const APPLY_STATE_ERROR = 3
 
 const CONFIG_PATH = 'datadog/2/ASM_FEATURES/asm-features-1/config'
+
+/**
+ * @typedef {object} CapabilityFixture
+ * @property {import('../packages/libdatadog/wasm/remote-config').RemoteConfigFetcher} fetcher
+ * @property {{ client: { capabilities: number[], products: string[] } }[]} requests
+ * @property {(string | Promise<MessageEvent[]>)[]} responses
+ * @property {import('node:http').Server} server
+ */
 
 /**
  * Builds a `/v0.7/config` response body: a base64 encoded TUF-like `targets` document plus the
@@ -51,6 +78,7 @@ function agentResponse (configs, targetsVersion) {
   })
 }
 
+/** @param {Partial<import('../packages/libdatadog/wasm/remote-config').RemoteConfigFetcherOptions>} [overrides] */
 function fetcherOptions (overrides) {
   return {
     clientId: 'client-id-1',
@@ -239,16 +267,71 @@ test('sends the apply state set for a config on the next poll', async () => {
 })
 
 test('skips unknown products and capabilities, and rejects bad apply states', async () => {
-  await withAgent(async ({ fetcher }) => {
-    // Names this build does not know are skipped and returned, so that a tracer whose own lists
-    // have moved ahead of libdatadog's keeps working with the names that do resolve.
+  await withAgent(/** @param {CapabilityFixture} fixture */ async ({ fetcher }) => {
     assert.deepStrictEqual(
       fetcher.setProductCapabilities(['ASM_FEATURES', 'NOT_A_PRODUCT'], ['ASM_ACTIVATION', 'NOT_A_CAPABILITY']),
       ['NOT_A_PRODUCT', 'NOT_A_CAPABILITY'],
     )
+    assert.deepStrictEqual(
+      fetcher.setProductCapabilityMask(['ASM_FEATURES', 'NOT_A_PRODUCT'], new Uint8Array([2])),
+      ['NOT_A_PRODUCT'],
+    )
 
     assert.throws(() => fetcher.setConfigState(CONFIG_PATH, 42, ''), { message: /Unknown apply state 42/ })
     assert.throws(() => fetcher.setConfigState('nonsense', APPLY_STATE_ACKNOWLEDGED, ''))
+  })
+})
+
+test('copies the selected capability view and preserves arbitrary mask widths', async () => {
+  await withAgent(/** @param {CapabilityFixture} fixture */ async ({ fetcher, requests }) => {
+    const source = new Uint8Array([0xFF, 0, 0x80, 0, 1, 0xFF])
+    fetcher.setProductCapabilityMask(['ASM_FEATURES'], source.subarray(1, 5))
+    source.fill(0)
+    await fetcher.fetchChanges()
+    assert.deepStrictEqual(requests[0].client.capabilities, [0, 0x80, 0, 1])
+
+    const masks = [Buffer.alloc(0), Buffer.from([0]), Buffer.from([0, 0]), Buffer.from([0, 0x80]),
+      Buffer.from([0, 0, 0, 0, 0, 0, 0, 1]), Buffer.alloc(33, 0x81)]
+    for (const mask of masks) {
+      fetcher.setProductCapabilityMask([], mask)
+      await fetcher.fetchChanges()
+      assert.deepStrictEqual(requests.at(-1).client.capabilities, [...mask])
+    }
+  })
+})
+
+test('keeps a complete poll snapshot and the final pending product and mask pair', async () => {
+  await withAgent(/** @param {CapabilityFixture} fixture */ async ({ fetcher, requests, responses, server }) => {
+    fetcher.setProductCapabilities(['ASM_FEATURES'], ['ASM_ACTIVATION'])
+    const responseEvents = new EventTarget()
+    responses.push(once(responseEvents, 'response'))
+    const started = once(server, 'request')
+    const first = fetcher.fetchChanges()
+    await started
+    try {
+      fetcher.setProductCapabilityMask(['ASM_DD'], new Uint8Array([0x40]))
+      fetcher.setProductCapabilities(['ASM_DD'], ['ASM_DD_RULES'])
+      const mask = new Uint8Array(33)
+      mask[0] = 1
+      mask[32] = 0x80
+      fetcher.setProductCapabilityMask(['APM_TRACING'], mask)
+      mask.fill(0)
+      const previousBuffer = guestMemory.buffer
+      guestMemory.grow(1)
+      assert.notStrictEqual(guestMemory.buffer, previousBuffer)
+    } finally {
+      responseEvents.dispatchEvent(new MessageEvent('response', { data: '{}' }))
+    }
+    await first
+    await fetcher.fetchChanges()
+    assert.deepStrictEqual(requests[0].client.products, ['ASM_FEATURES'])
+    assert.deepStrictEqual(requests[0].client.capabilities, [2])
+    assert.deepStrictEqual(requests[1].client.products, ['APM_TRACING'])
+    assert.deepStrictEqual(requests[1].client.capabilities, [1, ...Buffer.alloc(31), 0x80])
+    fetcher.setProductCapabilities(['ASM_DD'], ['ASM_DD_RULES'])
+    await fetcher.fetchChanges()
+    assert.deepStrictEqual(requests[2].client.products, ['ASM_DD'])
+    assert.deepStrictEqual(requests[2].client.capabilities, [8])
   })
 })
 

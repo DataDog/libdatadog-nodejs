@@ -166,6 +166,10 @@ test('keeps the WASM remote config validation contract', () => {
     ),
     ['NOT_A_PRODUCT', 'NOT_A_CAPABILITY'],
   )
+  assert.deepStrictEqual(
+    fetcher.setProductCapabilityMask(['ASM_FEATURES', 'NOT_A_PRODUCT'], new Uint8Array([2])),
+    ['NOT_A_PRODUCT'],
+  )
   assert.throws(
     () => fetcher.setConfigState(CONFIG_PATH, 42),
     /Unknown apply state 42/,
