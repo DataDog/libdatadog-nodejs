@@ -1057,7 +1057,7 @@ dependencies = [
  "bytes",
  "http 1.5.0",
  "js-sys",
- "libdd-capabilities 3.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v44.0.0)",
+ "libdd-capabilities 4.0.1",
  "wasm-bindgen",
  "wasm-bindgen-futures",
 ]
@@ -1246,11 +1246,15 @@ dependencies = [
  "http-body",
  "http-body-util",
  "hyper",
+ "hyper-rustls",
  "hyper-util",
  "libc",
  "nix 0.29.0",
  "pin-project",
  "regex",
+ "rustls",
+ "rustls-platform-verifier",
+ "rustls-webpki",
  "serde",
  "static_assertions",
  "thiserror 2.0.20",
@@ -1446,8 +1450,8 @@ dependencies = [
 
 [[package]]
 name = "libdd-remote-config"
-version = "5.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v44.0.0#8dba9be608993b6222766ed8b7f742ce01461770"
+version = "7.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v46.1.0#bfa70eb6166db96673844c1a3fc1048f58e895d1"
 dependencies = [
  "anyhow",
  "base64",
@@ -1459,18 +1463,16 @@ dependencies = [
  "hashbrown",
  "http 1.5.0",
  "http-body-util",
- "libdd-capabilities 3.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v44.0.0)",
- "libdd-capabilities-impl 5.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v44.0.0)",
- "libdd-common 6.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v44.0.0)",
- "libdd-trace-protobuf 5.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v44.0.0)",
+ "libdd-capabilities 4.0.1",
+ "libdd-capabilities-impl 7.0.0",
+ "libdd-common 8.0.0",
+ "libdd-trace-protobuf 5.1.0",
  "libdd-tuf",
  "manual_future",
  "prost",
  "rand",
- "ring",
  "serde",
  "serde_json",
- "serde_with",
  "sha2",
  "strum",
  "strum_macros",
@@ -2313,10 +2315,10 @@ dependencies = [
  "getrandom 0.2.17",
  "js-sys",
  "libdatadog-nodejs-capabilities",
- "libdd-capabilities 3.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v44.0.0)",
- "libdd-common 6.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v44.0.0)",
+ "libdd-capabilities 4.0.1",
+ "libdd-common 8.0.0",
  "libdd-data-pipeline",
- "libdd-shared-runtime 4.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v44.0.0)",
+ "libdd-shared-runtime 6.0.0",
  "libdd-trace-utils 14.0.0",
  "serde",
  "serde_json",
@@ -2513,7 +2515,7 @@ dependencies = [
  "console_error_panic_hook",
  "js-sys",
  "libdatadog-nodejs-capabilities",
- "libdd-common 6.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v44.0.0)",
+ "libdd-common 8.0.0",
  "libdd-remote-config",
  "serde",
  "serde-wasm-bindgen",
@@ -2654,9 +2656,9 @@ checksum = "f87165f0995f63a9fbeea62b64d10b4d9d8e78ec6d7d51fb2125fda7bb36788f"
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.15"
+version = "0.103.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3c3cf1d8b1e7d4927e2d154c3fcb02979afb9939629c62cd9048d4f07b60ac2"
+checksum = "4443b1b6d39d7c663139942cc4558262562d2c84123bb6282ef177009ca8b281"
 dependencies = [
  "aws-lc-rs",
  "ring",
@@ -2825,15 +2827,6 @@ dependencies = [
  "serde",
  "serde_core",
  "zmij",
-]
-
-[[package]]
-name = "serde_with"
-version = "3.22.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee78f1fbe43ac4a0e47aadb3dbd357b69eb0d3793e948624cd03dd2750ab1c0a"
-dependencies = [
- "serde_core",
 ]
 
 [[package]]

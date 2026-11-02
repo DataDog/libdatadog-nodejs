@@ -15,7 +15,9 @@ use libdd_capabilities::env::{EnvCapability, EnvError};
 use libdd_capabilities::file::{FileCapability, FileError, FileMetadata};
 use libdd_capabilities::http::HttpError;
 // Re-exported so consumers can name the traits without depending on `libdd-capabilities` directly.
-pub use libdd_capabilities::{HttpClientCapability, LogWriterCapability, MaybeSend, SleepCapability};
+pub use libdd_capabilities::{
+    HttpClientCapability, LogWriterCapability, MaybeSend, SleepCapability,
+};
 
 pub mod env;
 pub mod file;
@@ -66,9 +68,9 @@ impl HttpClientCapability for WasmCapabilities {
         Self::new()
     }
 
-    fn new_without_connection_pooling() -> Self {
+    fn new_periodic() -> Self {
         Self {
-            http: WasmHttpClient::new_without_connection_pooling(),
+            http: WasmHttpClient::new_periodic(),
             ..Self::new()
         }
     }

@@ -1,8 +1,9 @@
 'use strict'
 
 const { describe, it, before, beforeEach } = require('node:test')
-const assert = require('node:assert')
+const assert = require('node:assert/strict')
 const crypto = require('node:crypto')
+const { gunzipSync } = require('node:zlib')
 
 const pipeline = require('..').maybeLoad('pipeline')
 // The pipeline binding is wasm-only and is absent in the native
@@ -1158,21 +1159,26 @@ describe('pipeline', { skip }, () => {
       peer_tags: [],
       span_kinds_stats_computed: ['server', 'consumer', 'client', 'producer'],
     })
-    const server = http.createServer((req, res) => {
-      const chunks = []
-      req.on('data', c => chunks.push(c))
-      req.on('end', () => {
-        seen.push({
-          method: req.method,
-          url: req.url,
-          len: Buffer.concat(chunks).length,
-          headers: req.headers,
+    const server = http.createServer(/**
+     * @param {import('node:http').IncomingMessage} req
+     * @param {import('node:http').ServerResponse} res
+     */ (req, res) => {
+        const chunks = []
+        req.on('data', /** @param {Buffer} chunk */ chunk => chunks.push(chunk))
+        req.on('end', () => {
+          const body = Buffer.concat(chunks)
+          seen.push({
+            method: req.method,
+            url: req.url,
+            len: body.length,
+            body,
+            headers: req.headers,
+          })
+          const headers = { 'content-type': 'application/json', 'datadog-agent-state': state }
+          res.writeHead(200, headers)
+          res.end(req.url === '/info' ? info : '{}')
         })
-        const headers = { 'content-type': 'application/json', 'datadog-agent-state': state }
-        res.writeHead(200, headers)
-        res.end(req.url === '/info' ? info : '{}')
       })
-    })
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
     return {
       seen,
@@ -1184,6 +1190,10 @@ describe('pipeline', { skip }, () => {
     }
   }
 
+  /**
+   * @param {NativeSpansInterface} ns
+   * @param {string} resource
+   */
   function makeSpan (ns, resource) {
     const span = ns.createSpan()
     span.name = 'stats-span'
@@ -1194,6 +1204,35 @@ describe('pipeline', { skip }, () => {
     span.duration = 5_000_000n
     return span
   }
+
+  describe('telemetry runtime identity', () => {
+    for (const runtimeId of [undefined, '7938685c-19dd-490f-b9b3-8aae4c22f897']) {
+      it(`uses the ${runtimeId ? 'explicit' : 'constructor'} runtime ID`, async () => {
+        const agent = await startAgentStub()
+        const constructorId = '00000000-0000-0000-0000-000000000000'
+        const ns = new NativeSpansInterface({ agentUrl: agent.url, runtimeId: constructorId })
+        ns.state.enableTelemetry(0, runtimeId, false)
+
+        try {
+          await ns.flushSpans(makeSpan(ns, '/telemetry'))
+          ns.state.enableTelemetry(0, '7938685c-19dd-490f-b9b3-8aae4c22f898', false)
+          await ns.flushSpans(makeSpan(ns, '/telemetry-after-initialization'))
+          await ns.state.shutdown(10_000)
+
+          let count = 0
+          for (const request of agent.seen) {
+            if (!request.url.includes('/telemetry/')) continue
+            count++
+            const body = request.headers['content-encoding'] === 'gzip' ? gunzipSync(request.body) : request.body
+            assert.strictEqual(JSON.parse(body).runtime_id, runtimeId ?? constructorId)
+          }
+          assert.ok(count > 0, 'expected telemetry to be sent')
+        } finally {
+          agent.close()
+        }
+      })
+    }
+  })
 
   describe('client-side stats', () => {
     it('computes stats natively and flushes them to /v0.6/stats on shutdown', async () => {
@@ -1212,7 +1251,10 @@ describe('pipeline', { skip }, () => {
           tracesWithStatsHeader = agent.seen.filter(
             r => r.url === '/v0.4/traces' && r.headers['datadog-client-computed-stats'],
           )
-          if (tracesWithStatsHeader.length > 0) break
+          if (tracesWithStatsHeader.length > 0 && agent.seen.some(
+            /** @param {Pick<import('node:http').IncomingMessage, 'url'>} request */
+            request => request.url === '/info',
+          )) break
           await new Promise(resolve => setTimeout(resolve, 20))
         }
         assert.ok(agent.seen.some(r => r.url === '/info'), 'exporter polled /info')
