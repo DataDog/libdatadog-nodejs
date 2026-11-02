@@ -1,4 +1,4 @@
-const assert = require('node:assert')
+const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
 
@@ -61,3 +61,34 @@ function test_service_selector () {
 
 test_host_wide()
 test_service_selector()
+
+function test_configuration_inputs () {
+  const configurator = new libconfig.JsConfigurator()
+  const local = 'config_id: local\napm_configuration_default:\n  DD_SERVICE: local-service'
+  const managed = 'config_id: managed\napm_configuration_default:\n  DD_SERVICE: fleet-サービス'
+
+  for (const [localInput, managedInput, expected] of [
+    ['', '', []],
+    [local, '', [['local-service', 'local_stable_config', 'local']]],
+    ['', managed, [['fleet-サービス', 'fleet_stable_config', 'managed']]],
+    [local, managed, [['fleet-サービス', 'fleet_stable_config', 'managed']]],
+  ]) {
+    const entries = configurator.get_configuration(localInput, managedInput)
+    assert.strictEqual(entries.length, expected.length)
+    for (const [i, entry] of entries.entries()) {
+      assert.strictEqual(entry.name, 'DD_SERVICE')
+      assert.strictEqual(entry.value, expected[i][0])
+      assert.strictEqual(entry.source, expected[i][1])
+      assert.strictEqual(entry.config_id, expected[i][2])
+    }
+  }
+
+  for (const [localInput, managedInput] of [['[', ''], ['', '[']]) {
+    assert.throws(
+      () => configurator.get_configuration(localInput, managedInput),
+      /Failed to get configuration:/,
+    )
+  }
+}
+
+test_configuration_inputs()
