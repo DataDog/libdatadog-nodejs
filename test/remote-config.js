@@ -127,7 +127,7 @@ async function withAgent (run) {
 
 test('reports the client identity, products and capabilities', async () => {
   await withAgent(async ({ fetcher, requests }) => {
-    fetcher.setProductCapabilities(['ASM_FEATURES', 'ASM_DD'], new Uint8Array([10]))
+    fetcher.setProductCapabilities(['ASM_FEATURES', 'ASM_DD'], ['ASM_ACTIVATION', 'ASM_DD_RULES'])
     fetcher.setExtraServices(['other_svc'])
 
     assert.deepStrictEqual(await fetcher.fetchChanges(), [])
@@ -148,7 +148,7 @@ test('reports the client identity, products and capabilities', async () => {
 
 test('updates identity without resetting remote config state', async () => {
   await withAgent(async ({ fetcher, requests, responses, server }) => {
-    fetcher.setProductCapabilities(['ASM_FEATURES'], new Uint8Array([2]))
+    fetcher.setProductCapabilities(['ASM_FEATURES'], ['ASM_ACTIVATION'])
     const responseEvents = new EventTarget()
     responses.push(once(responseEvents, 'response'))
 
@@ -192,7 +192,7 @@ test('updates identity without resetting remote config state', async () => {
 
 test('diffs successive polls into add, update and remove changes', async () => {
   await withAgent(async ({ fetcher, responses }) => {
-    fetcher.setProductCapabilities(['ASM_FEATURES'], new Uint8Array())
+    fetcher.setProductCapabilities(['ASM_FEATURES'], [])
 
     responses.push(agentResponse([{ path: CONFIG_PATH, file: { asm: { enabled: true } }, version: 1 }], 1))
 
@@ -230,7 +230,7 @@ test('diffs successive polls into add, update and remove changes', async () => {
 
 test('sends the apply state set for a config on the next poll', async () => {
   await withAgent(async ({ fetcher, requests, responses }) => {
-    fetcher.setProductCapabilities(['ASM_FEATURES'], new Uint8Array())
+    fetcher.setProductCapabilities(['ASM_FEATURES'], [])
 
     responses.push(agentResponse([{ path: CONFIG_PATH, file: { asm: { enabled: true } }, version: 1 }], 1))
     await fetcher.fetchChanges()
@@ -266,10 +266,14 @@ test('sends the apply state set for a config on the next poll', async () => {
   })
 })
 
-test('skips unknown products and rejects bad apply states', async () => {
-  await withAgent(async ({ fetcher }) => {
+test('skips unknown products and capabilities, and rejects bad apply states', async () => {
+  await withAgent(/** @param {CapabilityFixture} fixture */ async ({ fetcher }) => {
     assert.deepStrictEqual(
-      fetcher.setProductCapabilities(['ASM_FEATURES', 'NOT_A_PRODUCT'], new Uint8Array([2])),
+      fetcher.setProductCapabilities(['ASM_FEATURES', 'NOT_A_PRODUCT'], ['ASM_ACTIVATION', 'NOT_A_CAPABILITY']),
+      ['NOT_A_PRODUCT', 'NOT_A_CAPABILITY'],
+    )
+    assert.deepStrictEqual(
+      fetcher.setProductCapabilityMask(['ASM_FEATURES', 'NOT_A_PRODUCT'], new Uint8Array([2])),
       ['NOT_A_PRODUCT'],
     )
 
@@ -281,7 +285,7 @@ test('skips unknown products and rejects bad apply states', async () => {
 test('copies the selected capability view and preserves arbitrary mask widths', async () => {
   await withAgent(/** @param {CapabilityFixture} fixture */ async ({ fetcher, requests }) => {
     const source = new Uint8Array([0xFF, 0, 0x80, 0, 1, 0xFF])
-    fetcher.setProductCapabilities(['ASM_FEATURES'], source.subarray(1, 5))
+    fetcher.setProductCapabilityMask(['ASM_FEATURES'], source.subarray(1, 5))
     source.fill(0)
     await fetcher.fetchChanges()
     assert.deepStrictEqual(requests[0].client.capabilities, [0, 0x80, 0, 1])
@@ -289,7 +293,7 @@ test('copies the selected capability view and preserves arbitrary mask widths', 
     const masks = [Buffer.alloc(0), Buffer.from([0]), Buffer.from([0, 0]), Buffer.from([0, 0x80]),
       Buffer.from([0, 0, 0, 0, 0, 0, 0, 1]), Buffer.alloc(33, 0x81)]
     for (const mask of masks) {
-      fetcher.setProductCapabilities([], mask)
+      fetcher.setProductCapabilityMask([], mask)
       await fetcher.fetchChanges()
       assert.deepStrictEqual(requests.at(-1).client.capabilities, [...mask])
     }
@@ -298,18 +302,19 @@ test('copies the selected capability view and preserves arbitrary mask widths', 
 
 test('keeps a complete poll snapshot and the final pending product and mask pair', async () => {
   await withAgent(/** @param {CapabilityFixture} fixture */ async ({ fetcher, requests, responses, server }) => {
-    fetcher.setProductCapabilities(['ASM_FEATURES'], new Uint8Array([2]))
+    fetcher.setProductCapabilities(['ASM_FEATURES'], ['ASM_ACTIVATION'])
     const responseEvents = new EventTarget()
     responses.push(once(responseEvents, 'response'))
     const started = once(server, 'request')
     const first = fetcher.fetchChanges()
     await started
     try {
-      fetcher.setProductCapabilities(['ASM_DD'], new Uint8Array([0x40]))
+      fetcher.setProductCapabilityMask(['ASM_DD'], new Uint8Array([0x40]))
+      fetcher.setProductCapabilities(['ASM_DD'], ['ASM_DD_RULES'])
       const mask = new Uint8Array(33)
       mask[0] = 1
       mask[32] = 0x80
-      fetcher.setProductCapabilities(['APM_TRACING'], mask)
+      fetcher.setProductCapabilityMask(['APM_TRACING'], mask)
       mask.fill(0)
       const previousBuffer = guestMemory.buffer
       guestMemory.grow(1)
@@ -323,6 +328,10 @@ test('keeps a complete poll snapshot and the final pending product and mask pair
     assert.deepStrictEqual(requests[0].client.capabilities, [2])
     assert.deepStrictEqual(requests[1].client.products, ['APM_TRACING'])
     assert.deepStrictEqual(requests[1].client.capabilities, [1, ...Buffer.alloc(31), 0x80])
+    fetcher.setProductCapabilities(['ASM_DD'], ['ASM_DD_RULES'])
+    await fetcher.fetchChanges()
+    assert.deepStrictEqual(requests[2].client.products, ['ASM_DD'])
+    assert.deepStrictEqual(requests[2].client.capabilities, [8])
   })
 })
 

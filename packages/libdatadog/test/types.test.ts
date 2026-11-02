@@ -68,9 +68,12 @@ const remoteConfigFetcher = new RemoteConfigFetcher({
 
 remoteConfigFetcher.setExtraServices([])
 remoteConfigFetcher.setIdentity('client-id-2', 'runtime-id-2', [])
-remoteConfigFetcher.setProductCapabilities([], new Uint8Array())
-// @ts-expect-error Capability masks use bytes.
 remoteConfigFetcher.setProductCapabilities([], ['ASM_ACTIVATION'])
+remoteConfigFetcher.setProductCapabilityMask([], new Uint8Array())
+// @ts-expect-error Capability masks use bytes.
+remoteConfigFetcher.setProductCapabilityMask([], ['ASM_ACTIVATION'])
+// @ts-expect-error The legacy setter accepts names.
+remoteConfigFetcher.setProductCapabilities([], new Uint8Array())
 setStorage(runInStorage)
 
 function runInStorage (callback: () => void): void {

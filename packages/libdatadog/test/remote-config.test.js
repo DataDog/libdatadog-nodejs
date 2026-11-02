@@ -89,7 +89,7 @@ test('exports agentless remote config from the dedicated entry point', async () 
   try {
     const fetcher = new RemoteConfigFetcher(fetcherOptions())
     assert.deepStrictEqual(
-      fetcher.setProductCapabilities(['ASM_FEATURES'], new Uint8Array([2])),
+      fetcher.setProductCapabilities(['ASM_FEATURES'], ['ASM_ACTIVATION']),
       [],
     )
     fetcher.setExtraServices(['extra-service'])
@@ -162,8 +162,12 @@ test('keeps the WASM remote config validation contract', () => {
   assert.deepStrictEqual(
     fetcher.setProductCapabilities(
       ['ASM_FEATURES', 'NOT_A_PRODUCT'],
-      new Uint8Array([2]),
+      ['ASM_ACTIVATION', 'NOT_A_CAPABILITY'],
     ),
+    ['NOT_A_PRODUCT', 'NOT_A_CAPABILITY'],
+  )
+  assert.deepStrictEqual(
+    fetcher.setProductCapabilityMask(['ASM_FEATURES', 'NOT_A_PRODUCT'], new Uint8Array([2])),
     ['NOT_A_PRODUCT'],
   )
   assert.throws(

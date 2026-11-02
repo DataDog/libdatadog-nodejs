@@ -13,9 +13,13 @@ published separately as `@datadog/libdatadog-extras`.
 Remote configuration is available from `@datadog/libdatadog/remote-config`.
 It uses a dedicated wasm-bindgen artifact that loads only with this entry point.
 
-`setProductCapabilities(products, capabilities)` accepts a `Uint8Array` or `Buffer`
-with unsigned, big-endian capability bytes. Bit zero is the low bit of the final
-byte. The method copies the selected view and preserves unknown bits and padding.
+`setProductCapabilities(products, capabilities)` accepts enum names
+and returns unrecognized product and capability names.
+
+Use `setProductCapabilityMask(products, capabilities)` to opt into byte masks.
+Supply a `Uint8Array` or `Buffer` with unsigned, big-endian capability bytes.
+Bit zero is the low bit of the final byte.
+The method copies the selected view and preserves unknown bits and padding.
 It returns unrecognized product names. Updates during a configuration request take effect on the
 next poll, with the final products and mask supplied together.
 

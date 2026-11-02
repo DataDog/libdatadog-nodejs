@@ -11,7 +11,9 @@ use libdd_remote_config::fetch::{
 };
 use libdd_remote_config::file_change_tracker::{Change, FilePath};
 use libdd_remote_config::file_storage::{RawFile, SimpleFileStorage};
-use libdd_remote_config::{CapabilityMask, RemoteConfigPath, RemoteConfigProduct, Target};
+use libdd_remote_config::{
+    CapabilityMask, RemoteConfigCapabilities, RemoteConfigPath, RemoteConfigProduct, Target,
+};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -30,6 +32,23 @@ type Fetcher = SingleChangesFetcher<SimpleFileStorage, WasmCapabilities>;
 /// cause by its `stack`, and the pure-JS fallback client rejects with `Error`s too.
 fn to_js_err(err: impl std::fmt::Display) -> JsValue {
     js_sys::Error::new(&err.to_string()).into()
+}
+
+fn parse_capability(name: &str) -> Option<RemoteConfigCapabilities> {
+    serde_json::from_value(serde_json::Value::String(name.to_string())).ok()
+}
+
+fn parse_products(products: Vec<String>, unknown: &mut Vec<String>) -> Vec<RemoteConfigProduct> {
+    products
+        .into_iter()
+        .filter_map(|name| match RemoteConfigProduct::from_str(&name) {
+            Ok(product) => Some(product),
+            Err(_) => {
+                unknown.push(name);
+                None
+            }
+        })
+        .collect()
 }
 
 /// Options accepted by [`RemoteConfigFetcher::new`]. These populate the `Client`/`ClientTracer` of
@@ -137,7 +156,7 @@ struct FetcherConfig {
 
 impl FetcherConfig {
     async fn build(&self) -> Result<Fetcher, JsValue> {
-        Ok(SingleChangesFetcher::new(
+        Ok(SingleChangesFetcher::new_with_capability_mask(
             SimpleFileStorage::default(),
             self.target.clone(),
             self.runtime_id.clone(),
@@ -254,7 +273,7 @@ impl RemoteConfigFetcher {
             fetcher.set_identity(identity.client_id, identity.runtime_id, identity.tags);
         }
         if let Some((products, capabilities)) = updates.product_capabilities {
-            fetcher.set_product_capabilities(products, capabilities);
+            fetcher.set_product_capability_mask(products, capabilities);
         }
         if let Some(services) = updates.extra_services {
             fetcher.set_extra_services(services);
@@ -314,28 +333,43 @@ impl RemoteConfigFetcher {
         });
     }
 
-    /// Replaces the set of subscribed products and capabilities.
+    /// Replaces subscribed products and capabilities using enum names.
+    /// Unrecognized product and capability names are skipped and returned.
+    #[wasm_bindgen(js_name = "setProductCapabilities")]
+    pub fn set_product_capabilities(
+        &self,
+        products: Vec<String>,
+        capabilities: Vec<String>,
+    ) -> Vec<String> {
+        let mut unknown = vec![];
+        let products = parse_products(products, &mut unknown);
+        let capabilities = capabilities
+            .into_iter()
+            .filter_map(|name| match parse_capability(&name) {
+                Some(capability) => Some(capability),
+                None => {
+                    unknown.push(name);
+                    None
+                }
+            })
+            .collect();
+        self.pending.borrow_mut().product_capabilities = Some((products, capabilities));
+        unknown
+    }
+
+    /// Opts into consumer-owned capability assignments.
     ///
     /// The unsigned big-endian capability bytes are copied before returning. Unknown
     /// bits are preserved. Only unrecognized product names are skipped and returned.
-    #[wasm_bindgen(js_name = "setProductCapabilities")]
-    pub fn set_product_capabilities(
+    #[wasm_bindgen(js_name = "setProductCapabilityMask")]
+    pub fn set_product_capability_mask(
         &self,
         products: Vec<String>,
         capabilities: Vec<u8>,
     ) -> Vec<String> {
         let mut unknown = vec![];
 
-        let products = products
-            .into_iter()
-            .filter_map(|name| match RemoteConfigProduct::from_str(&name) {
-                Ok(product) => Some(product),
-                Err(_) => {
-                    unknown.push(name);
-                    None
-                }
-            })
-            .collect();
+        let products = parse_products(products, &mut unknown);
 
         self.pending.borrow_mut().product_capabilities = Some((products, capabilities.into()));
 
