@@ -68,7 +68,9 @@ function find (name, binary = false) {
   const prebuildFolder = path.join(root, 'prebuilds', folder)
   const file = findFile(prebuildFolder, transformedName, binary)
 
-  return file ? path.join(prebuildFolder, file) : undefined
+  if (!file) return
+
+  return path.join(prebuildFolder, file)
 }
 
 function findFolder (root) {
@@ -86,11 +88,11 @@ function findFolder (root) {
 function findFile (root, name, binary = false) {
   const files = readdirSync(root)
 
-  return binary
-    ? files.find(f => f === name)
-    : files.find(f => f === `${name}-${ABI}.node`)
-      || files.find(f => f === `${name}-napi.node`)
-      || files.find(f => f === `${name}.node`)
+  if (binary) return files.find(f => f === name)
+
+  return files.find(f => f === `${name}-${ABI}.node`)
+    || files.find(f => f === `${name}-napi.node`)
+    || files.find(f => f === `${name}.node`)
 }
 
 module.exports = { find, load, maybeLoad }

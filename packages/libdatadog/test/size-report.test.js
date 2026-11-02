@@ -182,9 +182,9 @@ test('rejects forbidden code linked into WASM', () => {
 /**
  * @param {string} gluePath
  * @param {number} size
- * @param {Buffer} [wasm]
  */
-function writeInlineWasm (gluePath, size, wasm = Buffer.from([0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00])) {
+function writeInlineWasm (gluePath, size) {
+  const wasm = Buffer.from([0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00])
   const encodedWasm = brotliCompressSync(wasm).toString('base64')
   const loader = `const wasmBytes = Buffer.from('${encodedWasm}', 'base64')`
 

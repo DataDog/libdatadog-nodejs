@@ -14,8 +14,8 @@ const { WasmSpanState } = pipeline ?? {}
 const OpCode = pipeline ? pipeline.getOpCodes() : {}
 const wasmMemory = pipeline ? pipeline.getWasmMemory() : undefined
 
-function getRandomBytes (byteCount) {
-  return new Uint8Array(crypto.randomBytes(byteCount))
+function getRandomBytes () {
+  return new Uint8Array(crypto.randomBytes(8))
 }
 
 function bytesToBigInt (bytes) {
@@ -34,9 +34,9 @@ function bytesToBigInt (bytes) {
 class Span {
   constructor (nativeSpans, traceId, parentId) {
     this.nativeSpans = nativeSpans
-    this.traceId = traceId || [getRandomBytes(8), getRandomBytes(8)]
+    this.traceId = traceId || [getRandomBytes(), getRandomBytes()]
     this.parentId = parentId || new Uint8Array(8)
-    this.spanId = getRandomBytes(8)
+    this.spanId = getRandomBytes()
     // Spans are addressed by their span_id (u64). Operations carry the raw
     // 8-byte id in their header; getters take the numeric id as a BigInt.
     this.spanIdBig = bytesToBigInt(this.spanId)
@@ -325,7 +325,8 @@ class NativeSpansInterface {
       index += 8
     }
     const hasSpans = this.state.prepareChunk(spans.length, true, this.flushBuffer)
-    return hasSpans ? this.state.sendPreparedChunk() : false
+    if (!hasSpans) return false
+    return this.state.sendPreparedChunk()
   }
 }
 
