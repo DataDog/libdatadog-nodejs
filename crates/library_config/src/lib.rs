@@ -1,4 +1,20 @@
+use libdd_library_config::{io, ConfigRead};
 use wasm_bindgen::prelude::*;
+
+struct ConfigReader<'a> {
+    local: &'a [u8],
+    managed: &'a [u8],
+}
+
+impl ConfigRead for ConfigReader<'_> {
+    fn read(&self, path: &str) -> io::Result<Vec<u8>> {
+        match path {
+            "local" => Ok(self.local.to_vec()),
+            "managed" => Ok(self.managed.to_vec()),
+            _ => Err(io::ErrorKind::NotFound.into()),
+        }
+    }
+}
 
 #[wasm_bindgen]
 pub struct JsConfigurator {
@@ -105,17 +121,22 @@ impl JsConfigurator {
 
         let args: Vec<Vec<u8>> = self.args.iter().map(|s| s.as_bytes().to_vec()).collect();
 
-        let res_config = self.configurator.get_config_from_bytes(
-            config_string_local.as_bytes(),
-            config_string_managed.as_bytes(),
-            libdd_library_config::ProcessInfo {
+        let reader = ConfigReader {
+            local: config_string_local.as_bytes(),
+            managed: config_string_managed.as_bytes(),
+        };
+        let res_config = self.configurator.get_config_from_reader(
+            &reader,
+            "local",
+            "managed",
+            &libdd_library_config::ProcessInfo {
                 envp: envp,
                 args: args,
                 language: b"nodejs".to_vec(),
             },
         );
 
-        match res_config {
+        match res_config.data() {
             Ok(config) => {
                 let config_entries: Vec<ConfigEntry> = config
                     .into_iter()
