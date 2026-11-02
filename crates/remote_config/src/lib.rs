@@ -156,7 +156,7 @@ impl FetcherConfig {
                 products: vec![],
                 capabilities: vec![],
             },
-            WasmCapabilities::new_without_connection_pooling(),
+            WasmCapabilities::new_periodic(),
         )
         .await
         .map_err(to_js_err)?
