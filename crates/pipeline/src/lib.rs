@@ -205,7 +205,7 @@ pub struct WasmSpanState {
     /// When set, the lazily-built exporter has telemetry enabled with this
     /// config. Only takes effect if set before the first send
     /// (when the exporter is built).
-    telemetry_config: Cell<Option<TelemetryConfig>>,
+    telemetry_config: Cell<Option<(TelemetryConfig, Option<String>)>>,
     /// Set by `shutdown`. Terminal: the exporter (and the builder, if the
     /// exporter was never built) is dropped, so later sends must fail fast
     /// instead of lazily building a fresh exporter behind the caller's back.
@@ -368,11 +368,13 @@ impl WasmSpanState {
         runtime_id: Option<String>,
         debug_enabled: bool,
     ) {
-        self.telemetry_config.set(Some(TelemetryConfig {
-            heartbeat: u64::from(heartbeat_ms),
+        self.telemetry_config.set(Some((
+            TelemetryConfig {
+                heartbeat: u64::from(heartbeat_ms),
+                debug_enabled,
+            },
             runtime_id,
-            debug_enabled,
-        }));
+        )));
     }
 
     /// Set extra HTTP headers for OTLP export as a flat `[key, value, ...]`
@@ -539,7 +541,10 @@ impl WasmSpanState {
                     builder.set_otlp_headers(headers);
                 }
             }
-            if let Some(cfg) = self.telemetry_config.take() {
+            if let Some((cfg, runtime_id)) = self.telemetry_config.take() {
+                if let Some(runtime_id) = runtime_id {
+                    builder.set_runtime_id(&runtime_id);
+                }
                 builder.enable_telemetry(cfg);
             }
             match builder.build_async::<WasmCapabilities>().await {
