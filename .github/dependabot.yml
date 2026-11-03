@@ -27,6 +27,13 @@ updates:
       - javascript
       - semver-patch
     groups:
+      eslint:
+        patterns:
+          - "eslint"
+          - "eslint-*"
+          - "@eslint/*"
+          - "@stylistic/*"
+          - "globals"
       patch-updates:
         update-types:
           - "patch"
@@ -61,6 +68,14 @@ updates:
       - dependencies
       - rust
       - semver-patch
+    ignore:
+      # Keep the encoder aligned with libdatadog's pinned version.
+      # Explicit update types leave security updates enabled.
+      - dependency-name: "zrip"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
     groups:
       napi:
         patterns:
@@ -69,6 +84,12 @@ updates:
       libdatadog:
         patterns:
           - "libdd-*"
+      wasm-bindgen:
+        patterns:
+          - "wasm-bindgen"
+          - "wasm-bindgen-*"
+          - "js-sys"
+          - "web-sys"
       patch-updates:
         update-types:
           - "patch"
