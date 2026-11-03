@@ -39,7 +39,9 @@ jobs:
       - run: npm ci --prefix packages/libdatadog
       - run: npm run build --prefix packages/libdatadog
       - name: Build symbolized WASM for size attribution
-        run: npm run size:profile --prefix packages/libdatadog
+        run: |
+          node scripts/build-wasm.js crates/libdatadog-wasm target/size/libdatadog-wasm --profiling
+          node scripts/build-wasm.js crates/remote_config target/size/remote-config --profiling
       - name: Report and validate WASM binary size
         if: matrix.revision == 'after'
         run: >-
