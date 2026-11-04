@@ -16,8 +16,7 @@ const lineReader = readline.createInterface({
 lineReader.on('line', function (line) {
   const { filenames, reason, target } = JSON.parse(line)
 
-  if (reason !== 'compiler-artifact') return
-  if (!target.src_path.startsWith(cratesPath)) return
+  if (reason !== 'compiler-artifact' || !target.src_path.startsWith(cratesPath)) return
 
   const filename = target.kind[0] === 'bin' ? target.name : `${target.name}.node`
   const filePath = path.join(buildPath, filename)

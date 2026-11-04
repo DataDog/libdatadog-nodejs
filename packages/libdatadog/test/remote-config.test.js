@@ -12,12 +12,7 @@ const { RemoteConfigFetcher, setStorage } = require('../remote-config')
 
 const CONFIG_PATH = 'datadog/2/ASM_FEATURES/asm-features-1/config'
 
-/** @typedef {import('../remote-config').RemoteConfigFetcherOptions} RemoteConfigFetcherOptions */
-
-/**
- * @param {Partial<RemoteConfigFetcherOptions>} [overrides]
- */
-function fetcherOptions (overrides = {}) {
+function fetcherOptions () {
   return {
     clientId: 'client-id',
     runtimeId: 'runtime-id',
@@ -32,7 +27,6 @@ function fetcherOptions (overrides = {}) {
     timeoutMs: 5000,
     apiKey: 'api-key',
     hostname: 'host',
-    ...overrides,
   }
 }
 
