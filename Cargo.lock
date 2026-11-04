@@ -1545,14 +1545,6 @@ dependencies = [
 
 [[package]]
 name = "libdd-tinybytes"
-version = "1.1.5"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v46.1.0#bfa70eb6166db96673844c1a3fc1048f58e895d1"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "libdd-tinybytes"
 version = "1.2.0"
 source = "git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0#ef6371243c020319e74e8531035f0a5a2fcb8858"
 dependencies = [
@@ -1572,15 +1564,6 @@ source = "git+https://github.com/DataDog/libdatadog.git?rev=7d014fe1695bc122925d
 dependencies = [
  "anyhow",
  "libdd-trace-protobuf 5.0.0",
-]
-
-[[package]]
-name = "libdd-trace-normalization"
-version = "4.2.0"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v46.1.0#bfa70eb6166db96673844c1a3fc1048f58e895d1"
-dependencies = [
- "anyhow",
- "libdd-trace-protobuf 5.1.0",
 ]
 
 [[package]]
@@ -1747,43 +1730,6 @@ dependencies = [
  "tracing",
  "zrip",
  "zstd",
-]
-
-[[package]]
-name = "libdd-trace-utils"
-version = "14.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v46.1.0#bfa70eb6166db96673844c1a3fc1048f58e895d1"
-dependencies = [
- "anyhow",
- "base64",
- "bytes",
- "crossbeam-channel",
- "futures",
- "getrandom 0.2.17",
- "hashbrown",
- "hex",
- "http 1.5.0",
- "http-body",
- "http-body-util",
- "indexmap",
- "itoa 1.0.18",
- "libdd-capabilities 4.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v46.1.0)",
- "libdd-common 8.0.0",
- "libdd-tinybytes 1.1.5",
- "libdd-trace-normalization 4.2.0",
- "libdd-trace-protobuf 5.1.0",
- "prost",
- "rand",
- "rmp",
- "rmp-serde",
- "rmpv",
- "rustc-hash",
- "serde",
- "serde-transcode",
- "serde_json",
- "thin-vec",
- "thread_local",
- "tracing",
 ]
 
 [[package]]
@@ -2327,7 +2273,7 @@ dependencies = [
  "libdd-common 8.0.0",
  "libdd-data-pipeline",
  "libdd-shared-runtime 7.0.0",
- "libdd-trace-utils 14.0.0",
+ "libdd-trace-utils 15.0.0",
  "serde",
  "serde_json",
  "uuid",
