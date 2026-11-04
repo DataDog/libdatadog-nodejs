@@ -48,6 +48,7 @@ module.exports = [
         ignore: ['^library_config$'],
       }],
       'unicorn/name-replacements': 'off', // Naming churn
+      'unicorn/no-asterisk-prefix-in-documentation-comments': 'off', // Preserve standard JSDoc formatting
       'unicorn/no-break-in-nested-loop': 'off', // Conflicts with performance-oriented loops
       'unicorn/no-negated-array-predicate': 'off', // Predicate inversion is harder to read
       'unicorn/no-return-array-push': 'off', // Questionable benefit
@@ -55,12 +56,15 @@ module.exports = [
       'unicorn/no-top-level-assignment-in-function': 'off', // Module-level singletons are assigned from functions
       'unicorn/no-undeclared-class-members': 'off', // Field declarations can change object shape
       'unicorn/prefer-await': 'off', // Production code uses callbacks and synchronous patterns
+      'unicorn/prefer-default-parameters': ['error', { checkFallbackExpressions: false }],
+      'unicorn/prefer-early-return': 'off', // Preserve positive conditions around optional work
       'unicorn/prefer-minimal-ternary': 'off', // Conflicts with restricted syntax in consumers
       'unicorn/prefer-module': 'off', // We use CJS
       'unicorn/prefer-number-is-safe-integer': 'off', // Number.isInteger() can be intentional
       'unicorn/prefer-private-class-fields': 'off', // Existing underscore fields can cross module boundaries
       'unicorn/prefer-promise-with-resolvers': 'off', // Promise.withResolvers() requires Node.js 22
       'unicorn/prefer-simple-condition-first': 'off', // Needs a short-circuit behavior audit
+      'unicorn/prefer-ternary': 'off', // Keep explicit control flow when it is easier to read
       'unicorn/prefer-then-catch': 'off', // Rejection handlers broaden rejection boundaries
       'unicorn/prefer-unicode-code-point-escapes': 'off', // Questionable benefit
       'unicorn/prevent-abbreviations': 'off',
