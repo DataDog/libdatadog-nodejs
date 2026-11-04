@@ -6,6 +6,7 @@ const { execFileSync } = require('node:child_process')
 const repositoryRoot = path.join(__dirname, '..')
 const trees = [
   { package: 'libdatadog-wasm', target: 'wasm32-unknown-unknown' },
+  { package: 'libdatadog-wasm-zstd', target: 'wasm32-unknown-unknown' },
   { package: 'remote-config', target: 'wasm32-unknown-unknown' },
 ]
 // libdd-tuf 0.3.1 uses older dependency majors. Exact sets keep unrelated duplicates failing validation.
