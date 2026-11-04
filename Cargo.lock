@@ -1490,23 +1490,6 @@ dependencies = [
 
 [[package]]
 name = "libdd-shared-runtime"
-version = "6.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v46.1.0#bfa70eb6166db96673844c1a3fc1048f58e895d1"
-dependencies = [
- "async-trait",
- "futures",
- "futures-util",
- "libdd-capabilities 4.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v46.1.0)",
- "libdd-capabilities-impl 7.0.0",
- "libdd-common 8.0.0",
- "tokio",
- "tokio-util",
- "tracing",
- "wasm-bindgen-futures",
-]
-
-[[package]]
-name = "libdd-shared-runtime"
 version = "7.0.0"
 source = "git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0#ef6371243c020319e74e8531035f0a5a2fcb8858"
 dependencies = [
@@ -2343,7 +2326,7 @@ dependencies = [
  "libdd-capabilities 4.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v46.1.0)",
  "libdd-common 8.0.0",
  "libdd-data-pipeline",
- "libdd-shared-runtime 6.0.0",
+ "libdd-shared-runtime 7.0.0",
  "libdd-trace-utils 14.0.0",
  "serde",
  "serde_json",
