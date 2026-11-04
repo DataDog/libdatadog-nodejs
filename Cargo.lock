@@ -802,7 +802,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.62.2",
+ "windows-core",
 ]
 
 [[package]]
@@ -1057,7 +1057,7 @@ dependencies = [
  "bytes",
  "http 1.5.0",
  "js-sys",
- "libdd-capabilities 4.0.1",
+ "libdd-capabilities 4.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v46.1.0)",
  "wasm-bindgen",
  "wasm-bindgen-futures",
 ]
@@ -1122,6 +1122,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "libdd-capabilities"
+version = "4.0.1"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0#ef6371243c020319e74e8531035f0a5a2fcb8858"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "futures-channel",
+ "futures-util",
+ "http 1.5.0",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "libdd-capabilities-impl"
 version = "5.0.0"
 source = "git+https://github.com/DataDog/libdatadog.git?tag=v44.0.0#8dba9be608993b6222766ed8b7f742ce01461770"
@@ -1158,8 +1171,22 @@ dependencies = [
  "bytes",
  "http 1.5.0",
  "http-body-util",
- "libdd-capabilities 4.0.1",
+ "libdd-capabilities 4.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v46.1.0)",
  "libdd-common 8.0.0",
+ "tokio",
+]
+
+[[package]]
+name = "libdd-capabilities-impl"
+version = "8.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0#ef6371243c020319e74e8531035f0a5a2fcb8858"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "http 1.5.0",
+ "http-body-util",
+ "libdd-capabilities 4.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
+ "libdd-common 9.0.0",
  "tokio",
 ]
 
@@ -1264,6 +1291,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "libdd-common"
+version = "9.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0#ef6371243c020319e74e8531035f0a5a2fcb8858"
+dependencies = [
+ "anyhow",
+ "arc-swap",
+ "bytes",
+ "const_format",
+ "futures",
+ "hex",
+ "http 1.5.0",
+ "http-body",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "libc",
+ "nix 0.29.0",
+ "pin-project",
+ "regex",
+ "serde",
+ "static_assertions",
+ "thiserror 2.0.20",
+ "tokio",
+ "tower-service",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "libdd-crashtracker"
 version = "3.0.0"
 source = "git+https://github.com/DataDog/libdatadog.git?tag=v44.0.0#8dba9be608993b6222766ed8b7f742ce01461770"
@@ -1315,7 +1370,7 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
- "libdd-capabilities 4.0.1",
+ "libdd-capabilities 4.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v46.1.0)",
  "libdd-capabilities-impl 7.0.0",
  "libdd-common 8.0.0",
  "libdd-data-pipeline-core 3.0.0",
@@ -1364,7 +1419,7 @@ version = "3.0.0"
 source = "git+https://github.com/DataDog/libdatadog.git?tag=v46.1.0#bfa70eb6166db96673844c1a3fc1048f58e895d1"
 dependencies = [
  "http 1.5.0",
- "libdd-capabilities 4.0.1",
+ "libdd-capabilities 4.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v46.1.0)",
  "libdd-common 8.0.0",
  "libdd-trace-obfuscation 10.0.0",
  "libdd-trace-utils 14.0.0",
@@ -1462,7 +1517,7 @@ dependencies = [
  "hashbrown",
  "http 1.5.0",
  "http-body-util",
- "libdd-capabilities 4.0.1",
+ "libdd-capabilities 4.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v46.1.0)",
  "libdd-capabilities-impl 7.0.0",
  "libdd-common 8.0.0",
  "libdd-trace-protobuf 5.1.0",
@@ -1525,9 +1580,26 @@ dependencies = [
  "async-trait",
  "futures",
  "futures-util",
- "libdd-capabilities 4.0.1",
+ "libdd-capabilities 4.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v46.1.0)",
  "libdd-capabilities-impl 7.0.0",
  "libdd-common 8.0.0",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "wasm-bindgen-futures",
+]
+
+[[package]]
+name = "libdd-shared-runtime"
+version = "7.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0#ef6371243c020319e74e8531035f0a5a2fcb8858"
+dependencies = [
+ "async-trait",
+ "futures",
+ "futures-util",
+ "libdd-capabilities 4.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
+ "libdd-capabilities-impl 8.0.0",
+ "libdd-common 9.0.0",
  "tokio",
  "tokio-util",
  "tracing",
@@ -1578,7 +1650,7 @@ dependencies = [
  "hashbrown",
  "http 1.5.0",
  "libc",
- "libdd-capabilities 4.0.1",
+ "libdd-capabilities 4.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v46.1.0)",
  "libdd-common 8.0.0",
  "libdd-ddsketch 1.1.3",
  "libdd-shared-runtime 6.0.0",
@@ -1720,7 +1792,7 @@ dependencies = [
  "futures",
  "hashbrown",
  "http 1.5.0",
- "libdd-capabilities 4.0.1",
+ "libdd-capabilities 4.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v46.1.0)",
  "libdd-capabilities-impl 7.0.0",
  "libdd-common 8.0.0",
  "libdd-ddsketch 1.1.3",
@@ -1793,7 +1865,7 @@ dependencies = [
  "http-body-util",
  "indexmap",
  "itoa 1.0.18",
- "libdd-capabilities 4.0.1",
+ "libdd-capabilities 4.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v46.1.0)",
  "libdd-common 8.0.0",
  "libdd-tinybytes 1.1.5",
  "libdd-trace-normalization 4.2.0",
@@ -2310,10 +2382,10 @@ dependencies = [
  "getrandom 0.2.17",
  "js-sys",
  "libdatadog-nodejs-capabilities",
- "libdd-capabilities 4.0.1",
+ "libdd-capabilities 4.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v46.1.0)",
  "libdd-common 8.0.0",
  "libdd-data-pipeline",
- "libdd-shared-runtime 6.0.0",
+ "libdd-shared-runtime 7.0.0",
  "libdd-trace-utils 14.0.0",
  "serde",
  "serde_json",
@@ -3434,7 +3506,7 @@ version = "0.59.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f919aee0a93304be7f62e8e5027811bbba96bcb1de84d6618be56e43f8a32a1"
 dependencies = [
- "windows-core 0.59.0",
+ "windows-core",
  "windows-targets 0.53.5",
 ]
 
@@ -3444,24 +3516,11 @@ version = "0.59.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "810ce18ed2112484b0d4e15d022e5f598113e220c53e373fb31e67e21670c1ce"
 dependencies = [
- "windows-implement 0.59.0",
+ "windows-implement",
  "windows-interface",
- "windows-result 0.3.4",
- "windows-strings 0.3.1",
+ "windows-result",
+ "windows-strings",
  "windows-targets 0.53.5",
-]
-
-[[package]]
-name = "windows-core"
-version = "0.62.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8e83a14d34d0623b51dce9581199302a221863196a1dde71a7663a4c2be9deb"
-dependencies = [
- "windows-implement 0.60.2",
- "windows-interface",
- "windows-link 0.2.1",
- "windows-result 0.4.1",
- "windows-strings 0.5.1",
 ]
 
 [[package]]
@@ -3469,17 +3528,6 @@ name = "windows-implement"
 version = "0.59.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "83577b051e2f49a058c308f17f273b570a6a758386fc291b5f6a934dd84e48c1"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
-]
-
-[[package]]
-name = "windows-implement"
-version = "0.60.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "053e2e040ab57b9dc951b72c264860db7eb3b0200ba345b4e4c3b14f67855ddf"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3519,30 +3567,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "windows-result"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7781fa89eaf60850ac3d2da7af8e5242a5ea78d1a11c49bf2910bb5a73853eb5"
-dependencies = [
- "windows-link 0.2.1",
-]
-
-[[package]]
 name = "windows-strings"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "87fa48cc5d406560701792be122a10132491cff9d0aeb23583cc2dcafc847319"
 dependencies = [
  "windows-link 0.1.3",
-]
-
-[[package]]
-name = "windows-strings"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7837d08f69c77cf6b07689544538e017c1bfcf57e34b4c0ff58e6c2cd3b37091"
-dependencies = [
- "windows-link 0.2.1",
 ]
 
 [[package]]
