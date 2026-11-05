@@ -38,6 +38,21 @@ jobs:
         run: npm run check:dependencies
       - run: npm ci --prefix packages/libdatadog
       - run: npm run build --prefix packages/libdatadog
+      - name: Preserve function names in older baseline profiles
+        if: matrix.revision == 'before'
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import tomllib
+
+          for crate in ['libdatadog-wasm', 'remote_config']:
+              manifest = Path('crates') / crate / 'Cargo.toml'
+              profiles = tomllib.loads(manifest.read_text())['package']['metadata']['wasm-pack']['profile']
+              if 'profiling' not in profiles:
+                  with manifest.open('a') as output:
+                      output.write('\n[package.metadata.wasm-pack.profile.profiling]\n')
+                      output.write('wasm-opt = ["-O", "-g"]\n')
+          PY
       - name: Build symbolized WASM for size attribution
         run: |
           node scripts/build-wasm.js crates/libdatadog-wasm target/size/libdatadog-wasm --profiling
