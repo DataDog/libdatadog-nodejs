@@ -1,3 +1,4 @@
+use libdd_trace_model::TraceText;
 use libdd_trace_utils::span::SpanText;
 use serde::Serialize;
 use std::borrow::Borrow;
@@ -18,6 +19,12 @@ impl Hash for SpanString {
 impl Borrow<str> for SpanString {
     fn borrow(&self) -> &str {
         &self.0
+    }
+}
+
+impl TraceText for SpanString {
+    fn from_static(value: &'static str) -> Self {
+        Self::from(value)
     }
 }
 

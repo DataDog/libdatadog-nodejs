@@ -1,3 +1,5 @@
+use libdd_trace_model::{AttributeValue, ValueTypes};
+use libdd_trace_utils::span::v04::VecMap;
 use libdd_trace_utils::span::TraceData;
 use serde::Serialize;
 
@@ -10,7 +12,11 @@ use crate::span_string::SpanString;
 #[derive(Clone, Default, Debug, PartialEq, Serialize)]
 pub struct WasmTraceData;
 
-impl TraceData for WasmTraceData {
+impl ValueTypes for WasmTraceData {
     type Text = SpanString;
     type Bytes = SpanBytesImpl;
+    type Array = Vec<AttributeValue<Self>>;
+    type Map = VecMap<SpanString, AttributeValue<Self>>;
 }
+
+impl TraceData for WasmTraceData {}
