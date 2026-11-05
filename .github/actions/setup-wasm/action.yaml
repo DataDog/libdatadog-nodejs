@@ -35,7 +35,7 @@ runs:
       run: |
         archive="wasm-pack-v${WASM_PACK_VERSION}-x86_64-unknown-linux-musl.tar.gz"
         install_directory="$RUNNER_TEMP/wasm-pack"
-        curl --fail --location --silent --show-error \
+        curl --fail --location --retry 3 --silent --show-error \
           --output "$RUNNER_TEMP/$archive" \
           "https://github.com/wasm-bindgen/wasm-pack/releases/download/v${WASM_PACK_VERSION}/$archive"
         echo "$WASM_PACK_SHA256  $RUNNER_TEMP/$archive" | sha256sum --check
@@ -51,7 +51,7 @@ runs:
       run: |
         archive="binaryen-version_${BINARYEN_VERSION}-x86_64-linux.tar.gz"
         install_directory="$RUNNER_TEMP/binaryen"
-        curl --fail --location --silent --show-error \
+        curl --fail --location --retry 3 --silent --show-error \
           --output "$RUNNER_TEMP/$archive" \
           "https://github.com/WebAssembly/binaryen/releases/download/version_${BINARYEN_VERSION}/$archive"
         echo "$BINARYEN_SHA256  $RUNNER_TEMP/$archive" | sha256sum --check
