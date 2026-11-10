@@ -369,15 +369,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "deranged"
-version = "0.5.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7cd812cc2bc1d69d4764bd80df88b4317eaef9e773c75226407d9bc0876b211c"
-dependencies = [
- "serde_core",
-]
-
-[[package]]
 name = "derp"
 version = "0.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1057,7 +1048,7 @@ dependencies = [
  "bytes",
  "http 1.5.0",
  "js-sys",
- "libdd-capabilities 4.0.1",
+ "libdd-capabilities 4.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
  "wasm-bindgen",
  "wasm-bindgen-futures",
 ]
@@ -1109,6 +1100,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "libdd-capabilities"
+version = "4.0.1"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v48.0.0#0be9d869494c0d8b1732b03b1658ac45db0ca454"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "futures-channel",
+ "futures-util",
+ "http 1.5.0",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "libdd-capabilities-impl"
 version = "5.0.0"
 source = "git+https://github.com/DataDog/libdatadog.git?rev=7d014fe1695bc122925d6403e758c558059bb8c7#7d014fe1695bc122925d6403e758c558059bb8c7"
@@ -1131,8 +1135,23 @@ dependencies = [
  "bytes",
  "http 1.5.0",
  "http-body-util",
- "libdd-capabilities 4.0.1",
- "libdd-common 9.0.0",
+ "libdd-capabilities 4.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
+ "libdd-common 9.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
+ "tokio",
+]
+
+[[package]]
+name = "libdd-capabilities-impl"
+version = "8.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v48.0.0#0be9d869494c0d8b1732b03b1658ac45db0ca454"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "http 1.5.0",
+ "http-body-util",
+ "libdd-capabilities 4.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v48.0.0)",
+ "libdd-common 9.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v48.0.0)",
+ "libdd-process-utils",
  "tokio",
 ]
 
@@ -1199,6 +1218,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "libdd-common"
+version = "9.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v48.0.0#0be9d869494c0d8b1732b03b1658ac45db0ca454"
+dependencies = [
+ "anyhow",
+ "arc-swap",
+ "bytes",
+ "const_format",
+ "futures",
+ "hex",
+ "http 1.5.0",
+ "http-body",
+ "http-body-util",
+ "hyper",
+ "hyper-rustls",
+ "hyper-util",
+ "libc",
+ "libdd-process-utils",
+ "libdd-regex",
+ "pin-project",
+ "rustls",
+ "rustls-platform-verifier",
+ "serde",
+ "static_assertions",
+ "thiserror 2.0.20",
+ "tokio",
+ "tower-service",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "libdd-crashtracker"
 version = "3.0.0"
 source = "git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0#ef6371243c020319e74e8531035f0a5a2fcb8858"
@@ -1210,9 +1260,9 @@ dependencies = [
  "errno",
  "http 1.5.0",
  "libc",
- "libdd-capabilities 4.0.1",
- "libdd-capabilities-impl 8.0.0",
- "libdd-common 9.0.0",
+ "libdd-capabilities 4.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
+ "libdd-capabilities-impl 8.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
+ "libdd-common 9.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
  "libdd-gotter",
  "libdd-libunwind-sys",
  "libdd-telemetry",
@@ -1250,9 +1300,9 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
- "libdd-capabilities 4.0.1",
- "libdd-capabilities-impl 8.0.0",
- "libdd-common 9.0.0",
+ "libdd-capabilities 4.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
+ "libdd-capabilities-impl 8.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
+ "libdd-common 9.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
  "libdd-data-pipeline-core 4.0.0",
  "libdd-ddsketch 1.1.4",
  "libdd-dogstatsd-client",
@@ -1260,7 +1310,7 @@ dependencies = [
  "libdd-telemetry",
  "libdd-tinybytes 1.2.0",
  "libdd-trace-obfuscation 11.0.0",
- "libdd-trace-protobuf 5.1.1",
+ "libdd-trace-protobuf 5.1.1 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
  "libdd-trace-stats 12.0.0",
  "libdd-trace-utils 15.0.0",
  "prost",
@@ -1299,8 +1349,8 @@ version = "4.0.0"
 source = "git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0#ef6371243c020319e74e8531035f0a5a2fcb8858"
 dependencies = [
  "http 1.5.0",
- "libdd-capabilities 4.0.1",
- "libdd-common 9.0.0",
+ "libdd-capabilities 4.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
+ "libdd-common 9.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
  "libdd-trace-obfuscation 11.0.0",
  "libdd-trace-utils 15.0.0",
  "serde_json",
@@ -1332,7 +1382,7 @@ dependencies = [
  "async-trait",
  "cadence",
  "http 1.5.0",
- "libdd-common 9.0.0",
+ "libdd-common 9.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
  "libdd-shared-runtime 7.0.0",
  "serde",
  "tokio",
@@ -1354,7 +1404,7 @@ source = "git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0#ef6371243c02
 dependencies = [
  "anyhow",
  "libc",
- "libdd-trace-protobuf 5.1.1",
+ "libdd-trace-protobuf 5.1.1 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
  "memfd",
  "prost",
  "rand",
@@ -1375,9 +1425,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "libdd-process-utils"
+version = "1.0.0"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v48.0.0#0be9d869494c0d8b1732b03b1658ac45db0ca454"
+dependencies = [
+ "libc",
+ "nix 0.29.0",
+ "thiserror 2.0.20",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "libdd-regex"
+version = "0.1.0"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v48.0.0#0be9d869494c0d8b1732b03b1658ac45db0ca454"
+dependencies = [
+ "regex",
+]
+
+[[package]]
 name = "libdd-remote-config"
 version = "8.0.0"
-source = "git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0#ef6371243c020319e74e8531035f0a5a2fcb8858"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v48.0.0#0be9d869494c0d8b1732b03b1658ac45db0ca454"
 dependencies = [
  "anyhow",
  "base64",
@@ -1389,10 +1458,11 @@ dependencies = [
  "hashbrown",
  "http 1.5.0",
  "http-body-util",
- "libdd-capabilities 4.0.1",
- "libdd-capabilities-impl 8.0.0",
- "libdd-common 9.0.0",
- "libdd-trace-protobuf 5.1.1",
+ "libdd-capabilities 4.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v48.0.0)",
+ "libdd-capabilities-impl 8.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v48.0.0)",
+ "libdd-common 9.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v48.0.0)",
+ "libdd-regex",
+ "libdd-trace-protobuf 5.1.1 (git+https://github.com/DataDog/libdatadog.git?tag=v48.0.0)",
  "libdd-tuf",
  "manual_future",
  "prost",
@@ -1403,7 +1473,6 @@ dependencies = [
  "strum",
  "strum_macros",
  "thiserror 2.0.20",
- "time",
  "tokio",
  "tokio-util",
  "tracing",
@@ -1435,9 +1504,9 @@ dependencies = [
  "async-trait",
  "futures",
  "futures-util",
- "libdd-capabilities 4.0.1",
- "libdd-capabilities-impl 8.0.0",
- "libdd-common 9.0.0",
+ "libdd-capabilities 4.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
+ "libdd-capabilities-impl 8.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
+ "libdd-common 9.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
  "tokio",
  "tokio-util",
  "tracing",
@@ -1457,8 +1526,8 @@ dependencies = [
  "hashbrown",
  "http 1.5.0",
  "libc",
- "libdd-capabilities 4.0.1",
- "libdd-common 9.0.0",
+ "libdd-capabilities 4.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
+ "libdd-common 9.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
  "libdd-ddsketch 1.1.4",
  "libdd-shared-runtime 7.0.0",
  "serde",
@@ -1511,7 +1580,7 @@ version = "4.3.0"
 source = "git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0#ef6371243c020319e74e8531035f0a5a2fcb8858"
 dependencies = [
  "anyhow",
- "libdd-trace-protobuf 5.1.1",
+ "libdd-trace-protobuf 5.1.1 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
 ]
 
 [[package]]
@@ -1537,9 +1606,9 @@ source = "git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0#ef6371243c02
 dependencies = [
  "anyhow",
  "fluent-uri",
- "libdd-common 9.0.0",
+ "libdd-common 9.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
  "libdd-trace-model",
- "libdd-trace-protobuf 5.1.1",
+ "libdd-trace-protobuf 5.1.1 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
  "libdd-trace-utils 15.0.0",
  "log",
  "percent-encoding",
@@ -1562,6 +1631,16 @@ dependencies = [
 name = "libdd-trace-protobuf"
 version = "5.1.1"
 source = "git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0#ef6371243c020319e74e8531035f0a5a2fcb8858"
+dependencies = [
+ "prost",
+ "serde",
+ "serde_bytes",
+]
+
+[[package]]
+name = "libdd-trace-protobuf"
+version = "5.1.1"
+source = "git+https://github.com/DataDog/libdatadog.git?tag=v48.0.0#0be9d869494c0d8b1732b03b1658ac45db0ca454"
 dependencies = [
  "prost",
  "serde",
@@ -1606,15 +1685,15 @@ dependencies = [
  "futures",
  "hashbrown",
  "http 1.5.0",
- "libdd-capabilities 4.0.1",
- "libdd-capabilities-impl 8.0.0",
- "libdd-common 9.0.0",
+ "libdd-capabilities 4.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
+ "libdd-capabilities-impl 8.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
+ "libdd-common 9.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
  "libdd-ddsketch 1.1.4",
  "libdd-dogstatsd-client",
  "libdd-shared-runtime 7.0.0",
  "libdd-telemetry",
  "libdd-trace-obfuscation 11.0.0",
- "libdd-trace-protobuf 5.1.1",
+ "libdd-trace-protobuf 5.1.1 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
  "libdd-trace-utils 15.0.0",
  "rmp-serde",
  "serde",
@@ -1680,12 +1759,12 @@ dependencies = [
  "http-body-util",
  "indexmap",
  "itoa 1.0.18",
- "libdd-capabilities 4.0.1",
- "libdd-common 9.0.0",
+ "libdd-capabilities 4.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
+ "libdd-common 9.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
  "libdd-tinybytes 1.2.0",
  "libdd-trace-model",
  "libdd-trace-normalization 4.3.0",
- "libdd-trace-protobuf 5.1.1",
+ "libdd-trace-protobuf 5.1.1 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
  "prost",
  "rand",
  "rmp",
@@ -1929,12 +2008,6 @@ name = "nohash-hasher"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2bf50223579dc7cdcfb3bfcacf7069ff68243f8c363f62ffa99cf000a6b9c451"
-
-[[package]]
-name = "num-conv"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "521739c6d2bac4aa25192232afe6841231376b2b26d4d9fae5ecf8ca5772e441"
 
 [[package]]
 name = "num-derive"
@@ -2198,8 +2271,8 @@ dependencies = [
  "getrandom 0.2.17",
  "js-sys",
  "libdatadog-nodejs-capabilities",
- "libdd-capabilities 4.0.1",
- "libdd-common 9.0.0",
+ "libdd-capabilities 4.0.1 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
+ "libdd-common 9.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
  "libdd-data-pipeline",
  "libdd-shared-runtime 7.0.0",
  "libdd-trace-model",
@@ -2236,12 +2309,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "powerfmt"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
-
-[[package]]
 name = "ppv-lite86"
 version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2264,7 +2331,7 @@ name = "process-discovery"
 version = "0.1.0"
 dependencies = [
  "libdd-library-config",
- "libdd-trace-protobuf 5.1.1",
+ "libdd-trace-protobuf 5.1.1 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
  "napi",
  "napi-derive",
 ]
@@ -2399,7 +2466,7 @@ dependencies = [
  "console_error_panic_hook",
  "js-sys",
  "libdatadog-nodejs-capabilities",
- "libdd-common 9.0.0",
+ "libdd-common 9.0.0 (git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0)",
  "libdd-remote-config",
  "serde",
  "serde-wasm-bindgen",
@@ -2934,36 +3001,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ad99c4c6d32803332c548b1af0540b357b3f5fc0be8f6c6bfe8b2e6ae784070"
 dependencies = [
  "cfg-if",
-]
-
-[[package]]
-name = "time"
-version = "0.3.55"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdb87b95ec50ddfa440816d227a17b2ccbdda963a316a727fda0fc4334f7d134"
-dependencies = [
- "deranged",
- "num-conv",
- "powerfmt",
- "serde_core",
- "time-core",
- "time-macros",
-]
-
-[[package]]
-name = "time-core"
-version = "0.1.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e1c906769ad99c88eaa54e728060edef082f8e358ff32030cb7c7d315e81109"
-
-[[package]]
-name = "time-macros"
-version = "0.2.32"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e689342a48d2ea927c87ea50cabf8594854bf940e9310208848d680d668ed85"
-dependencies = [
- "num-conv",
- "time-core",
 ]
 
 [[package]]
