@@ -1,1 +1,50 @@
-* @DataDog/dd-trace-js @DataDog/libdatadog
+# Shared root files
+/* @DataDog/libdatadog @DataDog/lang-platform-js
+
+# Shared Node.js bindings and repository tooling
+/.cargo/ @DataDog/libdatadog @DataDog/lang-platform-js
+/.github/ @DataDog/libdatadog @DataDog/lang-platform-js
+/scripts/ @DataDog/libdatadog @DataDog/lang-platform-js
+
+# Supply-chain security
+/.github/chainguard/ @DataDog/libdatadog @DataDog/lang-platform-js @DataDog/sdlc-security
+
+# Shared bindings and package assembly
+/crates/libdatadog-wasm/Cargo.toml @DataDog/libdatadog @DataDog/apm-sdk-capabilities
+/crates/libdatadog-wasm/src/lib.rs @DataDog/libdatadog @DataDog/apm-sdk-capabilities
+/crates/libdatadog-wasm/src/sketches/ @DataDog/libdatadog @DataDog/apm-sdk-capabilities
+/crates/pipeline/ @DataDog/libdatadog @DataDog/apm-sdk-capabilities
+/packages/libdatadog/ @DataDog/libdatadog @DataDog/apm-sdk-capabilities
+/test/build-wasm.js @DataDog/libdatadog @DataDog/apm-sdk-capabilities
+/test/dependencies.js @DataDog/libdatadog @DataDog/apm-sdk-capabilities
+/test/pipeline.js @DataDog/libdatadog @DataDog/apm-sdk-capabilities
+
+# WASM capabilities
+/crates/capabilities/ @DataDog/libdatadog @DataDog/apm-sdk-capabilities
+/test/env-transport.js @DataDog/libdatadog @DataDog/apm-sdk-capabilities
+/test/filesystem.js @DataDog/libdatadog @DataDog/apm-sdk-capabilities
+/test/http_transport.js @DataDog/libdatadog @DataDog/apm-sdk-capabilities
+
+# Crash tracking
+/crates/crashtracker/ @DataDog/libdatadog @DataDog/lang-platform-js
+/test/crashtracker/ @DataDog/libdatadog @DataDog/lang-platform-js
+
+# Stable and remote configuration
+/crates/library_config/ @DataDog/libdatadog @DataDog/apm-sdk-capabilities
+/crates/remote_config/ @DataDog/libdatadog @DataDog/apm-sdk-capabilities
+/packages/libdatadog/remote-config.* @DataDog/libdatadog @DataDog/apm-sdk-capabilities
+/packages/libdatadog/test/remote-config.test.js @DataDog/libdatadog @DataDog/apm-sdk-capabilities
+/packages/libdatadog/wasm/remote-config.d.ts @DataDog/libdatadog @DataDog/apm-sdk-capabilities
+/test/remote-config.js @DataDog/libdatadog @DataDog/apm-sdk-capabilities
+/test/wasm/library_config/ @DataDog/libdatadog @DataDog/apm-sdk-capabilities
+
+# Process discovery
+/crates/process_discovery/ @DataDog/libdatadog @DataDog/apm-idm-js
+/test/process-discovery.js @DataDog/libdatadog @DataDog/apm-idm-js
+
+# Agentless data pipeline
+/crates/libdatadog-data-pipeline/ @DataDog/libdatadog @DataDog/apm-sdk-capabilities
+/crates/libdatadog-wasm/src/data_pipeline/ @DataDog/libdatadog @DataDog/apm-sdk-capabilities
+
+# Profiling compression
+/crates/libdatadog-wasm/src/zstd/ @DataDog/libdatadog @DataDog/profiling-js
