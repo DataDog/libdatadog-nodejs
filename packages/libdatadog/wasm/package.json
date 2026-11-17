@@ -28,6 +28,12 @@
       "require": "./dist/remote-config/remote_config.js",
       "default": "./dist/remote-config/remote_config.js"
     },
+    "./api-security": {
+      "types": "./dist/api-security/api_security.d.ts",
+      "import": "./dist/api-security/api_security.js",
+      "require": "./dist/api-security/api_security.js",
+      "default": "./dist/api-security/api_security.js"
+    },
     "./*": "./*"
   },
   "files": [

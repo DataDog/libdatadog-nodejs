@@ -1,3 +1,4 @@
+import { extractSchemaJson, extractSchema, extractSchemaSerialized } from '@datadog/libdatadog/api-security'
 import {
   type AgentlessLogger,
   type AgentlessTransportOptions,
@@ -84,3 +85,14 @@ void wasmBackend
 void wasmSketch
 void wasmCompress
 void remoteConfigFetcher
+
+const schemaJson: string = extractSchemaJson('{"id":42}')
+// @ts-expect-error API Security accepts JSON text, not JavaScript objects.
+extractSchemaJson({ id: 42 })
+void schemaJson
+
+const structuralSchema: unknown[] = extractSchema({ id: 42 })
+void structuralSchema
+
+const serializedSchema: string = extractSchemaSerialized({ id: 42 })
+void serializedSchema

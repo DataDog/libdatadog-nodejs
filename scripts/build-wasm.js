@@ -87,6 +87,11 @@ function buildWasm (cratePath, outputDirectory, options = {}) {
   const { profiling = false, skipOptimization = false } = options
   const resolvedOutputDirectory = path.resolve(cratePath, outputDirectory)
   const buildEnvironment = { ...env }
+  if (path.basename(cratePath) === 'api_security') {
+    // Compile this artifact and its parser dependencies for throughput; other
+    // WASM builds retain the workspace's size-optimized release profile.
+    buildEnvironment.CARGO_PROFILE_RELEASE_OPT_LEVEL = '3'
+  }
   if (path.basename(cratePath) === 'libdatadog-wasm') {
     if (buildEnvironment.CARGO_ENCODED_RUSTFLAGS === undefined) {
       const rustFlagsName = buildEnvironment.RUSTFLAGS === undefined

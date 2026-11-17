@@ -5,6 +5,7 @@ const { execFileSync } = require('node:child_process')
 
 const repositoryRoot = path.join(__dirname, '..')
 const trees = [
+  { package: 'api-security', target: 'wasm32-unknown-unknown' },
   { package: 'libdatadog-wasm', target: 'wasm32-unknown-unknown' },
   { package: 'remote-config', target: 'wasm32-unknown-unknown' },
 ]

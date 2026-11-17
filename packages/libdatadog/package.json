@@ -33,6 +33,12 @@
       "import": "./remote-config.js",
       "require": "./remote-config.js",
       "default": "./remote-config.js"
+    },
+    "./api-security": {
+      "types": "./api-security.d.ts",
+      "import": "./api-security.js",
+      "require": "./api-security.js",
+      "default": "./api-security.js"
     }
   },
   "files": [
@@ -44,7 +50,9 @@
     "wasm.js",
     "wasm.mjs",
     "index.d.ts",
-    "lib/"
+    "lib/",
+    "api-security.js",
+    "api-security.d.ts"
   ],
   "workspaces": [
     "wasm"
@@ -54,7 +62,7 @@
   },
   "scripts": {
     "benchmark:agentless": "npm run build:wasm:binary && npm run inline:wasm && node benchmark/agentless-pipeline.js",
-    "build:wasm": "npm run build:wasm:binary && npm run build:remote-config:binary && npm run inline:wasm && npm run inline:remote-config",
+    "build:wasm": "npm run build:wasm:binary && npm run build:remote-config:binary && npm run inline:wasm && npm run inline:remote-config && npm run build:api-security",
     "build:wasm:binary": "node ../../scripts/build-wasm.js ../../crates/libdatadog-wasm wasm/dist",
     "build:remote-config:binary": "node ../../scripts/build-wasm.js ../../crates/remote_config wasm/dist/remote-config",
     "size:profile": "npm run size:profile:wasm && npm run size:profile:remote-config",
@@ -66,7 +74,10 @@
     "build": "npm run build:wasm",
     "test": "node scripts/run-tests.js && npm run test:types",
     "test:package": "node --test test/package-contents.test.js",
-    "test:types": "tsc --noEmit --strict --target ES2022 --module Node16 --moduleResolution Node16 test/types.test.ts"
+    "test:types": "tsc --noEmit --strict --target ES2022 --module Node16 --moduleResolution Node16 test/types.test.ts",
+    "build:api-security": "npm run build:api-security:binary && npm run inline:api-security",
+    "build:api-security:binary": "node ../../scripts/build-wasm.js ../../crates/api_security wasm/dist/api-security",
+    "inline:api-security": "node scripts/inline-wasm.js api_security wasm/dist/api-security"
   },
   "dependencies": {
     "@datadog/libdatadog-wasm": "0.1.0-pre"

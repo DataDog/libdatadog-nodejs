@@ -47,6 +47,10 @@ test('published packages contain only the intended artifacts', () => {
   assert(names.includes('remote-config.js'))
   assert.strictEqual(names.includes('remote-config.mjs'), false)
   assert(names.includes('remote-config.d.ts'))
+  assert(names.includes('api-security.js'))
+  assert(names.includes('api-security.d.ts'))
+  assert(wasmNames.includes('dist/api-security/api_security.js'))
+  assert(wasmNames.includes('dist/api-security/api_security.d.ts'))
   assert.strictEqual(libdatadogWasm.name, '@datadog/libdatadog-wasm')
   assert.strictEqual(
     metapackageJson.dependencies['@datadog/libdatadog-wasm'],
@@ -103,6 +107,13 @@ test('installed package uses its WASM dependency', () => {
 
     assert.strictEqual(libdatadog.RemoteConfigFetcher, undefined)
     assert.strictEqual(explicitWasm.RemoteConfigFetcher, undefined)
+    const apiArtifact = requireInstalled.resolve('@datadog/libdatadog-wasm/api-security')
+    assert.strictEqual(require.cache[apiArtifact], undefined)
+    assert.strictEqual(libdatadog.extractSchemaJson, undefined)
+    const apiSecurity = requireInstalled('@datadog/libdatadog/api-security')
+    assert.strictEqual(apiSecurity.extractSchemaJson('{"id":42}'), '[{"id":[4]}]')
+    assert.strictEqual(apiSecurity.extractSchemaSerialized({ id: 42 }), '[{"id":[16]}]')
+    assert.throws(() => apiSecurity.extractSchemaJson('{'), /^Error: invalid JSON input:/)
     const remoteConfig = requireInstalled('@datadog/libdatadog/remote-config')
     assert.strictEqual(typeof remoteConfig.RemoteConfigFetcher, 'function')
     assert.strictEqual(remoteConfig.RemoteConfigFetcher, directRemoteConfig.RemoteConfigFetcher)
@@ -145,6 +156,10 @@ function assertEsmImports (installRoot, environment) {
       RemoteConfigFetcher as DirectRemoteConfigFetcher,
       setStorage as setDirectStorage,
     } from '@datadog/libdatadog-wasm/remote-config'
+
+    const { extractSchemaJson, extractSchemaSerialized } = await import('@datadog/libdatadog/api-security')
+    assert.strictEqual(extractSchemaJson('{"id":42}'), '[{"id":[4]}]')
+    assert.strictEqual(extractSchemaSerialized({ id: 42 }), '[{"id":[16]}]')
 
     assert.strictEqual(libdatadog.RemoteConfigFetcher, undefined)
     assert.strictEqual(wasm.RemoteConfigFetcher, undefined)

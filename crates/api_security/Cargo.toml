@@ -1,0 +1,48 @@
+# Copyright 2026-Present Datadog, Inc. https://www.datadoghq.com/
+# SPDX-License-Identifier: Apache-2.0
+
+[package]
+name = "api-security"
+version = "0.1.0"
+edition = "2021"
+description = "WASM binding for libdatadog's structural API Security schemas"
+license = "Apache-2.0"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+serde_json = "1"
+
+# Local PoC: pin the approved commit, not the mutable neighboring working tree.
+# Use the GitHub source URL once this revision is available remotely.
+[dependencies.libdd-api-security]
+git = "file:///Users/ilyas.shabi/Desktop/Repositories/libdatadog"
+rev = "f1478bbb9436d5a67cb0bf59980a0bcd93d118f5"
+default-features = false
+
+[package.metadata.wasm-pack.profile.release]
+# Keep emitted instructions compatible with the package's Node.js 18 floor.
+wasm-opt = [
+  "-O",
+  "--enable-mutable-globals",
+  "--enable-nontrapping-float-to-int",
+  "--enable-bulk-memory",
+  "--enable-sign-ext",
+  "--enable-reference-types",
+  "--enable-multivalue",
+]
+
+[package.metadata.wasm-pack.profile.profiling]
+wasm-opt = [
+  "-O",
+  "--enable-mutable-globals",
+  "--enable-nontrapping-float-to-int",
+  "--enable-bulk-memory",
+  "--enable-sign-ext",
+  "--enable-reference-types",
+  "--enable-multivalue",
+  "-g",
+]

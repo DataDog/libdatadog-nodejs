@@ -39,6 +39,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
+name = "api-security"
+version = "0.1.0"
+dependencies = [
+ "libdd-api-security",
+ "serde_json",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "arc-swap"
 version = "1.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1080,6 +1089,16 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "zrip",
+]
+
+[[package]]
+name = "libdd-api-security"
+version = "0.1.0"
+source = "git+file:///Users/ilyas.shabi/Desktop/Repositories/libdatadog?rev=f1478bbb9436d5a67cb0bf59980a0bcd93d118f5#f1478bbb9436d5a67cb0bf59980a0bcd93d118f5"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
