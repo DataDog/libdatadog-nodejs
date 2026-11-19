@@ -18,8 +18,6 @@ http = "1"
 # The agentless v0.4 path does not compile or evaluate user-provided patterns.
 # Use the smaller regex engine so the full engine and its Unicode tables are
 # removed by the WASM linker.
-# Keep this aligned with the pure-Rust WASM encoder used by libdatadog.
-zrip = { version = "=0.6.0", default-features = false, features = ["alloc"] }
 
 [dependencies.libdd-ddsketch]
 git = "https://github.com/DataDog/libdatadog.git"

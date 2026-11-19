@@ -16,6 +16,7 @@ const entries = new Map([
   ['package', path.join(packageRoot, 'index.js')],
   ['WASM', path.join(packageRoot, 'wasm.js')],
   ['remote config', path.join(packageRoot, 'remote-config.js')],
+  ['Zstandard', path.join(packageRoot, 'zstd.js')],
 ])
 
 for (const [name, entry] of entries) {

@@ -28,6 +28,12 @@
       "require": "./dist/remote-config/remote_config.js",
       "default": "./dist/remote-config/remote_config.js"
     },
+    "./zstd": {
+      "types": "./dist/zstd/libdatadog_wasm_zstd.d.ts",
+      "import": "./dist/zstd/libdatadog_wasm_zstd.js",
+      "require": "./dist/zstd/libdatadog_wasm_zstd.js",
+      "default": "./dist/zstd/libdatadog_wasm_zstd.js"
+    },
     "./*": "./*"
   },
   "files": [
