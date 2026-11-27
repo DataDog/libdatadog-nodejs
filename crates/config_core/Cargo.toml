@@ -1,0 +1,13 @@
+[package]
+name = "config-core"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+libdd-config-core = { git = "https://github.com/DataDog/libdatadog.git", rev = "b3287f9b9836f960264e03c28345578d5e0c7bc9" }
+napi = "3.15.0"
+napi-derive = { version = "3", default-features = false }

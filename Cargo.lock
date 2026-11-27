@@ -228,6 +228,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "config-core"
+version = "0.1.0"
+dependencies = [
+ "libdd-config-core",
+ "napi",
+ "napi-derive",
+]
+
+[[package]]
 name = "console_error_panic_hook"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -926,6 +935,8 @@ checksum = "d466e9454f08e4a911e14806c24e16fba1b4c121d1ea474396f396069cf949d9"
 dependencies = [
  "equivalent",
  "hashbrown",
+ "serde",
+ "serde_core",
 ]
 
 [[package]]
@@ -1199,6 +1210,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "libdd-config-core"
+version = "0.1.0"
+source = "git+https://github.com/DataDog/libdatadog.git?rev=b3287f9b9836f960264e03c28345578d5e0c7bc9#b3287f9b9836f960264e03c28345578d5e0c7bc9"
+dependencies = [
+ "indexmap",
+ "libdd-regex",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "libdd-crashtracker"
 version = "3.0.0"
 source = "git+https://github.com/DataDog/libdatadog.git?tag=v47.0.0#ef6371243c020319e74e8531035f0a5a2fcb8858"
@@ -1372,6 +1395,14 @@ dependencies = [
  "cc",
  "libc",
  "paste",
+]
+
+[[package]]
+name = "libdd-regex"
+version = "0.1.0"
+source = "git+https://github.com/DataDog/libdatadog.git?rev=b3287f9b9836f960264e03c28345578d5e0c7bc9#b3287f9b9836f960264e03c28345578d5e0c7bc9"
+dependencies = [
+ "regex",
 ]
 
 [[package]]
