@@ -34,3 +34,10 @@ process discovery, the legacy pipeline, and library configuration.
 Platform-native extensions are combined under platform-specific directories
 in `prebuilds`. Standalone WASM modules are stored under capability-specific
 directories in the same location.
+
+The native `config_core` capability exposes `JsConfigResolver`.
+Pass a UTF-8 JSON request to `request` as a Node.js `Buffer`. The reply
+is a `Buffer`. Initialize the resolver with a path to the installed
+manifest, or supply manifest JSON for a virtual asset.
+With `report_sources` enabled, a source event includes the `config_id`
+supplied with that input when present.

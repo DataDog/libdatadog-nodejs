@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 default-members = [
+  "crates/config_core",
   "crates/crashtracker",
   "crates/process_discovery",
 ]
