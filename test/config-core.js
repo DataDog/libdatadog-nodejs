@@ -23,9 +23,10 @@ try {
     operation: 'initialize',
     manifest: { kind: 'path', value: manifest },
     inputs: {
+      report_sources: true,
       layers: [{
-        origin: 'env_var',
-        entries: [{ name: 'DD_MODE', value: 'debug' }],
+        origin: 'fleet_stable_config',
+        entries: [{ name: 'DD_MODE', value: 'debug', config_id: 'fleet-1' }],
       }],
     },
   }
@@ -38,10 +39,13 @@ try {
     property: 'DD_MODE',
     resolved: {
       value: { kind: 'string', value: 'debug' },
-      origin: 'env_var',
+      origin: 'fleet_stable_config',
       input_name: 'DD_MODE',
+      config_id: 'fleet-1',
     },
   }])
+  const fleet = snapshot.sources.find(entry => entry.origin === 'fleet_stable_config')
+  assert.strictEqual(fleet.config_id, 'fleet-1')
 
   const resolve = Buffer.from(JSON.stringify({ version: 1, operation: 'resolve', inputs: {} }))
   const defaults = JSON.parse(resolver.request(resolve))
