@@ -1212,10 +1212,11 @@ dependencies = [
 [[package]]
 name = "libdd-config-core"
 version = "0.1.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=b3287f9b9836f960264e03c28345578d5e0c7bc9#b3287f9b9836f960264e03c28345578d5e0c7bc9"
+source = "git+https://github.com/DataDog/libdatadog.git?rev=ecfa31c6b5cdfba9e9b20f0d382cd33758828002#ecfa31c6b5cdfba9e9b20f0d382cd33758828002"
 dependencies = [
  "indexmap",
  "libdd-regex",
+ "ryu",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
@@ -1400,7 +1401,7 @@ dependencies = [
 [[package]]
 name = "libdd-regex"
 version = "0.1.0"
-source = "git+https://github.com/DataDog/libdatadog.git?rev=b3287f9b9836f960264e03c28345578d5e0c7bc9#b3287f9b9836f960264e03c28345578d5e0c7bc9"
+source = "git+https://github.com/DataDog/libdatadog.git?rev=ecfa31c6b5cdfba9e9b20f0d382cd33758828002#ecfa31c6b5cdfba9e9b20f0d382cd33758828002"
 dependencies = [
  "regex",
 ]

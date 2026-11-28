@@ -50,7 +50,14 @@ try {
     value: { kind: 'string', value: 'info' },
     origin: 'default',
   })
-  assert.strictEqual(JSON.parse(new JsConfigResolver().request(resolve)).status, 'error')
+  const oneShot = new JsConfigResolver()
+  const oneShotRequest = Buffer.from(JSON.stringify({
+    ...request,
+    operation: 'resolve_once',
+    inputs: { ...request.inputs, skip_defaults: true },
+  }))
+  assert.deepStrictEqual(JSON.parse(oneShot.request(oneShotRequest)).settings, snapshot.settings)
+  assert.strictEqual(JSON.parse(oneShot.request(resolve)).status, 'error')
 } finally {
   rmSync(directory, { recursive: true, force: true })
 }
